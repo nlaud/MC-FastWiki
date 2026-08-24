@@ -1,0 +1,60 @@
+[project]
+name = "mc-fastwiki-pipeline"
+version = "0.1.0"
+description = "Build-time data pipeline for MC-FastWiki. It writes JSON into /data/dist."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.11",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18",
+    "ruff>=0.14",
+]
+
+# The pipeline is imported from the repository root, never installed, and it
+# never goes to a package index, so uv treats it as a virtual project. The CLI
+# entry point that `python -m pipeline` needs arrives with the first stage.
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# Ruff formats Python inside Markdown fences. Left on, formatting CLAUDE.md
+# alone rewrites its code blocks and breaks the byte-for-byte mirror it keeps
+# with AGENTS.md. Documentation is not ruff's to reformat.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import order
+    "N",    # pep8 naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "PTH",  # use pathlib
+    "RUF",  # ruff rules
+]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["pipeline", "tests"]
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+# The pydantic plugin is permissive by default: it types every synthesized
+# `__init__` argument as `Any` and accepts unknown keywords, so a wrong field
+# type or a misspelled field name passes mypy and then vanishes at runtime,
+# because pydantic drops unknown keys silently. Strict mode is only strict for
+# models with these on.
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true

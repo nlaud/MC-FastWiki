@@ -11,7 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 0 — Foundations
 
-- [ ] Python 3.12+ pipeline package with `uv` or `pip-tools`; `ruff` + `mypy` strict
 - [ ] Web app scaffold: **vanilla TypeScript + Vite, no UI framework** (see Decision 5)
 - [ ] TypeScript strict config, ESLint, Prettier, Vitest; `pytest` for the pipeline
 - [ ] `/pipeline/schema` — JSON Schema as the contract; generate TS types from it in `pnpm build`
@@ -360,6 +359,12 @@ New collections the added data makes nearly free:
     its chests, trade to item, enchantment to what accepts it. Clicking is faster than typing a new
     query, so a name rendered as plain text is a dead end where a jump should be. Enforced with a
     lint pass rather than left to renderer discipline.
+
+14. **`uv`, not `pip-tools`.** Phase 0 left the choice open. `uv` resolves and installs in one
+    tool, writes a `uv.lock` that pins every transitive version so a build is reproducible, and
+    supports `package = false` for a project that is run from the repository root and never
+    published to an index. `pip-tools` would need a separate virtualenv step and gives no
+    equivalent lock across dependency groups.
 
 ## Still open
 
