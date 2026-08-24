@@ -1,0 +1,38 @@
+/* Base stylesheet. The Minecraft theme arrives in Phase 8. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-family: system-ui, sans-serif;
+}
+
+#app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.placeholder {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Sprites are pixel art. Never smooth them. */
+img,
+canvas,
+.sprite {
+  image-rendering: pixelated;
+}

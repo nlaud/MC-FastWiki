@@ -1,0 +1,22 @@
+{
+  "name": "mc-fastwiki",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Fast, keyboard-driven Minecraft Java Edition reference. Static site, no UI framework.",
+  "license": "CC-BY-NC-SA-3.0",
+  "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -11,7 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 0 — Foundations
 
-- [ ] Web app scaffold: **vanilla TypeScript + Vite, no UI framework** (see Decision 5)
 - [ ] TypeScript strict config, ESLint, Prettier, Vitest; `pytest` for the pipeline
 - [ ] `/pipeline/schema` — JSON Schema as the contract; generate TS types from it in `pnpm build`
 - [ ] `.gitignore` — ignore `/data/.cache`, **commit** `/data/dist`
