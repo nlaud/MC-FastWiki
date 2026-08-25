@@ -10,3 +10,29 @@
 # Binary files are unaffected: `text=auto` detects them and Git skips the
 # conversion, so the sprite atlas and the fonts stay byte-exact.
 * text=auto eol=lf
+
+# Collapse the pipeline output in a GitHub review.
+#
+# `/data/dist` holds generated files. Every Minecraft release rewrites them,
+# and no person writes a line of them. GitHub hides a file behind a "Load diff"
+# control only when `.gitattributes` marks that file as generated. Without the
+# mark, thousands of machine-written lines bury the hand-written change in the
+# same pull request. The mark also drops these files from the language
+# statistics of the repository, so generated JSON does not decide the reported
+# language.
+#
+# Do not use `-diff` here. `-diff` makes Git read the file as binary, so
+# `git diff` and `git log -p` print "Binary files differ" and show no content
+# at all. The rule below changes no local Git command.
+#
+# The pattern is anchored to the directory of this file, the way it is in
+# `.gitignore`, and it is the embedded slashes that anchor it, not the leading
+# one: `data/dist/**` would match the same paths. Keep the leading slash for
+# the reader, but do not rely on it to hold the pattern down. What does widen
+# the match is a prefix -- `**/dist/**` or `*dist/**` would take `web/dist` and
+# every other `dist` directory with it. `/data/curated`, `web/dist`, and
+# `web/types` keep the attributes they have now.
+#
+# The rule sets neither `text` nor `eol`, so the line above still decides the
+# line endings of these files.
+/data/dist/** linguist-generated=true

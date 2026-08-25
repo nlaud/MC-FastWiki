@@ -203,3 +203,191 @@ def test_the_ignore_gate_still_answers_for_a_tracked_path(phase_one_repo: Path) 
     gitignore.write_text(gitignore.read_text(encoding="utf-8") + "dist/\n", encoding="utf-8")
 
     assert _ignored_paths(candidates, phase_one_repo) == set(candidates)
+
+
+# `/data/dist` holds the whole of the pipeline output, so every path below must
+# read as generated. The three entries come from `TRACKED_DATA_PATHS` above.
+GENERATED_PATHS = tuple(path for path in TRACKED_DATA_PATHS if path.startswith("data/dist/"))
+
+# These four must not read as generated. `data/curated` holds the hand-written
+# overrides, and a person reviews every line of them.
+#
+# `web/dist` catches a pattern widened at the front. Note which mutation that
+# is: dropping the leading slash is not one. A pattern that holds a slash
+# anywhere but its last character is already anchored to the directory of the
+# `.gitattributes` file, so `data/dist/**` matches exactly what `/data/dist/**`
+# matches, and no guard can tell the two apart. The mutation that does reach
+# `web/dist` is a widened prefix -- `**/dist/**` or `*dist/**` -- which marks
+# every `dist` directory at any depth.
+#
+# The two mirror documents catch a pattern that spread to the whole repository,
+# which would collapse the one diff that always needs a reader.
+PLAIN_PATHS = (
+    "data/curated/mob-overrides.json",
+    "web/dist/assets/app.js",
+    "CLAUDE.md",
+    "AGENTS.md",
+)
+
+# `git check-attr` prints the value of the attribute, not the word "set". A
+# rule written as `linguist-generated` gives `set`, and one written as
+# `linguist-generated=true` gives `true`. Linguist reads both as enabled, so
+# the gate below must accept both. Anything else means the mark is absent.
+ENABLED_VALUES = frozenset({"set", "true"})
+
+# `* text=auto eol=lf` at the top of `.gitattributes` decides these, and the
+# generated-file rule under it must leave them alone.
+LINE_ENDING_ATTRIBUTES = (("text", "auto"), ("eol", "lf"))
+
+
+def _attribute_values(
+    candidates: tuple[str, ...], attribute: str, repo_root: Path = REPO_ROOT
+) -> dict[str, str]:
+    """Return the value Git resolves for `attribute` on each candidate path.
+
+    `git check-attr` reads path names alone. It answers for a path that has no
+    file behind it, which is what this module needs, because `/data` does not
+    exist yet. `-z` makes the tool read NUL-separated input and write fields
+    that are each NUL-*terminated*, three per path: path, attribute, value.
+
+    Every field is kept, including an empty one. A rule written as
+    `linguist-generated=` resolves to the empty string, and discarding that
+    field would shift every later record by one and pair a path with another
+    path. A length check cannot see that corruption, because the shortened
+    stream is still a whole number of records.
+
+    The path column is compared against the candidates rather than trusted. A
+    gate that asserts "none of these is marked" reads the same green whether
+    Git answered "no" or did not answer at all.
+    """
+    result = subprocess.run(
+        ["git", "check-attr", "--stdin", "-z", attribute],
+        capture_output=True,
+        check=True,
+        cwd=repo_root,
+        input="\0".join(candidates),
+        text=True,
+    )
+    # Every field carries a terminator, so the split leaves one trailing empty
+    # field and nothing else to drop.
+    fields = result.stdout.split("\0")
+    if fields and fields[-1] == "":
+        fields = fields[:-1]
+    if len(fields) != 3 * len(candidates):
+        pytest.fail(
+            f"git check-attr wrote {len(fields)} fields for {len(candidates)} paths, "
+            f"so the output is not the three-field records this helper reads"
+        )
+    if fields[0::3] != list(candidates):
+        pytest.fail(f"git check-attr answered for {fields[0::3]}, not for {list(candidates)}")
+    return dict(zip(fields[0::3], fields[2::3], strict=True))
+
+
+def _generated_paths(candidates: tuple[str, ...], repo_root: Path = REPO_ROOT) -> set[str]:
+    """Return the candidates that `.gitattributes` marks as generated."""
+    values = _attribute_values(candidates, "linguist-generated", repo_root)
+    return {path for path, value in values.items() if value in ENABLED_VALUES}
+
+
+@pytest.fixture
+def empty_value_repo(tmp_path: Path) -> Path:
+    """A throwaway repository whose rule resolves to the empty string.
+
+    `linguist-generated=` is the one rule shape that makes `git check-attr`
+    write an empty value field, which is what the record parsing above has to
+    survive. No commit is needed: `check-attr` reads the working-tree
+    `.gitattributes` and answers for paths that have no file behind them.
+
+    `core.attributesFile` is pointed at nothing, the way `phase_one_repo`
+    points `core.excludesFile` at nothing, so no rule from the developer
+    machine reaches this fixture.
+    """
+    if shutil.which("git") is None:
+        pytest.skip("git is not on PATH, so the attributes cannot be read")
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], capture_output=True, check=True, cwd=tmp_path, text=True)
+
+    git("init", "-q", ".")
+    git("config", "core.attributesFile", str(tmp_path / "no-such-attributes"))
+
+    attributes = tmp_path / ".gitattributes"
+    attributes.write_text("/data/dist/** linguist-generated=\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_the_attribute_gate_keeps_an_empty_value_field(empty_value_repo: Path) -> None:
+    """An empty attribute value must not shift the records that follow it.
+
+    This pins the helper rather than the rules. `git check-attr -z` terminates
+    every field, so a rule written as `linguist-generated=` writes an empty
+    value field, and discarding empty fields shifts each later record by one
+    and pairs a path with another path. A count check cannot catch that: three
+    paths lose three fields and the stream stays a whole number of records, so
+    the helper returns a confident wrong answer instead of failing.
+
+    The gate above then reports the mark as absent for a reason that has
+    nothing to do with the mark, and a reader chasing that message edits a
+    pattern that was never wrong.
+    """
+    candidates = GENERATED_PATHS
+    assert len(candidates) == 3, "the shift needs more than one record to show"
+
+    values = _attribute_values(candidates, "linguist-generated", empty_value_repo)
+
+    # Every path keeps its own value, and that value is the empty string --
+    # not the path that followed it.
+    assert values == dict.fromkeys(candidates, "")
+    # An empty value is not the mark. Linguist reads `set` and `true`.
+    assert _generated_paths(candidates, empty_value_repo) == set()
+
+
+def test_pipeline_output_is_marked_as_generated() -> None:
+    """GitHub must collapse each file under `/data/dist` in a review.
+
+    Every Minecraft release rewrites that tree, and no person writes a line of
+    it. GitHub hides a file behind a "Load diff" control only when
+    `.gitattributes` marks the file as generated. Without the mark, a release
+    pull request buries the hand-written change under thousands of
+    machine-written lines, and the reviewer reads neither.
+
+    `.gitattributes` fails in silence. A wrong pattern reports no error and
+    prints no warning, so the only way to see the failure is to read the
+    attribute back through Git. This test does that.
+    """
+    if shutil.which("git") is None:
+        pytest.skip("git is not on PATH, so the attributes cannot be read")
+
+    # `GENERATED_PATHS` is derived, so a rewrite of `TRACKED_DATA_PATHS` could
+    # leave it empty, and `_generated_paths(()) == set(())` is `set() ==
+    # set()`: green with nothing checked. Pin the count so that rewrite fails
+    # here instead of quietly retiring the gate.
+    assert len(GENERATED_PATHS) == 3, "the /data/dist paths of TRACKED_DATA_PATHS went missing"
+
+    assert _generated_paths(GENERATED_PATHS) == set(GENERATED_PATHS)
+    assert _generated_paths(PLAIN_PATHS) == set()
+
+
+def test_the_generated_mark_leaves_the_line_endings_alone() -> None:
+    """Marking `/data/dist` generated must not disturb `text=auto eol=lf`.
+
+    Nothing else can check this yet. `test_tracked_files_check_out_with_lf`
+    reads `git ls-files --eol`, which reports only files that exist and are
+    tracked, and `/data/dist` arrives with Phase 1. So a rule written today
+    that unsets `text` would go unnoticed until the pipeline commits several
+    thousand JSON shards, and every one of them would then check out with CRLF
+    on Windows.
+
+    The reachable mistake is `binary`, or a hand-written `-text`, added by
+    someone trying to make the collapse stronger. `binary` is a macro for
+    `-diff -merge -text`: it resolves `text` to `unset` and leaves `eol`
+    unspecified, and `-diff` is the thing the file already warns against,
+    because it makes `git diff` and `git log -p` print "Binary files differ"
+    instead of the content.
+    """
+    if shutil.which("git") is None:
+        pytest.skip("git is not on PATH, so the attributes cannot be read")
+
+    for attribute, expected in LINE_ENDING_ATTRIBUTES:
+        values = _attribute_values(GENERATED_PATHS, attribute)
+        assert values == dict.fromkeys(GENERATED_PATHS, expected)
