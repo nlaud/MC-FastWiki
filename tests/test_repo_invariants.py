@@ -7,8 +7,11 @@ pytest is the only gate that reads the whole tree, so they live here next to
 the version check.
 """
 
+import json
+import re
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -391,3 +394,136 @@ def test_the_generated_mark_leaves_the_line_endings_alone() -> None:
     for attribute, expected in LINE_ENDING_ATTRIBUTES:
         values = _attribute_values(GENERATED_PATHS, attribute)
         assert values == dict.fromkeys(GENERATED_PATHS, expected)
+
+
+# README.md repeats three versions that the manifests own. A repeated fact
+# rots. Raise `requires-python` and the README still names the old floor, and
+# the next contributor installs a toolchain the pipeline rejects. Neither
+# prettier nor ruff reads Markdown, and no manifest reads prose, so nothing
+# else in the repository compares the two.
+README_MD = REPO_ROOT / "README.md"
+PYPROJECT_TOML = REPO_ROOT / "pyproject.toml"
+PACKAGE_JSON = REPO_ROOT / "package.json"
+
+REQUIREMENTS_HEADING = "## Requirements"
+
+# One row of the Requirements list: `- **Python 3.12 or later** — the pipeline.`
+# The bold label is the whole claim, so the gate compares labels and ignores
+# the prose after the dash. Matching the version alone would pass on `3.12`
+# found inside `3.12.1`, inside a path, or inside another section.
+REQUIREMENT_LINE = re.compile(r"^- \*\*(?P<label>[^*]+)\*\* — ")
+
+# A bound this module cannot read is a bound it must not translate. `>=3.12`
+# means "or later"; `>=3.12,<4` does not, and `~=3.12` does not either.
+VERSION = re.compile(r"\d+(?:\.\d+)*")
+
+
+def _floor_label(tool: str, constraint: str) -> str:
+    """Return the README label that a `>=` bound requires."""
+    if not constraint.startswith(">="):
+        pytest.fail(f"{tool} constraint {constraint!r} is not a `>=` bound, so `or later` is wrong")
+    version = constraint[2:].strip()
+    if VERSION.fullmatch(version) is None:
+        pytest.fail(f"{tool} constraint {constraint!r} holds more than one bound")
+    return f"{tool} {version} or later"
+
+
+def _pinned_label(package_manager: str) -> str:
+    """Return the README label that the `packageManager` pin requires.
+
+    The pin carries an optional integrity suffix. `corepack use pnpm@11.23.0`
+    does not write `pnpm@11.23.0`; it writes `pnpm@11.23.0+sha512.<hash>`, and
+    that is the normal shape of the field, not a corruption of it. The suffix
+    pins the download, not the version a contributor installs, so it belongs
+    nowhere near the README label and must not fail this gate: a bump made
+    with corepack leaves a correct README and a hash the prose never mentions.
+    """
+    tool, _, pin = package_manager.partition("@")
+    version, _, _ = pin.partition("+")
+    if VERSION.fullmatch(version) is None:
+        pytest.fail(f"packageManager {package_manager!r} names no plain version")
+    return f"{tool} {version}"
+
+
+def _readme_section(heading: str) -> list[str]:
+    """Return the lines under a README `##` heading, up to the next one.
+
+    A heading that is absent fails here rather than returning an empty list.
+    Each gate below reads one section and compares what it holds against the
+    repository, so an empty list compares nothing against nothing and reports
+    green for a README that dropped the whole section.
+    """
+    lines = README_MD.read_text(encoding="utf-8").split("\n")
+    if heading not in lines:
+        pytest.fail(f"README.md has no `{heading}` heading, so the section it gates is gone")
+
+    body: list[str] = []
+    for line in lines[lines.index(heading) + 1 :]:
+        if line.startswith("## "):
+            break
+        body.append(line)
+    return body
+
+
+def _readme_requirement_labels() -> list[str]:
+    """Return the bold label of each row of the README Requirements list."""
+    return [
+        match.group("label")
+        for line in _readme_section(REQUIREMENTS_HEADING)
+        if (match := REQUIREMENT_LINE.match(line)) is not None
+    ]
+
+
+def test_readme_states_the_toolchain_versions_that_the_manifests_set() -> None:
+    """The README must name the Python, Node, and pnpm versions of the manifests.
+
+    The README is the first file a contributor reads, and its Requirements
+    list is where it answers which Python and which Node. Those two answers
+    live in `pyproject.toml` and `package.json`, so the README states them
+    twice over. This test is what keeps the second copy true.
+
+    Order matters here as well as content. The list reads as the install order
+    of the two halves, and a row that goes missing has to fail rather than
+    leave a shorter list that still matches on the rows it kept.
+    """
+    pyproject = tomllib.loads(PYPROJECT_TOML.read_text(encoding="utf-8"))
+    package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+
+    expected = [
+        _floor_label("Python", pyproject["project"]["requires-python"]),
+        _floor_label("Node", package["engines"]["node"]),
+        _pinned_label(package["packageManager"]),
+    ]
+    assert _readme_requirement_labels() == expected
+
+
+
+WHERE_TO_READ_HEADING = "## Where to read next"
+
+# Each pointer row of that list names its files in backticks. The rows carry
+# more than one name, so the gate reads every token of the row rather than the
+# first one.
+POINTER_ROW = re.compile(r"^- ")
+BACKTICKED = re.compile(r"`(?P<name>[^`]+)`")
+
+
+def test_the_readme_points_at_files_that_the_repository_holds() -> None:
+    """Every file the README sends a reader to must exist.
+
+    The README names the repository map of CLAUDE.md, which lists directories
+    that no phase has written yet. `/docs` is the first of them. A pointer to
+    a directory that a fresh clone does not hold sends the reader looking for
+    a file that is not there, and the README says outright that a gate keeps
+    that from happening.
+
+    The prose paragraphs are out of scope. They discuss a path that does not
+    exist on purpose, and this gate reads the list rows alone.
+    """
+    rows = [line for line in _readme_section(WHERE_TO_READ_HEADING) if POINTER_ROW.match(line)]
+    assert rows, "the `Where to read next` list is empty, so the README points nowhere"
+
+    named = [match.group("name") for row in rows for match in BACKTICKED.finditer(row)]
+    assert named, "no row of the list names a file in backticks"
+
+    missing = [name for name in named if not (REPO_ROOT / name.lstrip("/")).exists()]
+    assert missing == []

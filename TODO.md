@@ -9,11 +9,6 @@ reasoning survives even after the choice is made.
 
 ---
 
-## Phase 0 — Foundations
-
-- [ ] README states Python and Node versions. **No Java requirement** — say so explicitly, since
-      every other Minecraft data project needs it and contributors will assume this one does too.
-
 ## Phase 1 — Vanilla data (Tier A, from mcmeta)
 
 No jars and no JVM — `misode/mcmeta` publishes the data generator output as JSON. See Decision 6.
