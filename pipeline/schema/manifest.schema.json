@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mc-fastwiki.local/schema/manifest.schema.json",
+  "title": "Manifest",
+  "description": "data/manifest.json. It names the build, and `python -m pipeline check` reads it to decide whether a rebuild is needed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "minecraftVersion", "mcmetaRef", "pipelineVersion", "builtAt"],
+  "properties": {
+    "schemaVersion": {
+      "description": "The version of this contract. The web app refuses data that carries another number. Raise it whenever a schema change breaks an older reader.",
+      "type": "integer",
+      "const": 1
+    },
+    "minecraftVersion": {
+      "description": "The Minecraft Java Edition release that this build describes. The value comes from the Mojang version manifest.",
+      "type": "string",
+      "minLength": 1,
+      "examples": ["26.2"]
+    },
+    "mcmetaRef": {
+      "description": "The misode/mcmeta tag that the build read. A tag keeps the build reproducible, and a bare branch head does not.",
+      "type": "string",
+      "minLength": 1,
+      "examples": ["26.2-data"]
+    },
+    "pipelineVersion": {
+      "description": "The version of the pipeline package that wrote this output.",
+      "type": "string",
+      "minLength": 1,
+      "examples": ["0.1.0"]
+    },
+    "builtAt": {
+      "description": "The time of the build, in UTC.",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

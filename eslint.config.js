@@ -20,6 +20,11 @@ export default tseslint.config(
       // Build output of the web app, and generated data of the pipeline. Both
       // are written by a tool, and neither is edited by hand.
       "web/dist/**",
+      // TypeScript types that `pnpm schema:types` writes from the JSON Schema
+      // files. A rule here would report the generator, not an author, and the
+      // fix would have to happen in the tool. `tsc` still checks these files,
+      // because tsconfig.json includes them.
+      "web/types/**",
       "data/dist/**",
       "data/.cache/**",
       // Python side: the virtual environment and every tool cache.
@@ -63,9 +68,10 @@ export default tseslint.config(
     },
   },
   {
-    // Build configuration and the tests that cover it. Node runs these, not
-    // the browser. `eslint.config.js` already matches `*.config.js`.
-    files: ["*.config.ts", "*.config.js", "*.test.ts"],
+    // Build configuration, the build scripts, and the tests that cover them.
+    // Node runs these, not the browser. `eslint.config.js` already matches
+    // `*.config.js`.
+    files: ["*.config.ts", "*.config.js", "*.test.ts", "scripts/**/*.js"],
     languageOptions: {
       globals: globals.node,
     },

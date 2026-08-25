@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mc-fastwiki.local/schema/entity.schema.json",
+  "title": "Entity",
+  "description": "One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "aliases", "wikiUrl", "sourceTiers", "sections"],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/entityId"
+    },
+    "kind": {
+      "$ref": "#/$defs/entityKind"
+    },
+    "name": {
+      "description": "The display name. Search shows this text, and no key uses it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "aliases": {
+      "description": "Every extra search term of this entity. The list holds identifier segments, community shorthand, and curated extras. Search matches these as well as the name.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "icon": {
+      "description": "The sprite key in the atlas coordinate map. A missing icon is a broken join between the wiki and the registry, so the build reports it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "blurb": {
+      "description": "The intro text of the wiki page, as plain text.",
+      "type": "string"
+    },
+    "wikiUrl": {
+      "description": "The source wiki page. The license is CC BY-NC-SA 3.0, so the user interface shows this link as a visible credit. Every entity carries one, because an entity that shows wiki text without a link to it breaks the license. The host is fixed too: the project reads minecraft.wiki and never Fandom, so the site keeps one scraper and one attribution obligation.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://minecraft\\.wiki/"
+    },
+    "sourceTiers": {
+      "description": "The tier that produced each field of this entity. The key is the field name. Wrong data is traceable to its source through this map.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/sourceTier"
+      }
+    },
+    "sections": {
+      "description": "The render blocks of this entity, in render order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    }
+  },
+  "$defs": {
+    "entityId": {
+      "description": "A namespaced identifier. Vanilla content uses the `minecraft` namespace. A collection page uses the `collection` namespace. A display name is never a key.",
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+:[a-z0-9_./-]+$",
+      "examples": ["minecraft:creeper", "collection:compostable"]
+    },
+    "entityKind": {
+      "description": "The discriminator of the Entity model. It selects the renderer.",
+      "type": "string",
+      "enum": [
+        "mob",
+        "item",
+        "block",
+        "effect",
+        "advancement",
+        "enchantment",
+        "structure",
+        "biome",
+        "collection"
+      ]
+    },
+    "sourceTier": {
+      "description": "The tier that produced one field. A is vanilla game data from mcmeta. B is the Minecraft Wiki. C is a curated override. A later tier wins.",
+      "type": "string",
+      "enum": ["A", "B", "C"]
+    },
+    "entityRef": {
+      "title": "EntityRef",
+      "description": "A cross-reference to another entity. A renderer never prints an entity name as plain text. It prints this object as a link that opens a new window.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/entityId"
+        },
+        "name": {
+          "description": "The display name of the target, at the time of the build.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "section": {
+      "description": "One render block. The `type` field selects the renderer. Phase 3 replaces the open payload of each member with real fields.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/statBlock"
+        },
+        {
+          "$ref": "#/$defs/spawnInfo"
+        },
+        {
+          "$ref": "#/$defs/dropTable"
+        },
+        {
+          "$ref": "#/$defs/recipeTree"
+        },
+        {
+          "$ref": "#/$defs/obtainList"
+        },
+        {
+          "$ref": "#/$defs/breedingInfo"
+        },
+        {
+          "$ref": "#/$defs/effectSources"
+        },
+        {
+          "$ref": "#/$defs/advancementInfo"
+        },
+        {
+          "$ref": "#/$defs/tradeTable"
+        },
+        {
+          "$ref": "#/$defs/chestLoot"
+        },
+        {
+          "$ref": "#/$defs/enchantInfo"
+        },
+        {
+          "$ref": "#/$defs/generationInfo"
+        },
+        {
+          "$ref": "#/$defs/linkList"
+        }
+      ]
+    },
+    "statBlock": {
+      "title": "StatBlock",
+      "description": "Named numbers of an entity. Health and damage of a mob are two examples. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "StatBlock"
+        }
+      }
+    },
+    "spawnInfo": {
+      "title": "SpawnInfo",
+      "description": "Where the entity spawns, and under which conditions. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "SpawnInfo"
+        }
+      }
+    },
+    "dropTable": {
+      "title": "DropTable",
+      "description": "What the entity drops, per looting level. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "DropTable"
+        }
+      }
+    },
+    "recipeTree": {
+      "title": "RecipeTree",
+      "description": "The obtain tree of an item. Brewing is a node of this tree. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "RecipeTree"
+        }
+      }
+    },
+    "obtainList": {
+      "title": "ObtainList",
+      "description": "Every acquisition path that the wiki Obtaining section lists. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "ObtainList"
+        }
+      }
+    },
+    "breedingInfo": {
+      "title": "BreedingInfo",
+      "description": "The items that breed a mob, and the result. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "BreedingInfo"
+        }
+      }
+    },
+    "effectSources": {
+      "title": "EffectSources",
+      "description": "Every source of a status effect. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "EffectSources"
+        }
+      }
+    },
+    "advancementInfo": {
+      "title": "AdvancementInfo",
+      "description": "How the player earns an advancement, and the parent chain. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "AdvancementInfo"
+        }
+      }
+    },
+    "tradeTable": {
+      "title": "TradeTable",
+      "description": "Villager trades, grouped by profession and level. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "TradeTable"
+        }
+      }
+    },
+    "chestLoot": {
+      "title": "ChestLoot",
+      "description": "The chest loot tables that hold the item. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "ChestLoot"
+        }
+      }
+    },
+    "enchantInfo": {
+      "title": "EnchantInfo",
+      "description": "Levels, applicable items, costs, and the exclusive set. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "EnchantInfo"
+        }
+      }
+    },
+    "generationInfo": {
+      "title": "GenerationInfo",
+      "description": "Where a block, a structure, or a biome generates. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "GenerationInfo"
+        }
+      }
+    },
+    "linkList": {
+      "title": "LinkList",
+      "description": "A plain list of links to other entities. The payload of this section arrives in Phase 3.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "LinkList"
+        }
+      }
+    }
+  }
+}

@@ -58,6 +58,8 @@ service on every page load. Pre-building is faster, more reliable, and a better 
   /shell           Search bar, suggestion list, window manager, grid layout
   /render          Per-entity-kind content renderers
   /theme           Minecraft-themed CSS, fonts, sprite handling
+  /types           TS types generated from /pipeline/schema. Never edit by hand
+/scripts           Node build scripts. JSON Schema to TypeScript types
 /docs              Design notes, data source reference
 ```
 
@@ -398,8 +400,9 @@ This is the most failure-prone renderer:
 ```
 pnpm dev              Web app dev server
 pnpm build            Build web app from committed data
-pnpm test             Web tests
-pnpm lint             ESLint over the web app and the build config
+pnpm test             Web tests. Fails first when /web/types is out of date
+pnpm schema:types     Rewrite /web/types from /pipeline/schema. `pnpm build` runs it too
+pnpm lint             ESLint over the web app, the build config, and the build scripts
 pnpm format           Prettier writes; `pnpm format:check` only reports
 
 python -m pipeline check      Compare latest Mojang release against data/dist/manifest.json

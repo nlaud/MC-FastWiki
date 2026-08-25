@@ -11,7 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 0 — Foundations
 
-- [ ] `/pipeline/schema` — JSON Schema as the contract; generate TS types from it in `pnpm build`
 - [ ] `.gitignore` — ignore `/data/.cache`, **commit** `/data/dist`
 - [ ] `.gitattributes` — mark `/data/dist/**` as generated so diffs collapse in review
 - [ ] README states Python and Node versions. **No Java requirement** — say so explicitly, since

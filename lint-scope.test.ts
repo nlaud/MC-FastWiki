@@ -22,9 +22,20 @@ const ignored = [
   "web/dist/assets/index-abc123.js",
   "data/dist/entities/shard.js",
   "data/.cache/mcmeta/probe.js",
+  // `pnpm schema:types` writes this file from the JSON Schema. A rule here
+  // would report the generator rather than an author.
+  "web/types/entity.ts",
 ];
 
-const linted = ["web/main.ts", "web/shell/mount.ts", "web/shell/mount.test.ts", "eslint.config.js"];
+const linted = [
+  "web/main.ts",
+  "web/shell/mount.ts",
+  "web/shell/mount.test.ts",
+  "eslint.config.js",
+  // Hand-written build tooling. It is JavaScript that Node runs, so the lint
+  // gate has to cover it even though it sits outside `web/`.
+  "scripts/generate-schema-types.js",
+];
 
 describe("lint scope", () => {
   it.each(ignored)("keeps %s out of the lint gate", async (path) => {

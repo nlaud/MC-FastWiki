@@ -4,6 +4,7 @@
 *.md
 
 # Written by a tool, never by hand.
+web/types/
 pnpm-lock.yaml
 pnpm-workspace.yaml
 uv.lock
