@@ -1,0 +1,10 @@
+{
+  "ref": "refs/tags/26.2-summary",
+  "node_id": "REF_kwDOGtGJ8LZyZWZzL3RhZ3MvMjYuMi1zdW1tYXJ5",
+  "url": "https://api.github.com/repos/misode/mcmeta/git/refs/tags/26.2-summary",
+  "object": {
+    "sha": "711a353b47d84e6cb592a1b72f682e5f44759284",
+    "type": "commit",
+    "url": "https://api.github.com/repos/misode/mcmeta/git/commits/711a353b47d84e6cb592a1b72f682e5f44759284"
+  }
+}

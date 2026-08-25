@@ -13,8 +13,6 @@ reasoning survives even after the choice is made.
 
 No jars and no JVM — `misode/mcmeta` publishes the data generator output as JSON. See Decision 6.
 
-- [ ] Resolve the matching mcmeta **version tag** (never a bare branch head — builds must be
-      reproducible, and a snapshot must not slip into a release build)
 - [ ] Fetch and cache by content hash:
   - [ ] `registries` — canonical ID lists for items, blocks, entities, effects
   - [ ] `data/recipe/` — crafting, smelting, smithing, stonecutting
