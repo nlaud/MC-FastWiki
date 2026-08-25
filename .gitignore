@@ -14,3 +14,12 @@ node_modules/
 
 # Web build output
 web/dist/
+
+# Data tree
+# The pipeline writes intermediate files to /data/.cache. Git must not track
+# them. The pipeline writes the site payload to /data/dist, and Git tracks that
+# directory on purpose. The web build reads /data/dist and nothing else, so a
+# deployment needs no pipeline run. Do not add a bare `dist/` rule to this file.
+# Such a rule also matches /data/dist and breaks the static build.
+# tests/test_repo_invariants.py fails when one half of this rule breaks.
+/data/.cache/
