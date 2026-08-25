@@ -9,9 +9,22 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    // Vite strips types with esbuild, one file at a time. A construct that
+    // needs a whole-program view to erase — an enum, a namespace, a
+    // parameter property — compiles under `tsc` and then breaks in the
+    // bundle. This flag rejects such syntax in the type check instead.
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    // `strict` leaves these off. Each one closes a hole that reaches the
+    // browser as an undefined value or a fallthrough.
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true
   },
-  "include": ["web/**/*.ts", "vite.config.ts"]
+  "include": ["web/**/*.ts", "*.config.ts", "*.test.ts"]
 }

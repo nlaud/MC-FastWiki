@@ -399,11 +399,15 @@ This is the most failure-prone renderer:
 pnpm dev              Web app dev server
 pnpm build            Build web app from committed data
 pnpm test             Web tests
+pnpm lint             ESLint over the web app and the build config
+pnpm format           Prettier writes; `pnpm format:check` only reports
 
 python -m pipeline check      Compare latest Mojang release against data/dist/manifest.json
 python -m pipeline build      Run the full pipeline (hits the network; no Java needed)
 python -m pipeline validate   Re-run schema + regression checks on existing output
 pytest                        Pipeline tests
+ruff check .                  Lint the pipeline
+mypy                          Type check the pipeline, strict mode
 ```
 
 The web app never invokes the pipeline. Building the site reads `/data/dist` and nothing else.

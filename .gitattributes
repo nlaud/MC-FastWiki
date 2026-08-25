@@ -1,2 +1,12 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Auto detect text files, and normalize them to LF in the repository.
+#
+# `eol=lf` is the load-bearing half. With `text=auto` alone the working-tree
+# ending is left to `core.autocrlf`, which the Git for Windows installer turns
+# on by default, so a fresh clone on Windows checks every file out as CRLF.
+# Prettier's `endOfLine` defaults to `lf`, so `pnpm format:check` then reports
+# every file it reads, and `git checkout -- <file>` re-breaks one file at a
+# time after that. `eol=lf` gives the same working tree on every platform.
+#
+# Binary files are unaffected: `text=auto` detects them and Git skips the
+# conversion, so the sprite atlas and the fonts stay byte-exact.
+* text=auto eol=lf

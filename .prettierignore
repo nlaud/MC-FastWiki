@@ -1,0 +1,11 @@
+# Prettier reflows Markdown. CLAUDE.md and AGENTS.md are hand-wrapped mirrors
+# that must stay byte-identical, and a reflow rewrites both differently. The
+# same rule already keeps ruff out of Markdown.
+*.md
+
+# Written by a tool, never by hand.
+pnpm-lock.yaml
+pnpm-workspace.yaml
+uv.lock
+web/dist/
+data/dist/

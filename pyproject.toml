@@ -10,6 +10,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy>=1.18",
+    "pytest>=9.1",
     "ruff>=0.14",
 ]
 
@@ -38,9 +39,23 @@ select = [
     "B",    # bugbear
     "C4",   # comprehensions
     "SIM",  # simplify
+    "PT",   # pytest style
     "PTH",  # use pathlib
     "RUF",  # ruff rules
 ]
+
+[tool.pytest.ini_options]
+# The pipeline is a virtual project, so it is never installed. pytest imports
+# it from the repository root instead.
+pythonpath = ["."]
+testpaths = ["tests"]
+# `--strict-config` fails on an unknown key in this table, and
+# `--strict-markers` fails on a marker that no plugin registered. Without them
+# a typo turns into a silently skipped check.
+addopts = ["-ra", "--strict-config", "--strict-markers", "--import-mode=importlib"]
+# A warning from upstream data handling is a fault to fix, not noise to scroll
+# past.
+filterwarnings = ["error"]
 
 [tool.mypy]
 python_version = "3.12"
