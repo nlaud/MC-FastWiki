@@ -13,15 +13,6 @@ reasoning survives even after the choice is made.
 
 No jars and no JVM — `misode/mcmeta` publishes the data generator output as JSON. See Decision 6.
 
-- [ ] Fetch and cache by content hash:
-  - [ ] `registries` — canonical ID lists for items, blocks, entities, effects
-  - [ ] `data/recipe/` — crafting, smelting, smithing, stonecutting
-  - [ ] `data/loot_table/` — entity, block, and chest tables
-  - [ ] `data/advancement/` — criteria, requirements, parent chains
-  - [ ] `data/tags/` — item, block, and entity_type tags
-  - [ ] `summary/blocks` — block states and properties
-  - [ ] `summary/item_components` — food, compostable, fuel (**keys are unprefixed** — `apple`,
-        not `minecraft:apple`; a prefixed lookup fails silently)
 - [ ] Derive block harvest requirements from `mineable/*` and `needs_*_tool` tags
 - [ ] Fall back to running Mojang's generator only if mcmeta ever lags a release — document the
       escape hatch in `/docs`, but do not build it until it is actually needed
@@ -365,3 +356,19 @@ New collections the added data makes nearly free:
 
 Recorded so these do not creep in later: Bedrock Edition, mod content, full wiki article text,
 editing or contributing back to the wiki, and multiplayer or sync features.
+
+## Data-source corrections
+
+Findings that contradict the data-source notes in `CLAUDE.md` and `AGENTS.md`. Recorded here rather
+than fixed in place, because the two files are byte-identical mirrors and a correction needs its
+replacement source decided first.
+
+- [ ] **`compostable` and `cooking_fuel` are not in `summary/item_components`.** `CLAUDE.md` states
+      that file carries `minecraft:compostable` for 122 items and `minecraft:cooking_fuel` for 347.
+      Checked against the live `26.2-summary` tag on 2026-08-26: it carries neither component, and
+      the `data` branch holds no equivalent list either. `minecraft:food` (44 items) does match, so
+      only two of the three claims are wrong. This removes the stated Tier A source for the Phase 7
+      `compostable` and `fuel` collections.
+  - [ ] Find where 26.x exposes composter chance and furnace burn time
+  - [ ] Correct the claim in `CLAUDE.md` and `AGENTS.md` in one commit, or move both collections to
+        the curated tier when no Tier A source exists

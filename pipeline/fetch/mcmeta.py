@@ -38,29 +38,58 @@ segments, so `../summary/item_components/data.json` becomes the URL of the
 built from, because a `McmetaTag` can also be rebuilt from a cache file rather
 than from an answer that `parse_git_ref` already checked.
 
-This module keeps no disk cache. The next stage of Phase 1 adds the content-hash
-cache that CLAUDE.md asks for, and it caches the large payloads that the SHA
-below addresses.
+Two readers sit on top of the pin, and they read the two branches differently
+because the branches are shaped differently.
+
+`fetch_summary_payload` reads the `summary` branch over `raw_url`. That branch
+holds each group of Tier A as one file: `registries/data.json`,
+`blocks/data.json`, and `item_components/data.json`. Three reads cover three of
+the payload groups of Phase 1.
+
+`fetch_data_files` reads the `data` branch as one gzip archive. That branch
+holds 5,422 files across the four groups that Phase 1 wants, and 5,422 requests
+against a volunteer-facing CDN is not a thing to do once, let alone on every
+build. GitHub serves the whole branch at `codeload.github.com` for 2.7 MB in
+under a second, and the archive of one commit is byte-for-byte the same on every
+download, so it caches by content hash like any other payload.
+
+Both readers take a `ContentCache`, so a second build of one Minecraft version
+reads no network at all. Both read a payload before they store it, so a body
+that is not the payload costs one fetch rather than every build after it.
+`_fetch_and_read` holds the reason.
 """
 
+import io
 import re
+import tarfile
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
+from pipeline.fetch.cache import ContentCache
 
 __all__ = [
+    "ARCHIVE_NAMESPACE_ROOT",
     "COMMIT_OBJECT_TYPE",
+    "DATA_GROUPS",
     "GITHUB_REF_URL",
+    "MAX_ARCHIVE_BYTES",
+    "MCMETA_ARCHIVE_URL",
     "MCMETA_BRANCHES",
     "MCMETA_RAW_URL",
     "MCMETA_REPOSITORY",
+    "SUMMARY_PAYLOADS",
+    "TAR_HEADER_BYTES",
     "GitRef",
     "GitRefObject",
     "McmetaTag",
+    "fetch_data_files",
+    "fetch_summary_payload",
     "mcmeta_tag_name",
     "parse_git_ref",
+    "read_data_archive",
     "resolve_mcmeta_tag",
 ]
 
@@ -87,10 +116,71 @@ GITHUB_REF_URL = "https://api.github.com/repos/{repository}/git/ref/tags/{tag}"
 # path, so the read cannot move under the build.
 MCMETA_RAW_URL = "https://raw.githubusercontent.com/{repository}/{commit_sha}/{path}"
 
+# Where GitHub serves one whole commit as a gzip archive. The SHA goes in the
+# path here too, so the archive cannot move under the build.
+#
+# `api.github.com/repos/{repository}/tarball/{sha}` answers the same question
+# and is the wrong endpoint for it. It redirects to `legacy.tar.gz`, whose
+# member paths start with a directory named after the nearest tag, such as
+# `misode-mcmeta-26.2-data-0-g4d12c05`. That name depends on the tag history of
+# the repository rather than on the commit. The URL below names the commit in
+# the member paths instead, as `mcmeta-<commit_sha>`, and it costs no redirect.
+MCMETA_ARCHIVE_URL = "https://codeload.github.com/{repository}/tar.gz/{commit_sha}"
+
 # The branches that CLAUDE.md records, and the only names that this project
 # asks for. A typo then fails with this list, not with a 404 that reads like an
 # outage at GitHub.
 MCMETA_BRANCHES = frozenset({"assets", "atlas", "data", "diff", "registries", "summary"})
+
+# The files of the `summary` branch that Phase 1 reads, by the name that this
+# project calls each one.
+#
+# `registries` comes from here rather than from the `registries` branch. Both
+# hold the same lists. The branch spreads them over 182 files, one for each
+# registry, and this is one file of 966 kB that holds all 182. Reading the
+# branch would mean 182 requests for data that arrives here in one.
+#
+# CLAUDE.md gives the trap of `item_components`: its keys are unprefixed, so a
+# lookup of `minecraft:apple` returns nothing and says nothing. The key is
+# `apple`.
+SUMMARY_PAYLOADS: Mapping[str, str] = {
+    "blocks": "blocks/data.json",
+    "item_components": "item_components/data.json",
+    "registries": "registries/data.json",
+}
+
+# The directory of the `data` branch that holds the vanilla data pack. mcmeta
+# publishes one namespace, `minecraft`, and 8,528 of the 8,531 files of the
+# branch sit under this prefix.
+ARCHIVE_NAMESPACE_ROOT = "data/minecraft"
+
+# The groups of the `data` branch that Phase 1 reads. `datapacks/` also holds
+# recipes and tags, and it is left out on purpose: it holds the experimental
+# trade rebalance pack, which is not the vanilla game. The prefix test below
+# excludes it, because its path is `data/minecraft/datapacks/...` rather than
+# `data/minecraft/tags/...`.
+DATA_GROUPS = ("advancement", "loot_table", "recipe", "tags")
+
+# How many bytes of archive this module reads before it stops.
+#
+# The whole `data` branch is 9.1 MB of files in 9,030 members today, which is
+# 9.6 MB of archive once each member's header block is counted, and the four
+# groups above are 2.9 MB of that. 256 MB leaves room for many years of growth
+# and still fails a gzip bomb long before it fills the memory of a CI runner.
+# The reader adds up every member as it walks the headers in order, so it stops
+# part-way through a bomb rather than after it.
+MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+
+# The size of one tar header block, which is what a member costs before its
+# content is counted at all.
+#
+# Counting it is what makes the limit above a limit. A member that declares no
+# content still costs this much of the decompressed stream, and `tarfile` holds
+# one `TarInfo` for each member it has walked, so an archive of a few hundred
+# thousand empty members exhausts memory while a content-only total stays at
+# zero. Measured: 200,000 empty members compress to 940 kB and expand to 102 MB
+# of headers, which a content-only total reads as an empty archive.
+TAR_HEADER_BYTES = 512
 
 # mcmeta uses lightweight tags. A lightweight tag points straight at the commit,
 # so `object.sha` is the commit SHA and `object.type` is `commit`. An annotated
@@ -346,3 +436,276 @@ def resolve_mcmeta_tag(
         tag=tag,
         commit_sha=reference.object.sha,
     )
+
+
+def _checked_archive_segments(name: str, source: str) -> list[str]:
+    """Split one archive member name into segments, and refuse a name that lies.
+
+    This reader keeps every file in memory and writes none, so a member named
+    `../../etc/passwd` overwrites nothing. The rule is still here, because the
+    names that leave this module do not stop at this module. Each one becomes a
+    dictionary key, then a cache key, then part of an entity ID, and a later
+    stage will join one to a path on disk. A name that carries a dot segment or
+    a leading slash is wrong at the moment it arrives, and that is the cheapest
+    moment to say so.
+
+    The rule is the rule of `_checked_repository_path`, with two additions that
+    only an archive needs. A backslash is refused because Windows reads it as a
+    separator and POSIX reads it as an ordinary character, so a member named
+    `a\\..\\b` means two different things on two machines. A drive letter is
+    refused for the same reason: `C:file` is a path relative to another drive.
+
+    Every one of the 9,030 member names of the live `data` branch passes.
+    """
+    if not name:
+        raise FetchError(f"{source} holds a member with an empty name.")
+    if "\\" in name or name.startswith("/") or re.fullmatch(r"[A-Za-z]:.*", name) is not None:
+        raise FetchError(
+            f"{source} holds the member {name!r}, which is not a relative path of one archive."
+        )
+    segments = name.split("/")
+    unsafe = [
+        segment
+        for segment in segments
+        if segment in DOT_SEGMENTS or SAFE_PATH_SEGMENT_PATTERN.fullmatch(segment) is None
+    ]
+    if unsafe:
+        raise FetchError(
+            f"{source} holds the member {name!r}. A member path holds segments of letters, "
+            f"digits, a dot, an underscore, or a hyphen, joined by one slash each, and no "
+            f"segment is {'.'!r} or {'..'!r}."
+        )
+    return segments
+
+
+def read_data_archive(
+    payload: bytes,
+    *,
+    groups: Iterable[str] = DATA_GROUPS,
+    source: str,
+) -> dict[str, bytes]:
+    """Read one mcmeta `data` archive, and return the files of `groups`.
+
+    The key of the answer is the path under `data/minecraft/`, such as
+    `recipe/oak_stairs.json` or `tags/item/planks.json`. The value is the bytes
+    of that file. A caller decodes the JSON itself, because this function stays
+    a reader and the extract stage owns the parsing.
+
+    The function is pure. It takes bytes and returns a dictionary, so a test
+    builds its own archive in memory and opens no socket. Name `source` so the
+    error of a bad archive says which read produced it.
+
+    Every fault raises `FetchError`: a body that is not a gzip archive, a member
+    that is not a regular file, a member name that could leave the archive, two
+    members of one name, an archive that goes past `MAX_ARCHIVE_BYTES`, and an
+    archive that holds no wanted file at all. The last one matters as much as
+    the rest. mcmeta could rename a directory in a future version, and an empty
+    answer would then travel down the pipeline as "Minecraft has no recipes"
+    rather than as a broken read.
+    """
+    prefixes = tuple(f"{ARCHIVE_NAMESPACE_ROOT}/{group}/" for group in groups)
+    if not prefixes:
+        raise FetchError(f"{source} was read with no group to look for.")
+
+    files: dict[str, bytes] = {}
+    root: str | None = None
+    archive_bytes = 0
+    try:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
+            for member in archive:
+                # The header declares the size, so this runs before the content
+                # of the member is decompressed and it stops a bomb part-way
+                # through. The header block itself counts too, because a member
+                # that declares no content still costs one, and `tarfile` holds
+                # a `TarInfo` for every member it has walked.
+                archive_bytes += TAR_HEADER_BYTES + max(member.size, 0)
+                if archive_bytes > MAX_ARCHIVE_BYTES:
+                    raise FetchError(
+                        f"{source} holds more than {MAX_ARCHIVE_BYTES} bytes of archive. "
+                        f"The mcmeta data branch is under 10 MB, so this is not that archive."
+                    )
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise FetchError(
+                        f"{source} holds the member {member.name!r}, which is not a regular file "
+                        f"or a directory. mcmeta publishes neither a link nor a device node, so "
+                        f"this archive is not the one this build asked for."
+                    )
+
+                segments = _checked_archive_segments(member.name, source)
+                if len(segments) < 2:
+                    # A file at the top level of the archive. GitHub wraps every
+                    # commit in one directory, so a file here means the layout
+                    # changed and the strip below would remove a real segment.
+                    raise FetchError(
+                        f"{source} holds the file {member.name!r} outside the root directory of "
+                        f"the archive."
+                    )
+                if root is None:
+                    root = segments[0]
+                elif segments[0] != root:
+                    raise FetchError(
+                        f"{source} holds two root directories, {root!r} and {segments[0]!r}. "
+                        f"One commit archive holds one."
+                    )
+
+                relative = "/".join(segments[1:])
+                if not relative.startswith(prefixes):
+                    continue
+                handle = archive.extractfile(member)
+                if handle is None:
+                    raise FetchError(f"{source} could not open the member {member.name!r}.")
+                content = handle.read()
+                if len(content) != member.size:
+                    raise FetchError(
+                        f"{source} declared {member.size} bytes for {member.name!r} and gave "
+                        f"{len(content)}. The archive is truncated."
+                    )
+
+                key = relative[len(ARCHIVE_NAMESPACE_ROOT) + 1 :]
+                if key in files:
+                    raise FetchError(
+                        f"{source} holds two members named {member.name!r}. A later member would "
+                        f"silently replace an earlier one."
+                    )
+                files[key] = content
+    except (tarfile.TarError, EOFError, OSError) as error:
+        raise FetchError(f"{source} is not a readable gzip archive: {error}") from error
+
+    if not files:
+        wanted = ", ".join(prefixes)
+        raise FetchError(
+            f"{source} holds no file under any of: {wanted}. An empty read is a broken scrape, "
+            f"not a version of Minecraft with no data."
+        )
+    return files
+
+
+def _fetch_and_read[T](
+    store: ContentCache,
+    url: str,
+    *,
+    transport: Transport,
+    read: Callable[[bytes], T],
+) -> T:
+    """Return `read` of the payload of `url`, and store no payload that `read` refuses.
+
+    `ContentCache.fetch` stores whatever the transport hands it. That is right
+    for the store, which proves an object against its own name and so catches a
+    file that changed after it was written. It cannot catch a body that was
+    already wrong when it arrived, and only the caller knows what a right one
+    looks like.
+
+    The case that matters is a proxy or a captive portal that answers 200 with
+    an HTML page. `get_bytes` sees a valid response, so the page reaches the
+    store, and every later build reads it back and fails with an error that
+    names a URL that is fine and never mentions the cache. The only repair is to
+    delete `data/.cache` by hand, and nothing tells the reader to.
+
+    So `read` runs first. A fresh payload that fails it is never stored. A
+    stored payload that fails it is dropped for this build and fetched again,
+    which costs one request and then either works or raises the truthful error
+    of the fresh read.
+    """
+    cached = store.read(url)
+    if cached is not None:
+        try:
+            return read(cached)
+        except FetchError:
+            # The stored payload is not the payload. Say nothing here: the
+            # fresh read below reports whatever is actually wrong.
+            pass
+    payload = transport(url)
+    value = read(payload)
+    store.write(url, payload)
+    return value
+
+
+def fetch_summary_payload(
+    tag: McmetaTag,
+    name: str,
+    *,
+    cache: ContentCache | None = None,
+    transport: Transport = get_bytes,
+) -> bytes:
+    """Return one file of the pinned `summary` branch, as bytes.
+
+    `name` is a key of `SUMMARY_PAYLOADS`. `tag` comes from `resolve_mcmeta_tag`
+    with the branch `summary`.
+
+    The answer is cached by content hash, so a second build of one Minecraft
+    version reads no network. Pass `cache` to name the store, which every test
+    does. Pass `transport` to read the bytes from somewhere else.
+
+    The bytes come back undecoded, because the extract stage owns the parsing.
+    They are still decoded once here, and thrown away, so that a body which is
+    not JSON never enters the store. `_fetch_and_read` holds the reason.
+    """
+    if tag.branch != "summary":
+        raise FetchError(
+            f"the tag {tag.tag!r} pins the branch {tag.branch!r}, and a summary payload lives on "
+            f"the branch 'summary'."
+        )
+    path = SUMMARY_PAYLOADS.get(name)
+    if path is None:
+        accepted = ", ".join(sorted(SUMMARY_PAYLOADS))
+        raise FetchError(f"{name!r} is not a summary payload. This project reads: {accepted}.")
+    store = ContentCache() if cache is None else cache
+    url = tag.raw_url(path)
+
+    def read(payload: bytes) -> bytes:
+        decode_json(payload, source=url)
+        return payload
+
+    return _fetch_and_read(store, url, transport=transport, read=read)
+
+
+def fetch_data_files(
+    tag: McmetaTag,
+    *,
+    groups: Iterable[str] = DATA_GROUPS,
+    cache: ContentCache | None = None,
+    transport: Transport = get_bytes,
+) -> dict[str, bytes]:
+    """Return the vanilla data pack files of `groups`, from the pinned `data` branch.
+
+    The key of the answer is the path under `data/minecraft/`, such as
+    `loot_table/entities/creeper.json`. `tag` comes from `resolve_mcmeta_tag`
+    with the branch `data`.
+
+    One archive covers every group, so this is one request for the 5,422 files
+    that Phase 1 reads. The archive is cached by content hash, and its URL
+    carries the pinned commit SHA, so the cached copy never goes stale.
+
+    The archive is read before it is stored, so a body that is not an archive
+    costs one fetch rather than every future build. `_fetch_and_read` holds the
+    reason.
+    """
+    if tag.branch != "data":
+        raise FetchError(
+            f"the tag {tag.tag!r} pins the branch {tag.branch!r}, and the vanilla data pack lives "
+            f"on the branch 'data'."
+        )
+    # Read the argument one time. `Iterable` accepts a generator, and a
+    # generator that is walked twice is empty on the second walk.
+    wanted = tuple(groups)
+    unknown = sorted(set(wanted) - set(DATA_GROUPS))
+    if unknown:
+        accepted = ", ".join(DATA_GROUPS)
+        raise FetchError(
+            f"{', '.join(repr(group) for group in unknown)} is not a data group of this project. "
+            f"This project reads: {accepted}."
+        )
+    # `read_data_archive` refuses this too. Refusing it there alone would mean
+    # the 2.7 MB archive is already downloaded by the time anyone says so.
+    if not wanted:
+        accepted = ", ".join(DATA_GROUPS)
+        raise FetchError(f"a data read names at least one group. This project reads: {accepted}.")
+    url = MCMETA_ARCHIVE_URL.format(repository=MCMETA_REPOSITORY, commit_sha=tag.commit_sha)
+    store = ContentCache() if cache is None else cache
+
+    def read(payload: bytes) -> dict[str, bytes]:
+        return read_data_archive(payload, groups=wanted, source=url)
+
+    return _fetch_and_read(store, url, transport=transport, read=read)

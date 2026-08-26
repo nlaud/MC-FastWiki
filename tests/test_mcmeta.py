@@ -13,8 +13,12 @@ autouse fixture below fails any test that tries to reach the network anyway.
 """
 
 import inspect
+import io
 import json
+import re
 import socket
+import tarfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -22,15 +26,24 @@ from urllib.parse import urljoin
 import pytest
 from pydantic import ValidationError
 
+import pipeline.fetch.mcmeta as mcmeta_module
 from pipeline.fetch import FetchError, get_bytes
+from pipeline.fetch.cache import ContentCache
 from pipeline.fetch.mcmeta import (
+    ARCHIVE_NAMESPACE_ROOT,
+    DATA_GROUPS,
     GITHUB_REF_URL,
+    MCMETA_ARCHIVE_URL,
     MCMETA_BRANCHES,
     MCMETA_RAW_URL,
     MCMETA_REPOSITORY,
+    SUMMARY_PAYLOADS,
     McmetaTag,
+    fetch_data_files,
+    fetch_summary_payload,
     mcmeta_tag_name,
     parse_git_ref,
+    read_data_archive,
     resolve_mcmeta_tag,
 )
 
@@ -433,3 +446,507 @@ def test_the_resolver_defaults_to_the_guarded_transport() -> None:
     path while this module stays green.
     """
     assert inspect.signature(resolve_mcmeta_tag).parameters["transport"].default is get_bytes
+
+
+# --------------------------------------------------------------------------
+# The payload readers of Phase 1: the summary files, and the data archive.
+# --------------------------------------------------------------------------
+
+# The root directory that GitHub puts in front of every member of a commit
+# archive from `codeload.github.com/<repository>/tar.gz/<sha>`.
+ARCHIVE_ROOT = f"mcmeta-{FIXTURE_SHA}"
+
+# A small stand-in for the live `data` branch. Four members are wanted, one for
+# each group of `DATA_GROUPS`. Three are not: `structure` is a group this
+# project does not read, `datapacks` is the experimental trade rebalance pack
+# rather than the vanilla game, and `pack.mcmeta` sits outside the namespace.
+ARCHIVE_MEMBERS: Mapping[str, bytes] = {
+    "data/minecraft/advancement/story/root.json": b'{"parent": null}',
+    "data/minecraft/loot_table/entities/creeper.json": b'{"pools": []}',
+    "data/minecraft/recipe/oak_stairs.json": b'{"type": "minecraft:crafting_shaped"}',
+    "data/minecraft/tags/item/planks.json": b'{"values": ["minecraft:oak_planks"]}',
+    "data/minecraft/structure/village/plains/houses/small.nbt": b"not read",
+    "data/minecraft/datapacks/trade_rebalance/data/minecraft/tags/item/x.json": b"not read",
+    "pack.mcmeta": b'{"pack": {}}',
+}
+
+WANTED_MEMBERS = {
+    "advancement/story/root.json": b'{"parent": null}',
+    "loot_table/entities/creeper.json": b'{"pools": []}',
+    "recipe/oak_stairs.json": b'{"type": "minecraft:crafting_shaped"}',
+    "tags/item/planks.json": b'{"values": ["minecraft:oak_planks"]}',
+}
+
+ARCHIVE_SOURCE = "test-archive"
+
+
+def _file_member(name: str, body: bytes) -> tuple[tarfile.TarInfo, bytes | None]:
+    info = tarfile.TarInfo(name)
+    info.type = tarfile.REGTYPE
+    info.size = len(body)
+    return info, body
+
+
+def _directory_member(name: str) -> tuple[tarfile.TarInfo, bytes | None]:
+    info = tarfile.TarInfo(name)
+    info.type = tarfile.DIRTYPE
+    return info, None
+
+
+def _symlink_member(name: str, target: str) -> tuple[tarfile.TarInfo, bytes | None]:
+    info = tarfile.TarInfo(name)
+    info.type = tarfile.SYMTYPE
+    info.linkname = target
+    return info, None
+
+
+def _tar_gz(members: list[tuple[tarfile.TarInfo, bytes | None]]) -> bytes:
+    """Return one gzip archive of the given members, built in memory."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for info, body in members:
+            archive.addfile(info, io.BytesIO(body) if body is not None else None)
+    return buffer.getvalue()
+
+
+def _data_archive(
+    members: Mapping[str, bytes] = ARCHIVE_MEMBERS, *, root: str = ARCHIVE_ROOT
+) -> bytes:
+    """Return an archive shaped like the one that GitHub serves for a commit."""
+    entries = [_directory_member(root)]
+    entries += [_file_member(f"{root}/{name}", body) for name, body in members.items()]
+    return _tar_gz(entries)
+
+
+def _summary_tag() -> McmetaTag:
+    return McmetaTag(version_id="26.2", branch="summary", tag=FIXTURE_TAG, commit_sha=FIXTURE_SHA)
+
+
+def _data_tag() -> McmetaTag:
+    return McmetaTag(version_id="26.2", branch="data", tag="26.2-data", commit_sha=FIXTURE_SHA)
+
+
+def test_the_summary_payloads_cover_the_groups_that_phase_one_reads() -> None:
+    """Three of the seven payload groups of Phase 1 live on the `summary` branch.
+
+    `registries` is here rather than on the `registries` branch on purpose. Both
+    hold the same lists. The branch spreads them over 182 files, and this is one
+    file that holds all 182.
+    """
+    assert set(SUMMARY_PAYLOADS) == {"blocks", "item_components", "registries"}
+    assert SUMMARY_PAYLOADS["item_components"] == "item_components/data.json"
+
+
+def test_every_summary_path_passes_the_pinned_path_rule() -> None:
+    """A payload path must be one that `raw_url` accepts.
+
+    `raw_url` refuses a path that could leave the pinned commit. A constant that
+    it refused would fail at build time rather than here, one stage away from
+    the table that holds it.
+    """
+    tag = _summary_tag()
+    for path in SUMMARY_PAYLOADS.values():
+        assert tag.raw_url(path).endswith(path)
+
+
+def test_the_data_groups_cover_the_rest_of_phase_one() -> None:
+    """The other four payload groups of Phase 1 live on the `data` branch."""
+    assert DATA_GROUPS == ("advancement", "loot_table", "recipe", "tags")
+
+
+def test_the_summary_fetcher_reads_the_pinned_raw_url(tmp_path: Path) -> None:
+    """The read must name the commit sha, never the branch head."""
+    transport = RecordingTransport(b'{"blocks": {}}')
+    tag = _summary_tag()
+
+    body = fetch_summary_payload(tag, "blocks", cache=ContentCache(tmp_path), transport=transport)
+
+    assert body == b'{"blocks": {}}'
+    assert transport.urls == [
+        f"https://raw.githubusercontent.com/{MCMETA_REPOSITORY}/{FIXTURE_SHA}/blocks/data.json"
+    ]
+
+
+def test_the_summary_fetcher_reads_the_network_once_for_one_version(tmp_path: Path) -> None:
+    """The cache is what keeps a rebuild off the network.
+
+    CLAUDE.md asks this pipeline to be a good citizen with the services it
+    reads. A second build of one Minecraft version must send no second request.
+    """
+    transport = RecordingTransport(b'{"blocks": {}}')
+    tag = _summary_tag()
+
+    fetch_summary_payload(tag, "blocks", cache=ContentCache(tmp_path), transport=transport)
+    again = fetch_summary_payload(tag, "blocks", cache=ContentCache(tmp_path), transport=transport)
+
+    assert again == b'{"blocks": {}}'
+    assert len(transport.urls) == 1
+
+
+def test_the_summary_fetcher_refuses_a_tag_of_another_branch() -> None:
+    """A `data` tag names a commit with no `blocks/data.json` in it.
+
+    Without this guard the read would answer 404 one stage later, and the error
+    would name a URL rather than the mistake that built it.
+    """
+    with pytest.raises(FetchError, match="branch 'summary'"):
+        fetch_summary_payload(_data_tag(), "blocks", transport=RecordingTransport(b"{}"))
+
+
+def test_the_summary_fetcher_refuses_an_unknown_payload_name() -> None:
+    """A typo must fail with the accepted list, not with a 404."""
+    with pytest.raises(FetchError, match="not a summary payload"):
+        fetch_summary_payload(_summary_tag(), "block", transport=RecordingTransport(b"{}"))
+
+
+def test_the_data_fetcher_reads_one_archive_of_the_pinned_commit(tmp_path: Path) -> None:
+    """5,422 files must cost one request, and that request must name the sha."""
+    transport = RecordingTransport(_data_archive())
+
+    files = fetch_data_files(_data_tag(), cache=ContentCache(tmp_path), transport=transport)
+
+    assert files == WANTED_MEMBERS
+    assert transport.urls == [
+        f"https://codeload.github.com/{MCMETA_REPOSITORY}/tar.gz/{FIXTURE_SHA}"
+    ]
+
+
+def test_the_data_fetcher_refuses_a_tag_of_another_branch() -> None:
+    """The vanilla data pack is on `data`, and the archive of `summary` is 351 MB."""
+    with pytest.raises(FetchError, match="branch 'data'"):
+        fetch_data_files(_summary_tag(), transport=RecordingTransport(b""))
+
+
+def test_the_data_fetcher_refuses_a_group_that_this_project_does_not_read() -> None:
+    """A typo must fail with the accepted list, before it downloads 2.7 MB."""
+    transport = RecordingTransport(_data_archive())
+    with pytest.raises(FetchError, match="not a data group"):
+        fetch_data_files(_data_tag(), groups=["recipes"], transport=transport)
+    assert transport.urls == []
+
+
+def test_the_data_fetcher_takes_a_generator_of_groups(tmp_path: Path) -> None:
+    """A group argument must survive being read twice inside the function."""
+    transport = RecordingTransport(_data_archive())
+    files = fetch_data_files(
+        _data_tag(),
+        groups=(group for group in DATA_GROUPS if group == "recipe"),
+        cache=ContentCache(tmp_path),
+        transport=transport,
+    )
+    assert set(files) == {"recipe/oak_stairs.json"}
+
+
+def test_the_archive_url_names_codeload_and_carries_the_sha() -> None:
+    """The archive must be pinned the same way that every other read is.
+
+    `api.github.com/repos/<repository>/tarball/<sha>` answers the same question
+    and names its root directory after the nearest tag rather than after the
+    commit.
+    """
+    assert MCMETA_ARCHIVE_URL.startswith("https://codeload.github.com/")
+    url = MCMETA_ARCHIVE_URL.format(repository=MCMETA_REPOSITORY, commit_sha=FIXTURE_SHA)
+    assert url.endswith(FIXTURE_SHA)
+
+
+def test_the_archive_reader_keeps_the_wanted_groups_and_drops_the_rest() -> None:
+    """The key is the path under the namespace, and nothing else comes back."""
+    files = read_data_archive(_data_archive(), source=ARCHIVE_SOURCE)
+    assert files == WANTED_MEMBERS
+
+
+def test_the_archive_reader_drops_the_experimental_datapack() -> None:
+    """`datapacks/` holds the trade rebalance pack, which is not the vanilla game.
+
+    Its members sit under `data/minecraft/datapacks/`, so the prefix test that
+    keeps `data/minecraft/tags/` excludes them without a rule of their own. This
+    test pins that, because a prefix of `data/minecraft/` would not.
+    """
+    files = read_data_archive(_data_archive(), source=ARCHIVE_SOURCE)
+    assert not any("datapacks" in name for name in files)
+
+
+def test_the_archive_reader_reads_one_group_when_asked_for_one() -> None:
+    """A caller that wants recipes must not get loot tables as well."""
+    files = read_data_archive(_data_archive(), groups=["recipe"], source=ARCHIVE_SOURCE)
+    assert set(files) == {"recipe/oak_stairs.json"}
+
+
+def test_the_archive_reader_refuses_a_member_that_is_not_a_regular_file() -> None:
+    """mcmeta publishes files and directories, and nothing else.
+
+    A symbolic link in an archive is the classic way to make an extractor write
+    outside its target. This reader writes nothing, so the link cannot do that
+    here. It still fails, because an archive that holds one is not the archive
+    that this build asked for.
+    """
+    payload = _tar_gz(
+        [
+            _directory_member(ARCHIVE_ROOT),
+            _file_member(f"{ARCHIVE_ROOT}/data/minecraft/recipe/a.json", b"{}"),
+            _symlink_member(f"{ARCHIVE_ROOT}/data/minecraft/recipe/b.json", "/etc/passwd"),
+        ]
+    )
+    with pytest.raises(FetchError, match="not a regular file"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ROOT/../../../etc/passwd",
+        "ROOT/data/minecraft/recipe/../../../../escape.json",
+        "ROOT/data/minecraft/recipe/./a.json",
+        "/etc/passwd",
+        "C:/Windows/system32/drivers/etc/hosts",
+        "ROOT\\data\\minecraft\\recipe\\a.json",
+        "ROOT/data/minecraft/recipe/a?b.json",
+        "ROOT/data/minecraft/recipe//a.json",
+    ],
+)
+def test_the_archive_reader_refuses_a_member_name_that_lies(name: str) -> None:
+    """A member name becomes a dictionary key, a cache key, and part of an entity ID.
+
+    This reader keeps every file in memory, so none of these names writes
+    anything. The rule is here because the names do not stop at this module, and
+    the moment a name arrives is the cheapest moment to refuse it.
+    """
+    payload = _tar_gz(
+        [_directory_member(ARCHIVE_ROOT), _file_member(name.replace("ROOT", ARCHIVE_ROOT), b"{}")]
+    )
+    with pytest.raises(FetchError):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_refuses_two_root_directories() -> None:
+    """One commit archive wraps one directory, and the reader strips exactly one.
+
+    A second root would mean the strip removed a real path segment from half the
+    members, and the survivors would land under the wrong keys.
+    """
+    payload = _tar_gz(
+        [
+            _directory_member(ARCHIVE_ROOT),
+            _file_member(f"{ARCHIVE_ROOT}/data/minecraft/recipe/a.json", b"{}"),
+            _file_member("other-root/data/minecraft/recipe/b.json", b"{}"),
+        ]
+    )
+    with pytest.raises(FetchError, match="two root directories"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_refuses_a_file_outside_the_root_directory() -> None:
+    """A top-level file means the layout changed, and the strip would eat a segment."""
+    payload = _tar_gz([_directory_member(ARCHIVE_ROOT), _file_member("loose.json", b"{}")])
+    with pytest.raises(FetchError, match="outside the root directory"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_refuses_two_members_of_one_name() -> None:
+    """A repeated name would let a later member replace an earlier one in silence."""
+    name = f"{ARCHIVE_ROOT}/data/minecraft/recipe/a.json"
+    payload = _tar_gz(
+        [
+            _directory_member(ARCHIVE_ROOT),
+            _file_member(name, b'{"first": true}'),
+            _file_member(name, b'{"second": true}'),
+        ]
+    )
+    with pytest.raises(FetchError, match="two members named"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"", b"not a gzip archive at all", b"\x1f\x8b truncated"],
+    ids=["empty", "text", "truncated-gzip"],
+)
+def test_the_archive_reader_refuses_a_body_that_is_not_an_archive(payload: bytes) -> None:
+    """An error page or a truncated download must stop the build, not read as empty."""
+    with pytest.raises(FetchError, match="not a readable gzip archive"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_refuses_an_archive_with_no_wanted_file() -> None:
+    """An empty read is a broken scrape, not a Minecraft version with no recipes.
+
+    CLAUDE.md gives this rule for the wiki scrape, and it holds here for the
+    same reason. mcmeta could rename a directory in a future version, and an
+    empty dictionary would travel down the pipeline as data.
+    """
+    payload = _data_archive({"data/minecraft/structure/village/a.nbt": b"x"})
+    with pytest.raises(FetchError, match="holds no file under"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_stops_at_the_size_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A compression bomb must fail the build rather than fill the memory of a runner.
+
+    The reader adds up the size that each header declares, so it stops part-way
+    through a bomb rather than after it.
+    """
+    monkeypatch.setattr(mcmeta_module, "MAX_ARCHIVE_BYTES", 4)
+    with pytest.raises(FetchError, match="bytes of archive"):
+        read_data_archive(_data_archive(), source=ARCHIVE_SOURCE)
+
+
+def test_the_size_limit_counts_a_member_that_declares_no_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bomb of empty members must trip the limit that a content-only total misses.
+
+    Every member costs one header block of the decompressed stream whatever its
+    size, and `tarfile` keeps a `TarInfo` for each member it has walked. So an
+    archive of a few hundred thousand empty members exhausts the memory of a
+    runner while the content it declares stays at zero. Measured against the
+    live shape: 200,000 empty members compress to 940 kB and expand to 102 MB of
+    headers, which the shipped 256 MB limit reads as an empty archive when the
+    total counts content alone.
+
+    The limit is scaled down here rather than the archive scaled up, because
+    building the real thing costs a hundred megabytes for one assertion. Every
+    member of this archive declares zero bytes of content, so the total that
+    trips the limit is made of headers and nothing else.
+    """
+    members = {f"data/minecraft/recipe/x{index}.json": b"" for index in range(2000)}
+    monkeypatch.setattr(mcmeta_module, "MAX_ARCHIVE_BYTES", mcmeta_module.TAR_HEADER_BYTES * 100)
+    with pytest.raises(FetchError, match="bytes of archive"):
+        read_data_archive(_data_archive(members), source=ARCHIVE_SOURCE)
+
+
+def test_the_header_block_is_the_size_that_tar_uses() -> None:
+    """The per-member cost above must be a tar header block, not a guess."""
+    assert mcmeta_module.TAR_HEADER_BYTES == tarfile.BLOCKSIZE
+
+
+def test_the_archive_reader_names_the_source_in_its_error() -> None:
+    """An error must say which read produced it, not only what went wrong."""
+    with pytest.raises(FetchError, match=re.escape("https://example.test/archive")):
+        read_data_archive(b"not an archive", source="https://example.test/archive")
+
+
+def test_the_namespace_root_is_the_one_that_mcmeta_publishes() -> None:
+    """mcmeta publishes one namespace, and every data file of it sits under this path."""
+    assert ARCHIVE_NAMESPACE_ROOT == "data/minecraft"
+
+
+def test_the_summary_reader_defaults_to_the_guarded_transport() -> None:
+    """The default transport is what a build uses, and it carries the HTTPS guard."""
+    assert inspect.signature(fetch_summary_payload).parameters["transport"].default is get_bytes
+
+
+def test_the_data_reader_defaults_to_the_guarded_transport() -> None:
+    """The default transport is what a build uses, and it carries the HTTPS guard."""
+    assert inspect.signature(fetch_data_files).parameters["transport"].default is get_bytes
+
+
+# --------------------------------------------------------------------------
+# What may enter the cache: a payload the reader accepted, and nothing else.
+# --------------------------------------------------------------------------
+
+
+class SequenceTransport:
+    """A transport that answers a different body for each call it gets."""
+
+    def __init__(self, *bodies: bytes) -> None:
+        self.bodies = list(bodies)
+        self.urls: list[str] = []
+
+    def __call__(self, url: str) -> bytes:
+        self.urls.append(url)
+        return self.bodies[min(len(self.urls) - 1, len(self.bodies) - 1)]
+
+
+# What a captive portal or an intercepting proxy answers with, at status 200.
+# `get_bytes` cannot tell it from a payload: the status is 200 and the body is
+# bytes. Only the reader of the payload can.
+INTERCEPTED_PAGE = b"<html><body>Sign in to continue</body></html>"
+
+
+def test_a_body_that_is_not_an_archive_never_enters_the_cache(tmp_path: Path) -> None:
+    """A bad body must cost one build, not every build after it.
+
+    `ContentCache` proves an object against its own name, so it catches a file
+    that changed after it was written. It cannot catch a body that was already
+    wrong when it arrived. Storing one would fail every later build with an
+    error naming a URL that is fine, and the only repair would be to delete
+    `data/.cache` by hand, which nothing in the error tells the reader to do.
+    """
+    cache = ContentCache(tmp_path)
+    transport = SequenceTransport(INTERCEPTED_PAGE)
+
+    with pytest.raises(FetchError, match="not a readable gzip archive"):
+        fetch_data_files(_data_tag(), cache=cache, transport=transport)
+
+    # Nothing at all reached the store: no index entry, and no object either.
+    assert list(tmp_path.rglob("*")) == []
+    # The next build meets a working CDN and must succeed with no hand repair.
+    good = RecordingTransport(_data_archive())
+    assert fetch_data_files(_data_tag(), cache=cache, transport=good) == WANTED_MEMBERS
+
+
+def test_a_stored_archive_that_no_longer_reads_costs_one_fetch(tmp_path: Path) -> None:
+    """A cache written before this rule existed must repair itself, not stop the build."""
+    cache = ContentCache(tmp_path)
+    url = MCMETA_ARCHIVE_URL.format(repository=MCMETA_REPOSITORY, commit_sha=FIXTURE_SHA)
+    cache.write(url, INTERCEPTED_PAGE)
+
+    transport = SequenceTransport(_data_archive())
+    assert fetch_data_files(_data_tag(), cache=cache, transport=transport) == WANTED_MEMBERS
+    assert transport.urls == [url]
+    assert ContentCache(tmp_path).read(url) == _data_archive()
+
+
+def test_a_summary_body_that_is_not_json_never_enters_the_cache(tmp_path: Path) -> None:
+    """The rule holds for the `summary` files too, and for the same reason.
+
+    These come back undecoded because the extract stage owns the parsing. They
+    are still decoded once on the way in, so an HTML page cannot take the place
+    of `blocks/data.json` for every build that follows.
+    """
+    cache = ContentCache(tmp_path)
+    transport = SequenceTransport(INTERCEPTED_PAGE)
+
+    with pytest.raises(FetchError, match="did not return JSON"):
+        fetch_summary_payload(_summary_tag(), "blocks", cache=cache, transport=transport)
+
+    assert list(tmp_path.rglob("*")) == []
+    good = RecordingTransport(b'{"blocks": {}}')
+    body = fetch_summary_payload(_summary_tag(), "blocks", cache=cache, transport=good)
+    assert body == b'{"blocks": {}}'
+
+
+def test_a_stored_summary_body_that_is_not_json_costs_one_fetch(tmp_path: Path) -> None:
+    """A summary payload already in the store must repair itself the same way."""
+    cache = ContentCache(tmp_path)
+    url = _summary_tag().raw_url(SUMMARY_PAYLOADS["blocks"])
+    cache.write(url, INTERCEPTED_PAGE)
+
+    transport = SequenceTransport(b'{"blocks": {}}')
+    body = fetch_summary_payload(_summary_tag(), "blocks", cache=cache, transport=transport)
+    assert body == b'{"blocks": {}}'
+    assert transport.urls == [url]
+
+
+def test_a_good_payload_is_read_from_the_store_without_a_second_request(tmp_path: Path) -> None:
+    """The check on the way in must not cost the cache its whole purpose."""
+    cache = ContentCache(tmp_path)
+    transport = RecordingTransport(_data_archive())
+
+    fetch_data_files(_data_tag(), cache=cache, transport=transport)
+    again = fetch_data_files(_data_tag(), cache=cache, transport=transport)
+
+    assert again == WANTED_MEMBERS
+    assert len(transport.urls) == 1
+
+
+def test_the_data_fetcher_refuses_an_empty_group_list() -> None:
+    """A read of no group must fail before the request, not after 2.7 MB of it.
+
+    `read_data_archive` refuses this too, and refusing it there alone means the
+    archive is already downloaded by the time anyone says so.
+    """
+    transport = RecordingTransport(_data_archive())
+    with pytest.raises(FetchError, match="at least one group"):
+        fetch_data_files(_data_tag(), groups=[], transport=transport)
+    assert transport.urls == []
