@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from pipeline.fetch.mcmeta import DATA_GROUPS, SUMMARY_PAYLOADS
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 AGENTS_MD = REPO_ROOT / "AGENTS.md"
@@ -510,14 +512,18 @@ BACKTICKED = re.compile(r"`(?P<name>[^`]+)`")
 def test_the_readme_points_at_files_that_the_repository_holds() -> None:
     """Every file the README sends a reader to must exist.
 
-    The README names the repository map of CLAUDE.md, which lists directories
-    that no phase has written yet. `/docs` is the first of them. A pointer to
-    a directory that a fresh clone does not hold sends the reader looking for
-    a file that is not there, and the README says outright that a gate keeps
-    that from happening.
+    The list is the entry point of the repository, and a row of it is read
+    under pressure: `docs/mcmeta-fallback.md` is the procedure someone opens
+    when a release build has already failed. A row that names a file a fresh
+    clone does not hold sends that reader looking for nothing, and the README
+    says outright that a gate keeps that from happening.
 
-    The prose paragraphs are out of scope. They discuss a path that does not
-    exist on purpose, and this gate reads the list rows alone.
+    This gate reads the list rows alone, and it is the only one that can:
+    the list is a section that has to be there and has to name something, and
+    a gate that scans the whole file reads a deleted list as green. The prose
+    of the README also points at files, and
+    `test_the_documents_point_at_the_files_that_the_repository_holds` below
+    covers those.
     """
     rows = [line for line in _readme_section(WHERE_TO_READ_HEADING) if POINTER_ROW.match(line)]
     assert rows, "the `Where to read next` list is empty, so the README points nowhere"
@@ -527,3 +533,228 @@ def test_the_readme_points_at_files_that_the_repository_holds() -> None:
 
     missing = [name for name in named if not (REPO_ROOT / name.lstrip("/")).exists()]
     assert missing == []
+
+
+# The repository map of CLAUDE.md names ten directories, and most of them
+# arrive with a later phase, so nothing can gate the whole map yet. `/docs` is
+# the one that is different: the `Where to read next` list of the README now
+# sends a reader into it.
+DOCS_DIR = REPO_ROOT / "docs"
+
+# The map row, as CLAUDE.md writes it: the path, then whitespace, then the
+# description. The description has to be there. A bare `/docs` line would match
+# a mention in the prose, and the prose discusses that directory often.
+REPO_MAP_DOCS_ROW = re.compile(r"^/docs +\S")
+
+
+def test_the_docs_directory_of_the_repository_map_holds_a_document() -> None:
+    """`/docs` must exist and must hold a document.
+
+    The gate above proves that each file the README names is present. It
+    cannot prove that `/docs` survives as a directory, because a README that
+    drops its `docs/` row passes that gate with the directory deleted, and the
+    repository map of CLAUDE.md then points at nothing.
+
+    An empty directory reads the same way to a reader and is easier to reach:
+    Git does not track a directory, so `/docs` disappears from a clone the
+    moment its last file goes. This test asks for the file, not the directory.
+    """
+    map_rows = [
+        line
+        for line in CLAUDE_MD.read_text(encoding="utf-8").split("\n")
+        if REPO_MAP_DOCS_ROW.match(line)
+    ]
+    assert len(map_rows) == 1, "the repository map of CLAUDE.md no longer names `/docs`"
+
+    assert DOCS_DIR.is_dir(), "the repository map names `/docs`, and a fresh clone does not hold it"
+
+    documents = sorted(path.name for path in DOCS_DIR.glob("*.md"))
+    assert documents, "`/docs` holds no document, so Git drops the directory from a clone"
+
+
+# The documents that send a reader to another file of this repository. The
+# README does it in its prose as well as in its list -- the `No JDK, no jars`
+# section names `docs/mcmeta-fallback.md` -- and the fallback document names
+# the module whose failure sends a reader to it.
+FALLBACK_DOC = DOCS_DIR / "mcmeta-fallback.md"
+GUIDED_DOCUMENTS = (README_MD, FALLBACK_DOC)
+
+# One pointer: a backticked token that ends in `.md` or `.py`. Both extensions
+# name a file a reader opens next, and neither shape appears in these documents
+# for any other reason. Every other backticked token is a command, a package, a
+# symbol, a directory, or a path inside an upstream payload -- `pnpm dev`,
+# `DATA_GROUPS`, `/data/dist`, `blocks/data.json` -- and none of those is a
+# file of this repository to check.
+DOCUMENT_POINTER = re.compile(r"[A-Za-z0-9._/-]+\.(?:md|py)")
+
+# The fence line of a Markdown code block, opening or closing.
+#
+# The blocks have to come out before anything counts backticks, and the reason
+# is not that a fence holds no pointer. It is that a fence holds three
+# backticks. `BACKTICKED` pairs them in the order it meets them, so one fence
+# shifts every pair after it by one: the text between two inline spans reads as
+# a span, and the spans themselves read as the text between. A gate that scans
+# a document with code blocks in it therefore stops seeing the names it exists
+# to check, and it reports that as green.
+CODE_FENCE = re.compile(r"^\s*```")
+
+
+def _prose_lines(document: Path) -> list[str]:
+    """Return the lines of `document` that sit outside a fenced code block."""
+    lines: list[str] = []
+    inside = False
+    for line in _document_text(document).split("\n"):
+        if CODE_FENCE.match(line):
+            inside = not inside
+            continue
+        if not inside:
+            lines.append(line)
+    return lines
+
+
+def _document_text(document: Path) -> str:
+    """Return the text of one document, and fail by name when it is gone.
+
+    Every gate below names its document as a constant, so a renamed or deleted
+    document would otherwise end the run with a `FileNotFoundError` and an
+    absolute path from a temporary checkout. The rename is the likely edit
+    here, and the reader who made it needs the repository-relative name and the
+    reason the file is read at all.
+    """
+    try:
+        return document.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        relative = document.relative_to(REPO_ROOT).as_posix()
+        pytest.fail(f"{relative} is gone, and the gates of this module read it by name")
+
+
+def _pointer_names(document: Path) -> list[str]:
+    """Return every file of this repository that `document` names in backticks."""
+    return sorted(
+        {
+            match.group("name")
+            for line in _prose_lines(document)
+            for match in BACKTICKED.finditer(line)
+            if DOCUMENT_POINTER.fullmatch(match.group("name"))
+        }
+    )
+
+
+def test_the_documents_point_at_the_files_that_the_repository_holds() -> None:
+    """A file that a document names must exist, wherever the name sits.
+
+    The gate on the `Where to read next` list reads that list alone, and the
+    pointers of this repository outgrew it in the same commit that wrote the
+    fallback document: the `No JDK, no jars` section of the README now names
+    `docs/mcmeta-fallback.md` in a paragraph, and the fallback document names
+    `pipeline/fetch/mcmeta.py`.
+
+    Rename either target and update only the list row, and every gate stays
+    green while the paragraph sends a reader to a file no clone holds. That
+    reader is the one this document exists for: a release build has already
+    failed, and a dead pointer costs them the wait they were told not to skip.
+    """
+    named = {document.name: _pointer_names(document) for document in GUIDED_DOCUMENTS}
+    # An empty list of pointers compares equal to an empty list of missing
+    # files, so a document that stopped naming anything would read as green.
+    assert all(named.values()), f"a document names no file of this repository: {named}"
+
+    missing = {
+        name: [pointer for pointer in pointers if not (REPO_ROOT / pointer.lstrip("/")).exists()]
+        for name, pointers in named.items()
+    }
+    assert missing == {name: [] for name in named}
+
+
+def test_the_pointer_scan_reads_a_name_that_follows_a_code_fence(tmp_path: Path) -> None:
+    """A code block must not hide the pointers written after it.
+
+    This pins the helper rather than the documents. The fallback document opens
+    with a URL block, a curl block, and a tar command, and every pointer it
+    holds is written after one of them. A scan that counts the three backticks
+    of a fence as inline markup pairs the rest of the file off by one, so the
+    prose reads as code and the code reads as prose. It then finds nothing and
+    reports no missing file, which is the same green as a document whose
+    pointers are all good.
+    """
+    document = tmp_path / "fenced.md"
+    document.write_text(
+        "Read `README.md` first.\n\n```sh\ncurl https://example.invalid\n```\n\n"
+        "Then read `CLAUDE.md`, and the module in `pipeline/fetch/mcmeta.py`.\n",
+        encoding="utf-8",
+    )
+
+    assert _pointer_names(document) == ["CLAUDE.md", "README.md", "pipeline/fetch/mcmeta.py"]
+
+
+# The fallback document repeats two lists that `pipeline.fetch.mcmeta` owns: the
+# data groups of Phase 1 and the three files of the `summary` branch. A repeated
+# fact rots, the way the README versions would without the gate above, and this
+# copy rots in the worst place. It is the shopping list of a hand run: a group
+# that mcmeta gains and the document misses is a group the person never packs,
+# and the build that follows reports a Minecraft with no advancements rather
+# than a document that went stale.
+DATA_HALF_HEADING = "### The data half maps path for path"
+SUMMARY_HALF_HEADING = "### The summary half needs a reshape"
+
+# `- `recipe``, the whole row and nothing else. The list of groups sits in the
+# data-half section, and other sections of the document carry rows that start
+# the same way, so the anchors matter as much as the section does.
+GROUP_ROW = re.compile(r"^- `(?P<group>[^`]+)`$")
+
+# One row of the payload table: `| `blocks` | `blocks/data.json` |`.
+PAYLOAD_ROW = re.compile(r"^\| `(?P<name>[^`]+)` \| `(?P<path>[^`]+)` \|$")
+
+
+def _fallback_section(heading: str) -> list[str]:
+    """Return the lines under one heading of the fallback document.
+
+    A heading that is absent fails here rather than returning an empty list,
+    for the reason `_readme_section` gives. The stop rule is every heading
+    rather than `## ` alone: both sections read below are `### `, so a `## `
+    rule would run one of them into the rest of the document and pick up rows
+    that another section owns.
+    """
+    lines = _document_text(FALLBACK_DOC).split("\n")
+    if heading not in lines:
+        pytest.fail(f"{FALLBACK_DOC.name} has no `{heading}` heading, so its gate reads nothing")
+
+    body: list[str] = []
+    for line in lines[lines.index(heading) + 1 :]:
+        if line.startswith("#"):
+            break
+        body.append(line)
+    return body
+
+
+def test_the_fallback_document_names_the_data_groups_that_the_pipeline_reads() -> None:
+    """The document must list `DATA_GROUPS`, in order and in full.
+
+    The hand run packs an archive by hand, and this list is what tells the
+    person which directories go in it. A group that the pipeline reads and the
+    document does not name is a directory nobody packs, and the read that
+    follows returns the other three groups without a word about the fourth.
+    """
+    listed = [
+        match.group("group")
+        for line in _fallback_section(DATA_HALF_HEADING)
+        if (match := GROUP_ROW.match(line)) is not None
+    ]
+    assert listed == list(DATA_GROUPS)
+
+
+def test_the_fallback_document_names_the_summary_payloads_that_the_pipeline_reads() -> None:
+    """The document must hold the whole of `SUMMARY_PAYLOADS`, name and path.
+
+    This half is the one the document calls the whole cost of the hatch: the
+    person writes the reshape from this table. A row that no longer matches
+    sends them to build a file the pipeline does not ask for, or to skip one it
+    does, and `fetch_summary_payload` reports the second case as a name that is
+    not a summary payload rather than as a document that went stale.
+    """
+    listed = {
+        match.group("name"): match.group("path")
+        for line in _fallback_section(SUMMARY_HALF_HEADING)
+        if (match := PAYLOAD_ROW.match(line)) is not None
+    }
+    assert listed == dict(SUMMARY_PAYLOADS)

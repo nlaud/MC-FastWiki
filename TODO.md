@@ -13,8 +13,6 @@ reasoning survives even after the choice is made.
 
 No jars and no JVM — `misode/mcmeta` publishes the data generator output as JSON. See Decision 6.
 
-- [ ] Fall back to running Mojang's generator only if mcmeta ever lags a release — document the
-      escape hatch in `/docs`, but do not build it until it is actually needed
 - [ ] Snapshot the extracted shape to a fixture so parser regressions are caught by tests
 
 ## Phase 2 — Wiki enrichment (Tier B)

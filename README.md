@@ -34,8 +34,8 @@ GitHub. The pipeline fetches that JSON. Nothing here starts a JVM, and nothing h
 
 One thing this rule depends on: mcmeta must stay current. It has published within hours of each
 release so far. If it ever lags a release, the fallback is to run Mojang's generator by hand and
-feed the output in. `TODO.md` records that fallback as a documented escape hatch, not as a step of
-the build.
+feed the output in. `docs/mcmeta-fallback.md` holds that procedure. It is an escape hatch for one
+person on one machine, not a step of the build, and nothing in this repository runs it.
 
 ## Quick start
 
@@ -75,9 +75,10 @@ Run these before you commit:
   repository. The two files are mirrors, and they must stay byte-identical below the horizontal
   rule.
 - `TODO.md` — the build plan, ordered by dependency, with the resolved decisions at the bottom.
+- `docs/mcmeta-fallback.md` — what one person does by hand if upstream mcmeta ever lags a
+  Minecraft release. Read it only when a build reports a 404 on an mcmeta tag.
 
-Every entry above names a file that a fresh clone holds, and a pytest gate keeps it that way. The
-`/docs` directory of the `CLAUDE.md` repository map is not one of them yet. Phase 1 writes it.
+Every entry above names a file that a fresh clone holds, and a pytest gate keeps it that way.
 
 ## License and attribution
 
