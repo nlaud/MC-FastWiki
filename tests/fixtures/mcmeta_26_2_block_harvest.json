@@ -1,0 +1,5174 @@
+{
+  "version_id": "26.2",
+  "tag": "26.2-data",
+  "commit_sha": "4d12c0553e21e461085d08dcb2c5d412398c494e",
+  "source_url": "https://codeload.github.com/misode/mcmeta/tar.gz/4d12c0553e21e461085d08dcb2c5d412398c494e",
+  "blocks": {
+    "minecraft:acacia_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:acacia_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:activator_rail": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:amethyst_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:amethyst_cluster": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:ancient_debris": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "diamond"
+    },
+    "minecraft:andesite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:andesite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:andesite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:andesite_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:anvil": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:azalea_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_block": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_mosaic": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_mosaic_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_mosaic_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bamboo_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:barrel": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:basalt": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bee_nest": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:beehive": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bell": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:big_dripleaf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:big_dripleaf_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:birch_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:black_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blackstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blackstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blackstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blackstone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blast_furnace": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_ice": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:blue_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bone_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bookshelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brain_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brewing_stand": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_mushroom_block": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:brown_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:bubble_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:budding_amethyst": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:calcite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:calibrated_sculk_sensor": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:campfire": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cartography_table": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:carved_pumpkin": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cauldron": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cherry_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chest": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chipped_anvil": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_bookshelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_cinnabar": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:chiseled_deepslate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_nether_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_polished_blackstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_quartz_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_red_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_resin_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_sulfur": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_tuff": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chiseled_tuff_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chorus_flower": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:chorus_plant": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cinnabar_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:clay": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:coal_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:coal_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:coarse_dirt": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobbled_deepslate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobbled_deepslate_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobbled_deepslate_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobbled_deepslate_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobblestone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobblestone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobblestone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cobblestone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cocoa": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:composter": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:conduit": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:copper_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:cracked_deepslate_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cracked_deepslate_tiles": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cracked_nether_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cracked_polished_blackstone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cracked_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crafter": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:crafting_table": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:creaking_heart": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_hyphae": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_nylium": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crimson_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:crying_obsidian": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "diamond"
+    },
+    "minecraft:cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:cut_red_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cut_red_sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cut_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cut_sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:cyan_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:damaged_anvil": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_prismarine": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_prismarine_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dark_prismarine_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:daylight_detector": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_brain_coral": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_brain_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_brain_coral_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_brain_coral_wall_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_bubble_coral": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_bubble_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_bubble_coral_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_bubble_coral_wall_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_fire_coral": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_fire_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_fire_coral_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_fire_coral_wall_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_horn_coral": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_horn_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_horn_coral_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_horn_coral_wall_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_tube_coral": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_tube_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_tube_coral_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dead_tube_coral_wall_fan": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_coal_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_copper_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:deepslate_diamond_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:deepslate_emerald_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:deepslate_gold_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:deepslate_iron_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:deepslate_lapis_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:deepslate_redstone_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:deepslate_tile_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_tile_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_tile_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:deepslate_tiles": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:detector_rail": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:diamond_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:diamond_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:diorite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:diorite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:diorite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:diorite_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dirt": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dirt_path": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dispenser": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dried_kelp_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dripstone_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:dropper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:emerald_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:emerald_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:enchanting_table": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:end_stone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:end_stone_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:end_stone_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:end_stone_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:end_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:ender_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:exposed_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:exposed_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:farmland": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:fire_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:fletching_table": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:flowering_azalea_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:furnace": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gilded_blackstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:glow_lichen": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gold_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:gold_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:granite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:granite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:granite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:granite_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:grass_block": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gravel": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:gray_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:green_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:grindstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:hay_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:heavy_core": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:heavy_weighted_pressure_plate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:hopper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:horn_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:ice": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_chiseled_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_cobblestone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_cracked_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_deepslate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_mossy_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_stone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:infested_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:iron_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:iron_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:iron_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:iron_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:iron_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:iron_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jack_o_lantern": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jukebox": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:jungle_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:ladder": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lapis_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:lapis_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:large_amethyst_bud": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lava_cauldron": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lectern": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_blue_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_gray_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:light_weighted_pressure_plate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:lime_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lime_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:lodestone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:loom": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magenta_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:magma_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_roots": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mangrove_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:medium_amethyst_bud": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:melon": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:moss_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:moss_carpet": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_cobblestone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_cobblestone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_cobblestone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_cobblestone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_stone_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_stone_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_stone_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mossy_stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mud": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mud_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mud_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mud_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mud_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:muddy_mangrove_roots": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mushroom_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:mycelium": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_brick_fence": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_gold_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_quartz_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:nether_wart_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:netherite_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "diamond"
+    },
+    "minecraft:netherrack": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:note_block": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:observer": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:obsidian": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "diamond"
+    },
+    "minecraft:orange_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:orange_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:oxidized_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:oxidized_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:packed_ice": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:packed_mud": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_moss_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_moss_carpet": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pale_oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:petrified_oak_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pink_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:piston": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:piston_head": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:podzol": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pointed_dripstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_andesite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_andesite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_andesite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_basalt": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_button": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_pressure_plate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_blackstone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_cinnabar": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_cinnabar_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_cinnabar_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_cinnabar_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_deepslate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_deepslate_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_deepslate_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_deepslate_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_diorite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_diorite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_diorite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_granite": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_granite_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_granite_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_sulfur": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_sulfur_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_sulfur_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_sulfur_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_tuff": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_tuff_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_tuff_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:polished_tuff_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:potent_sulfur": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:powder_snow_cauldron": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:powered_rail": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:prismarine_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:pumpkin": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purple_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purpur_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purpur_pillar": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purpur_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:purpur_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:quartz_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:quartz_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:quartz_pillar": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:quartz_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:quartz_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:rail": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:raw_copper_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:raw_gold_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:raw_iron_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:red_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_mushroom_block": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_nether_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_nether_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_nether_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_nether_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_sand": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_sandstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_sandstone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:red_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:redstone_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:redstone_ore": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "iron"
+    },
+    "minecraft:resin_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:resin_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:resin_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:resin_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:respawn_anchor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "diamond"
+    },
+    "minecraft:rooted_dirt": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sand": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sandstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sandstone_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sculk": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sculk_catalyst": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sculk_sensor": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sculk_shrieker": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sculk_vein": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:shroomlight": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:small_amethyst_bud": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smithing_table": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smoker": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_basalt": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_quartz": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_quartz_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_quartz_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_red_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_red_sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_red_sandstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_sandstone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_sandstone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_sandstone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_stone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:smooth_stone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:snow": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:snow_block": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:soul_campfire": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:soul_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:soul_sand": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:soul_soil": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spawner": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sponge": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_leaves": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:spruce_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sticky_piston": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_button": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_pressure_plate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stone_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stonecutter": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_acacia_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_acacia_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_bamboo_block": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_birch_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_birch_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_cherry_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_cherry_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_crimson_hyphae": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_crimson_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_dark_oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_dark_oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_jungle_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_jungle_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_mangrove_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_mangrove_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_pale_oak_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_pale_oak_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_spruce_log": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_spruce_wood": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_warped_hyphae": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:stripped_warped_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_spike": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:sulfur_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:suspicious_gravel": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:suspicious_sand": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:target": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:trapped_chest": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tube_coral_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_brick_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_brick_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_brick_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_bricks": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:tuff_wall": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:vine": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_button": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_door": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_fence": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_fence_gate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_hyphae": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_nylium": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_planks": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_pressure_plate": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_shelf": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_slab": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_stairs": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_stem": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_trapdoor": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_wall_hanging_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_wall_sign": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:warped_wart_block": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:water_cauldron": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_copper_block": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_exposed_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_exposed_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_exposed_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_exposed_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_exposed_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_exposed_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_oxidized_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_oxidized_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_oxidized_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_oxidized_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_oxidized_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_oxidized_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_weathered_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_weathered_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_weathered_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_weathered_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:waxed_weathered_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:waxed_weathered_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_chiseled_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_copper_bars": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:weathered_copper_bulb": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_copper_chain": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:weathered_copper_chest": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_copper_door": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:weathered_copper_golem_statue": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:weathered_copper_grate": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_copper_lantern": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:weathered_copper_trapdoor": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_cut_copper": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_cut_copper_slab": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_cut_copper_stairs": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:weathered_lightning_rod": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "stone"
+    },
+    "minecraft:wet_sponge": {
+      "tools": [
+        "hoe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:white_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_concrete": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_concrete_powder": {
+      "tools": [
+        "shovel"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_glazed_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_shulker_box": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_terracotta": {
+      "tools": [
+        "pickaxe"
+      ],
+      "tier": "wooden"
+    },
+    "minecraft:yellow_wall_banner": {
+      "tools": [
+        "axe"
+      ],
+      "tier": "wooden"
+    }
+  }
+}

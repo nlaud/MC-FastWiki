@@ -10,3 +10,20 @@ pnpm-workspace.yaml
 uv.lock
 web/dist/
 data/dist/
+
+# The mcmeta snapshots of the extract tests, written by
+# `tests/fixtures/build_block_tag_snapshot.py` with `json.dumps(indent=2)`.
+#
+# Two writers cannot own one file. Prettier keeps a short array on one line and
+# `json.dumps` never does, so `pnpm format` reflows both files and the next
+# rebuild writes them straight back. Without these rules `pnpm format:check`
+# reports both files on a clean tree.
+#
+# The glob carries the version, because the file names do: a snapshot of the
+# next Minecraft version arrives as `mcmeta_26_3_block_tags.json`, and a rule
+# naming one version would let it through.
+#
+# The other files of `tests/fixtures/` stay formatted. A person wrote them, and
+# they are small enough to read in a review.
+tests/fixtures/mcmeta_*_block_tags.json
+tests/fixtures/mcmeta_*_block_harvest.json

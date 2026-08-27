@@ -27,8 +27,12 @@ and gold harvests what wood harvests, whatever their durability and speed say. A
 later phase that shows every material still starts at those files, because the
 equality is a fact of one version and not a rule of the game.
 
-The stage is a pure function from the files of the archive to a mapping, so its
-tests build their own tag files in memory.
+The stage is a pure function from the files of the archive to a mapping, so no
+test of it opens a socket. Two suites read it from opposite ends.
+`tests/test_extract_harvest.py` builds its own tag files in memory, one rule per
+file, and `tests/test_extract_snapshot.py` runs the stage over a committed
+snapshot of the real `26.2-data` tag files and compares the answer with a
+committed snapshot of the answer.
 """
 
 from collections.abc import Mapping
@@ -42,6 +46,7 @@ from pipeline.extract.tags import BLOCK_REGISTRY, TagIndex
 __all__ = [
     "MINEABLE_TAG_TEMPLATE",
     "NEEDS_TOOL_TAG_TEMPLATE",
+    "TAGGED_TIERS",
     "BlockHarvest",
     "HarvestTier",
     "HarvestTool",

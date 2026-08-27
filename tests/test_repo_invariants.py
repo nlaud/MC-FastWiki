@@ -80,8 +80,12 @@ def test_tracked_files_check_out_with_lf() -> None:
     assert offenders == []
 
 
-# `/data` does not exist yet. Phase 1 of TODO.md creates it. `git check-ignore`
-# reads path names only, so it answers for a path that has no file behind it.
+# `/data` does not exist yet. The emit stage of the pipeline writes `/data/dist`
+# and the fetch stage writes `/data/.cache` beside it, and neither stage is
+# built. Name the stage rather than a phase of TODO.md: that file deletes a
+# phase once its checklist empties, so a reference to a phase number goes
+# dangling on the commit that finishes it. `git check-ignore` reads path names
+# only, so it answers for a path that has no file behind it.
 # The trailing slash on the first entry is necessary. The rule ends with a
 # slash, so it matches a directory only, and no directory exists here yet.
 IGNORED_DATA_PATHS = (
@@ -214,7 +218,7 @@ def test_the_ignore_gate_still_answers_for_a_tracked_path(phase_one_repo: Path) 
 # read as generated. The three entries come from `TRACKED_DATA_PATHS` above.
 GENERATED_PATHS = tuple(path for path in TRACKED_DATA_PATHS if path.startswith("data/dist/"))
 
-# These four must not read as generated. `data/curated` holds the hand-written
+# None of these may read as generated. `data/curated` holds the hand-written
 # overrides, and a person reviews every line of them.
 #
 # `web/dist` catches a pattern widened at the front. Note which mutation that
@@ -232,6 +236,28 @@ PLAIN_PATHS = (
     "web/dist/assets/app.js",
     "CLAUDE.md",
     "AGENTS.md",
+    # The hand-written fixtures of `tests/fixtures`. They sit in the directory
+    # that the snapshot rule below covers, so a rule widened to the directory
+    # rather than to the file names would take these two with it.
+    "tests/fixtures/version_manifest_v2.json",
+    "tests/fixtures/mcmeta_ref_26_2_summary.json",
+)
+
+# The mcmeta snapshots that `tests/fixtures/build_block_tag_snapshot.py` writes.
+# 6,405 lines of JSON that no person wrote, committed for the same reason
+# `/data/dist` is committed, and needing the same mark for the same reason: a
+# version bump rewrites both files, and the hand-written half of that pull
+# request has to stay readable.
+#
+# The 26.3 rows are paths with no file behind them. `git check-attr` answers for
+# a name, so they prove that the rule carries a `*` where the version sits. A
+# rule naming 26.2 outright would pass on the first two rows and leave the next
+# snapshot unmarked, which is a failure nobody sees until the release PR.
+GENERATED_FIXTURE_PATHS = (
+    "tests/fixtures/mcmeta_26_2_block_tags.json",
+    "tests/fixtures/mcmeta_26_2_block_harvest.json",
+    "tests/fixtures/mcmeta_26_3_block_tags.json",
+    "tests/fixtures/mcmeta_26_3_block_harvest.json",
 )
 
 # `git check-attr` prints the value of the attribute, not the word "set". A
@@ -370,6 +396,29 @@ def test_pipeline_output_is_marked_as_generated() -> None:
     assert len(GENERATED_PATHS) == 3, "the /data/dist paths of TRACKED_DATA_PATHS went missing"
 
     assert _generated_paths(GENERATED_PATHS) == set(GENERATED_PATHS)
+    assert _generated_paths(PLAIN_PATHS) == set()
+
+
+def test_the_mcmeta_test_fixtures_are_marked_as_generated() -> None:
+    """GitHub must collapse the mcmeta snapshots of `tests/fixtures` too.
+
+    They are not pipeline output, so the rule above does not reach them, and
+    the reason for the mark is the same either way: 6,405 lines that a script
+    wrote, rewritten whole every time the pinned Minecraft version moves.
+    Unmarked, the pull request that raises that version shows the hand-written
+    change and the machine-written change at the same size.
+
+    The 26.3 rows carry the other half of the check. They name no file, and
+    `git check-attr` answers for a name, so a rule that spelled 26.2 out passes
+    on the pair that exists and leaves the next snapshot bare. That failure has
+    no symptom until the release, which is the wrong moment to find it.
+    """
+    if shutil.which("git") is None:
+        pytest.skip("git is not on PATH, so the attributes cannot be read")
+
+    assert _generated_paths(GENERATED_FIXTURE_PATHS) == set(GENERATED_FIXTURE_PATHS)
+    # The hand-written fixtures share the directory, so the rule must name the
+    # files and not the directory. `PLAIN_PATHS` holds both of them.
     assert _generated_paths(PLAIN_PATHS) == set()
 
 

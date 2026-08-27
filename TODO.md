@@ -9,12 +9,6 @@ reasoning survives even after the choice is made.
 
 ---
 
-## Phase 1 — Vanilla data (Tier A, from mcmeta)
-
-No jars and no JVM — `misode/mcmeta` publishes the data generator output as JSON. See Decision 6.
-
-- [ ] Snapshot the extracted shape to a fixture so parser regressions are caught by tests
-
 ## Phase 2 — Wiki enrichment (Tier B)
 
 - [ ] Bucket API client: Lua query builder, `offset()` pagination past the 5000-row cap, disk

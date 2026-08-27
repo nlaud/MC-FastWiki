@@ -36,3 +36,19 @@
 # The rule sets neither `text` nor `eol`, so the line above still decides the
 # line endings of these files.
 /data/dist/** linguist-generated=true
+
+# Collapse the mcmeta snapshots of the extract tests for the same reason.
+#
+# `tests/fixtures/build_block_tag_snapshot.py` writes these two files, and they
+# are 6,405 lines of them. A pull request that raises the pinned Minecraft
+# version rewrites both, so the hand-written half of that change sits under
+# thousands of machine-written lines unless GitHub collapses them.
+#
+# They sit outside `/data/dist` because they are test input, not site output.
+# The mark is the same, and so is the reason for it.
+#
+# The glob carries the version, the way the `.prettierignore` rule does: the
+# next snapshot arrives as `mcmeta_26_3_block_tags.json`. The other files of
+# `tests/fixtures/` are hand-written and must stay in the diff.
+/tests/fixtures/mcmeta_*_block_tags.json linguist-generated=true
+/tests/fixtures/mcmeta_*_block_harvest.json linguist-generated=true

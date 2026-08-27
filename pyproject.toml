@@ -60,6 +60,17 @@ filterwarnings = ["error"]
 [tool.mypy]
 python_version = "3.12"
 files = ["pipeline", "tests"]
+# `tests` and its subdirectories hold no `__init__.py`, and pytest does not need
+# one, because `--import-mode=importlib` imports a test module by its path. mypy
+# does need one. Without these two settings it names
+# `tests/fixtures/build_block_tag_snapshot.py` after the deepest directory that
+# holds no `__init__.py`, so the module reads as `build_block_tag_snapshot` on
+# the walk and as `tests.fixtures.build_block_tag_snapshot` where a test imports
+# it, and mypy stops on "source file found twice". The two settings name the
+# repository root as the one package base, so every module takes its full dotted
+# name from there.
+mypy_path = "."
+explicit_package_bases = true
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
