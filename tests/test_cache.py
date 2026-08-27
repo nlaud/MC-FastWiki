@@ -33,6 +33,7 @@ from pipeline.fetch.cache import (
     OBJECTS_NAME,
     SHARD_LENGTH,
     ContentCache,
+    fetch_and_read,
 )
 
 URL = "https://raw.githubusercontent.com/misode/mcmeta/" + "a" * 40 + "/blocks/data.json"
@@ -361,3 +362,87 @@ def test_a_write_reports_the_keys_that_another_instance_added(tmp_path: Path) ->
     first.write("https://host/c", b"c")
 
     assert first.read("https://host/b") == b"b"
+
+
+def test_fetch_and_read_stores_a_payload_that_the_reader_accepted(tmp_path: Path) -> None:
+    """The ordinary path. One fetch, one stored object, and the parsed value back."""
+    cache = ContentCache(tmp_path)
+    sent: list[str] = []
+
+    def transport(url: str) -> bytes:
+        sent.append(url)
+        return PAYLOAD
+
+    value = fetch_and_read(cache, URL, transport=transport, read=lambda payload: len(payload))
+    assert value == len(PAYLOAD)
+    assert sent == [URL]
+    assert cache.read(URL) == PAYLOAD
+
+
+def test_fetch_and_read_stores_nothing_the_reader_refused(tmp_path: Path) -> None:
+    """A proxy page that reached the store would fail every later build, not this one.
+
+    `ContentCache` proves an object against its own name, so it catches a file
+    that changed after it was written. It cannot catch a body that was already
+    wrong when it arrived, and only the caller knows what a right one looks like.
+    """
+    cache = ContentCache(tmp_path)
+
+    def refuse(payload: bytes) -> int:
+        raise FetchError("that is an error page, not the payload")
+
+    with pytest.raises(FetchError, match="error page"):
+        fetch_and_read(cache, URL, transport=lambda url: b"<html>503</html>", read=refuse)
+    assert cache.read(URL) is None
+
+
+def test_fetch_and_read_drops_a_stored_payload_that_the_reader_refuses(tmp_path: Path) -> None:
+    """A bad object that arrived some other way costs one request, not every build."""
+    cache = ContentCache(tmp_path)
+    cache.write(URL, b"<html>503</html>")
+    sent: list[str] = []
+
+    def transport(url: str) -> bytes:
+        sent.append(url)
+        return PAYLOAD
+
+    def read(payload: bytes) -> bytes:
+        if payload.startswith(b"<"):
+            raise FetchError("that is an error page, not the payload")
+        return payload
+
+    assert fetch_and_read(cache, URL, transport=transport, read=read) == PAYLOAD
+    assert sent == [URL]
+    assert cache.read(URL) == PAYLOAD
+
+
+def test_fetch_and_read_names_the_cache_entry_with_key(tmp_path: Path) -> None:
+    """The URL still decides what is read. Only the name of the cache entry moves.
+
+    `pipeline.fetch.bucket` needs this, because a wiki URL does not name
+    immutable bytes and its key has to carry a caller revision in front of it.
+    """
+    cache = ContentCache(tmp_path)
+    key = f"bucket/26.2/{URL}"
+    sent: list[str] = []
+
+    def transport(url: str) -> bytes:
+        sent.append(url)
+        return PAYLOAD
+
+    fetch_and_read(cache, URL, transport=transport, read=lambda payload: payload, key=key)
+    assert sent == [URL]
+    assert cache.read(key) == PAYLOAD
+    assert cache.read(URL) is None
+
+
+def test_fetch_and_read_reads_a_hit_under_the_given_key(tmp_path: Path) -> None:
+    """A second call with the same key sends no request."""
+    cache = ContentCache(tmp_path)
+    key = f"bucket/26.2/{URL}"
+    cache.write(key, PAYLOAD)
+
+    def refuse(url: str) -> bytes:
+        raise AssertionError("the cache should have answered")
+
+    assert fetch_and_read(cache, URL, transport=refuse, read=lambda p: p, key=key) == PAYLOAD

@@ -31,16 +31,24 @@ Every write goes to a temporary file in the target directory, and then to
 `Path.replace`, which is atomic on one file system. An interrupted build leaves
 no half-written object and no half-written index.
 
-The cache holds no expiry rule, and it needs none. Every key that this pipeline
-writes carries the pinned mcmeta commit SHA in its URL, so a key names one
-immutable payload for all time. Read `pipeline/fetch/mcmeta.py` for the reason
-that the SHA is there.
+The cache holds no expiry rule, and it needs none, because every key that this
+pipeline writes names one immutable payload for all time. A key is immutable in
+one of two ways. An mcmeta key carries the pinned commit SHA in its URL, and the
+bytes at that URL cannot change; read `pipeline/fetch/mcmeta.py` for the reason
+that the SHA is there. A wiki key carries a caller revision in front of the URL,
+because the wiki is edited every day and its URL alone names different bytes
+next week; read `pipeline/fetch/bucket.py` for the shape of that key.
+
+The rule for any new caller follows from those two. Put something in the key
+that changes when the payload may have changed. A key that cannot promise this
+belongs in a different store, not in this one with an expiry bolted on.
 """
 
 import hashlib
 import json
 import string
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +61,7 @@ __all__ = [
     "OBJECTS_NAME",
     "SHARD_LENGTH",
     "ContentCache",
+    "fetch_and_read",
 ]
 
 # Where the pipeline keeps its intermediates. `.gitignore` holds `/data/.cache/`,
@@ -270,3 +279,51 @@ class ContentCache:
         payload = transport(url)
         self.write(url, payload)
         return payload
+
+
+def fetch_and_read[T](
+    store: ContentCache,
+    url: str,
+    *,
+    transport: Transport,
+    read: Callable[[bytes], T],
+    key: str | None = None,
+) -> T:
+    """Return `read` of the payload of `url`, and store no payload that `read` refuses.
+
+    `ContentCache.fetch` stores whatever the transport hands it. That is right
+    for the store, which proves an object against its own name and so catches a
+    file that changed after it was written. It cannot catch a body that was
+    already wrong when it arrived, and only the caller knows what a right one
+    looks like.
+
+    The case that matters is a proxy or a captive portal that answers 200 with
+    an HTML page. `get_bytes` sees a valid response, so the page reaches the
+    store, and every later build reads it back and fails with an error that
+    names a URL that is fine and never mentions the cache. The only repair is to
+    delete `data/.cache` by hand, and nothing tells the reader to.
+
+    So `read` runs first. A fresh payload that fails it is never stored. A
+    stored payload that fails it is dropped for this build and fetched again,
+    which costs one request and then either works or raises the truthful error
+    of the fresh read.
+
+    `key` names the cache entry when it must differ from the URL. It defaults to
+    the URL, which is right for every upstream whose URL already names immutable
+    bytes. The wiki is not one of those, so `pipeline.fetch.bucket` passes a key
+    that carries a caller revision. The URL still decides what the transport
+    reads; only the name of the cache entry moves.
+    """
+    cache_key = url if key is None else key
+    cached = store.read(cache_key)
+    if cached is not None:
+        try:
+            return read(cached)
+        except FetchError:
+            # The stored payload is not the payload. Say nothing here: the
+            # fresh read below reports whatever is actually wrong.
+            pass
+    payload = transport(url)
+    value = read(payload)
+    store.write(cache_key, payload)
+    return value

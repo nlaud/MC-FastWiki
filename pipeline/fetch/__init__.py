@@ -64,7 +64,29 @@ class FetchError(Exception):
     whose shape the parser rejects. A caller then stops the build on one
     exception type instead of on the union of what `urllib`, `http.client`, and
     `json` raise.
+
+    `status` and `retry_after` carry what the server said, for the one caller
+    that must tell two faults apart. `pipeline.fetch.polite` retries a 429 and a
+    5xx, and it must not retry a 404: the answer to a bad URL does not change,
+    and a repeat only loads a service that this project reads as a guest. A
+    fault with no status is a timeout or a refused connection, which a retry can
+    fix, so `None` is the retryable value and not the safe one.
+
+    `retry_after` is the `Retry-After` header, undecoded. RFC 9110 allows two
+    forms there, a count of seconds and an HTTP date, and the policy that waits
+    owns the choice between them. Both attributes default to `None`, so every
+    caller that raises this class with a message alone keeps working.
     """
+
+    def __init__(
+        self,
+        *args: object,
+        status: int | None = None,
+        retry_after: str | None = None,
+    ) -> None:
+        super().__init__(*args)
+        self.status = status
+        self.retry_after = retry_after
 
 
 class HttpsOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -155,12 +177,21 @@ def get_bytes(url: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> bytes:
     # `URLError`, `HTTPError`, and a timeout are all `OSError`. `HTTPException`
     # is not, and it covers a truncated or malformed response.
     except (OSError, http.client.HTTPException) as error:
+        # Only an `HTTPError` carries a status and headers. Every other fault
+        # here happened below HTTP, so it leaves both attributes at `None`, and
+        # a retry policy reads that as "the server said nothing".
+        if isinstance(error, urllib.error.HTTPError):
+            raise FetchError(
+                f"GET {url} failed: {error}",
+                status=int(error.code),
+                retry_after=error.headers.get("Retry-After"),
+            ) from error
         raise FetchError(f"GET {url} failed: {error}") from error
 
     # The opener raises on a 4xx and a 5xx and follows a redirect, so this guard
     # catches the rest, such as a 204 with no body.
     if status != HTTPStatus.OK:
-        raise FetchError(f"GET {url} returned status {status}, not 200.")
+        raise FetchError(f"GET {url} returned status {status}, not 200.", status=status)
     return body
 
 

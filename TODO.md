@@ -11,8 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 2 — Wiki enrichment (Tier B)
 
-- [ ] Bucket API client: Lua query builder, `offset()` pagination past the 5000-row cap, disk
-      cache, rate limiting, retry with backoff
 - [ ] Pull `resource_location` (Java rows only) and build the **display name to registry ID join
       table** — this unblocks everything else in this phase
 - [ ] Pull `droptable`; parse the `json` column, **keep only the `java` key**, preserve

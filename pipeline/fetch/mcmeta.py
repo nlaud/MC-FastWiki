@@ -62,13 +62,13 @@ that is not the payload costs one fetch rather than every build after it.
 import io
 import re
 import tarfile
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
-from pipeline.fetch.cache import ContentCache
+from pipeline.fetch.cache import ContentCache, fetch_and_read
 
 __all__ = [
     "ARCHIVE_NAMESPACE_ROOT",
@@ -582,44 +582,12 @@ def read_data_archive(
     return files
 
 
-def _fetch_and_read[T](
-    store: ContentCache,
-    url: str,
-    *,
-    transport: Transport,
-    read: Callable[[bytes], T],
-) -> T:
-    """Return `read` of the payload of `url`, and store no payload that `read` refuses.
-
-    `ContentCache.fetch` stores whatever the transport hands it. That is right
-    for the store, which proves an object against its own name and so catches a
-    file that changed after it was written. It cannot catch a body that was
-    already wrong when it arrived, and only the caller knows what a right one
-    looks like.
-
-    The case that matters is a proxy or a captive portal that answers 200 with
-    an HTML page. `get_bytes` sees a valid response, so the page reaches the
-    store, and every later build reads it back and fails with an error that
-    names a URL that is fine and never mentions the cache. The only repair is to
-    delete `data/.cache` by hand, and nothing tells the reader to.
-
-    So `read` runs first. A fresh payload that fails it is never stored. A
-    stored payload that fails it is dropped for this build and fetched again,
-    which costs one request and then either works or raises the truthful error
-    of the fresh read.
-    """
-    cached = store.read(url)
-    if cached is not None:
-        try:
-            return read(cached)
-        except FetchError:
-            # The stored payload is not the payload. Say nothing here: the
-            # fresh read below reports whatever is actually wrong.
-            pass
-    payload = transport(url)
-    value = read(payload)
-    store.write(url, payload)
-    return value
+# `fetch_and_read` moved to `pipeline.fetch.cache` when the Bucket client of
+# Tier B needed the same rule: read a payload before you store it, so an error
+# page from a proxy never enters the store. The name stays bound here because
+# this module's docstring and two of its functions name it, and because a reader
+# who finds the old private name in the history lands on the current one.
+_fetch_and_read = fetch_and_read
 
 
 def fetch_summary_payload(
