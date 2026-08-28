@@ -135,6 +135,20 @@ Rules learned the hard way: bucket names are lowercase snake_case (`spawn_table`
 `Spawn table`); `select()` is mandatory; `limit()` caps at **5000** rows; `offset()` works, so
 paginate with it. Schemas live on the `Bucket:` wiki pages (namespace 9592) as JSON.
 
+**`page_name` is selectable on every bucket and appears in no schema page.** It names the wiki page
+a row was written on, and it is worth selecting every time: it is the attribution URL, it is the
+grouping key for the buckets whose rows sit on the page of the thing they describe (`spawn_table`
+rows are on biome pages, `trade` rows on profession pages), and it carries the namespace.
+
+**Filter on that namespace, or the tables are unusable.** The buckets index the whole wiki, user
+sandboxes and translation projects included. Of the 3,690 Java `resource_location` rows, 966 come
+from `User:`, `Minecraft Wiki:`, and `Forum:` pages — and a translation row is the dangerous kind,
+because it is well-formed: it maps `Taş` to `stone` and `poki moku` to `bowl` with nothing in the
+row to say so. A main-namespace title holds no colon, so that is the test. `advancement` needs a
+second filter on top: 615 rows describe 126 advancements, and the extra 489 are April Fools' and
+version-page snapshots whose `internal_id` values collide exactly with the live ones, so take only
+the rows on the `Advancement` page.
+
 Buckets that matter to us, with row counts observed at time of writing:
 
 | Bucket | Rows | Contents |

@@ -29,6 +29,13 @@ line-length = 100
 extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
+# The Minecraft Wiki writes ranges with an en dash: `0–5` for a drop quantity,
+# `50%–67%` for a trade probability, `5–64` for a villager's asking price. The
+# enrich stage has to match that character exactly and has to be able to quote
+# it when explaining what it matched. RUF001-003 flag it as confusable with a
+# hyphen, which is the right call for prose somebody typed and the wrong one for
+# a byte that arrives from upstream.
+allowed-confusables = ["–"]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings

@@ -30,6 +30,11 @@ const ignored = [
   // The next Minecraft version, to prove the rules are not pinned to 26.2.
   "tests/fixtures/mcmeta_26_3_block_tags.json",
   "tests/fixtures/mcmeta_26_3_block_harvest.json",
+  // Written by `tests/fixtures/build_bucket_row_snapshot.py`. Prettier agrees
+  // with that file's formatting today only because the rows it selects hold no
+  // arrays; the rule exists so a refresh that selects a repeated column does
+  // not turn the format gate red on a clean tree.
+  "tests/fixtures/wiki_bucket_rows.json",
   // The rest of the generated tree, already covered before this gate existed.
   "web/types/entity.ts",
   "data/dist/entities/mob-0.json",

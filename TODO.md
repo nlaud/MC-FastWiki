@@ -11,16 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 2 — Wiki enrichment (Tier B)
 
-- [ ] Pull `resource_location` (Java rows only) and build the **display name to registry ID join
-      table** — this unblocks everything else in this phase
-- [ ] Pull `droptable`; parse the `json` column, **keep only the `java` key**, preserve
-      per-looting-level distributions
-- [ ] Pull `spawn_table`; filter `Edition == java`; group by mob into biome/weight/group-size rows
-- [ ] Pull `crafting_recipe`; parse `A1`–`C3` grid slots into a shape comparable with Tier A
-      recipes (used as a cross-check, not as the primary source)
-- [ ] Pull `advancement`; join on `internal_id` to the Tier A advancement tree
-- [ ] Pull `trade` (280 rows); **keep `java_probability`, drop `bedrock_probability`**; group by
-      profession and level
 - [ ] Fetch intro blurbs via `prop=extracts&exintro&explaintext`, batched
 - [ ] Wikitext infobox parser for what Bucket does not cover: health, damage, size, usable items
   - [ ] Strip `{{IN|BE}}` / `{{only|bedrock}}` regions **before** reading any value

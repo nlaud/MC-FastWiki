@@ -27,3 +27,16 @@ data/dist/
 # they are small enough to read in a review.
 tests/fixtures/mcmeta_*_block_tags.json
 tests/fixtures/mcmeta_*_block_harvest.json
+
+# The wiki Bucket row snapshot of the enrich tests, written by
+# `tests/fixtures/build_bucket_row_snapshot.py` with `json.dumps(indent=2)`.
+#
+# Prettier happens to agree with that output today, because the rows this
+# fixture selects hold no arrays. That is luck, not a guarantee: the Bucket API
+# returns a repeated column as a list, so the day a refresh selects one, the two
+# writers disagree and `pnpm format:check` reports the file on a clean tree.
+# Naming it here settles the ownership before that happens.
+#
+# The name carries no version, unlike the mcmeta rules above, because the wiki
+# has none. A refresh overwrites this file in place.
+tests/fixtures/wiki_bucket_rows.json

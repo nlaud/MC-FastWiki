@@ -52,3 +52,8 @@
 # `tests/fixtures/` are hand-written and must stay in the diff.
 /tests/fixtures/mcmeta_*_block_tags.json linguist-generated=true
 /tests/fixtures/mcmeta_*_block_harvest.json linguist-generated=true
+
+# Collapse the wiki Bucket row snapshot of the enrich tests, for the reason
+# above: `tests/fixtures/build_bucket_row_snapshot.py` writes it, it is several
+# thousand lines, and a refresh rewrites all of them at once.
+/tests/fixtures/wiki_bucket_rows.json linguist-generated=true
