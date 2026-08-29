@@ -11,7 +11,6 @@ reasoning survives even after the choice is made.
 
 ## Phase 2 — Wiki enrichment (Tier B)
 
-- [ ] Fetch intro blurbs via `prop=extracts&exintro&explaintext`, batched
 - [ ] Wikitext infobox parser for what Bucket does not cover: health, damage, size, usable items
   - [ ] Strip `{{IN|BE}}` / `{{only|bedrock}}` regions **before** reading any value
   - [ ] Handle difficulty-tiered damage (easy/normal/hard) rather than assuming one number

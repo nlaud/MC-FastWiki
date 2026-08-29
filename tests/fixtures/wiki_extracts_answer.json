@@ -1,0 +1,31 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "normalized": [
+      {
+        "fromencoded": false,
+        "from": "creeper",
+        "to": "Creeper"
+      }
+    ],
+    "redirects": [
+      {
+        "from": "Creepers",
+        "to": "Creeper"
+      }
+    ],
+    "pages": [
+      {
+        "ns": 0,
+        "title": "MC-FastWiki no such page 12345",
+        "missing": true
+      },
+      {
+        "pageid": 628,
+        "ns": 0,
+        "title": "Creeper",
+        "extract": "A creeper is a common hostile mob that quietly approaches a player, hisses, and explodes if the player remains near. Creeper explosions can destroy blocks and deal massive amounts of damage, which can be completely blocked using a shield or blocks.\nWhen struck by lightning, a creeper becomes a charged creeper, which amplifies its explosion power and enables mob heads to be obtained from piglins, zombies, skeletons and other creepers it kills. It also bumps up the chance for a wither skeleton skull to drop to 100% from a wither skeleton.\nDue to its distinctive appearance and unique destructive method of attack, the creeper has become one of the most iconic mobs of Minecraft, being featured in promotional material and merchandise.\n\n"
+      }
+    ]
+  }
+}

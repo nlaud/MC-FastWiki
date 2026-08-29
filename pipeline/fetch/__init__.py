@@ -26,6 +26,7 @@ __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "OPENER",
     "USER_AGENT",
+    "WIKI_API_URL",
     "FetchError",
     "HttpsOnlyRedirectHandler",
     "Transport",
@@ -43,6 +44,16 @@ USER_AGENT = f"MC-FastWiki/{__version__} (+https://github.com/nlaud/MC-FastWiki)
 
 # A stalled read must fail the build, not hang it. CI has no keyboard.
 DEFAULT_TIMEOUT_SECONDS = 30.0
+
+# The one wiki endpoint of this project. CLAUDE.md records MediaWiki 1.45 with
+# Weird Gloop's Bucket extension behind it.
+#
+# Two modules read Tier B through this URL, and they read different parts of it.
+# `pipeline.fetch.bucket` sends `action=bucket` for the structured rows.
+# `pipeline.fetch.extracts` sends `action=query&prop=extracts` for the intro
+# blurb, which no bucket holds. The endpoint is the same for both, so it is
+# named once here rather than copied into each module.
+WIKI_API_URL = "https://minecraft.wiki/api.php"
 
 # Every upstream of this project speaks HTTPS. `urlopen` also serves `file:`
 # and `ftp:`, so a URL that arrives from a data file could read a local path

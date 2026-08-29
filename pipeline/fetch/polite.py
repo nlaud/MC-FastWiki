@@ -51,6 +51,7 @@ from pipeline.fetch import FetchError, Transport, get_bytes
 __all__ = [
     "DEFAULT_MIN_INTERVAL_SECONDS",
     "MAX_WAIT_SECONDS",
+    "WIKI_TRANSPORT",
     "Clock",
     "RateLimiter",
     "RetryPolicy",
@@ -262,3 +263,25 @@ def polite_transport(
         raise FetchError(f"GET {url} was not attempted: the retry policy allows no try.")
 
     return fetch
+
+
+# The one transport that every wiki reader of this package shares.
+#
+# A rate limit is a property of a host, not of an API action. `WIKI_API_URL` is
+# one host, and two modules read two actions of it: `pipeline.fetch.bucket`
+# sends `action=bucket` and `pipeline.fetch.extracts` sends
+# `action=query&prop=extracts`. A module-level default in each of them would
+# hold a `RateLimiter` of its own, and this module says in full why that is
+# wrong: two limiters do not space each other, so the wiki would see the sum of
+# both rates while each reader believed it was keeping to one.
+#
+# It would also undo the reason those defaults exist. Each is built at import so
+# that politeness is not something a caller has to remember, and politeness
+# *across* the two readers would go straight back to being remembered -- by
+# building one `polite_transport` and passing it to both, at every call site,
+# for all time. One object here is the same rule stated once.
+#
+# Built at import, so every caller that takes a default shares this limiter. A
+# stage that wants its own spacing -- a sprite read of several thousand files,
+# say -- still builds its own `polite_transport` and passes it.
+WIKI_TRANSPORT: Transport = polite_transport()

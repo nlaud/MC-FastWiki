@@ -38,6 +38,8 @@ bytes at that URL cannot change; read `pipeline/fetch/mcmeta.py` for the reason
 that the SHA is there. A wiki key carries a caller revision in front of the URL,
 because the wiki is edited every day and its URL alone names different bytes
 next week; read `pipeline/fetch/bucket.py` for the shape of that key.
+`check_revision` below holds what such a revision may be, so that both wiki
+readers of this package agree on one answer.
 
 The rule for any new caller follows from those two. Put something in the key
 that changes when the payload may have changed. A key that cannot promise this
@@ -46,6 +48,7 @@ belongs in a different store, not in this one with an expiry bolted on.
 
 import hashlib
 import json
+import re
 import string
 import tempfile
 from collections.abc import Callable
@@ -59,8 +62,10 @@ __all__ = [
     "HASH_ALGORITHM",
     "INDEX_NAME",
     "OBJECTS_NAME",
+    "REVISION",
     "SHARD_LENGTH",
     "ContentCache",
+    "check_revision",
     "fetch_and_read",
 ]
 
@@ -86,6 +91,30 @@ SHARD_LENGTH = 2
 # The length of a SHA-256 in hexadecimal, and the character set of one.
 DIGEST_LENGTH = hashlib.new(HASH_ALGORITHM).digest_size * 2
 DIGEST_CHARACTERS = frozenset(string.hexdigits[:16])
+
+# What a cache revision may hold.
+#
+# A revision names a generation of a key, so it must hold no separator that
+# would make two revisions collide, and it must stay readable in the index file.
+# A Minecraft version ID such as `26.2` and a date such as `2026-08-27` both
+# pass. A slash, a space, and a newline do not.
+REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+
+
+def check_revision(value: str) -> str:
+    """Return `value` when it names a cache revision, or raise `FetchError`.
+
+    Every caller whose URL does not name immutable bytes puts a revision in
+    front of that URL, and the two wiki readers of this package both do. The
+    check lives here, with the store, because the rule it enforces is a rule of
+    the key and not a rule of any one API.
+    """
+    if not REVISION.fullmatch(value):
+        raise FetchError(
+            f"{value!r} is not a cache revision. A revision is a plain token such as `26.2` "
+            f"or `2026-08-27`, because it names one generation of a cache key."
+        )
+    return value
 
 
 def _digest(payload: bytes) -> str:

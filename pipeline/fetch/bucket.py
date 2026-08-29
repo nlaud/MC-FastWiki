@@ -75,9 +75,9 @@ from urllib.parse import urlencode
 
 from pydantic import BaseModel, field_validator
 
-from pipeline.fetch import FetchError, Transport, decode_json
-from pipeline.fetch.cache import ContentCache, fetch_and_read
-from pipeline.fetch.polite import polite_transport
+from pipeline.fetch import WIKI_API_URL, FetchError, Transport, decode_json
+from pipeline.fetch.cache import ContentCache, check_revision, fetch_and_read
+from pipeline.fetch.polite import WIKI_TRANSPORT
 
 __all__ = [
     "BUCKET_API_URL",
@@ -90,9 +90,10 @@ __all__ = [
     "parse_bucket_answer",
 ]
 
-# The one wiki endpoint of this project. CLAUDE.md records MediaWiki 1.45 with
-# Weird Gloop's Bucket extension behind it.
-BUCKET_API_URL = "https://minecraft.wiki/api.php"
+# The wiki endpoint, under the name that a bucket caller reads it by. One URL
+# serves every action of the API, so `pipeline.fetch` holds the string and this
+# module holds the name.
+BUCKET_API_URL = WIKI_API_URL
 
 # The row cap of one request, and the reason it is also the page size. See fact
 # 3 in the module docstring: the server truncates a larger limit without saying
@@ -117,13 +118,14 @@ MAX_ROWS = 200_000
 # remembered is a rule that will be forgotten: one full `spritefile` read is
 # forty requests, and nothing fails or warns when they all go out at once.
 #
-# Built once, at import, so that every caller that takes the default shares one
-# `RateLimiter` and the service sees one rate for the whole build. Two
-# transports hold two limiters and do not space each other, which is why
-# `pipeline.fetch.polite` says to build one and pass it everywhere. A stage that
+# It is `WIKI_TRANSPORT`, and not a `polite_transport()` of this module, so that
+# the service sees one rate for the whole build. Two transports hold two
+# limiters and do not space each other, which is why `pipeline.fetch.polite`
+# says to build one and pass it everywhere -- and `pipeline.fetch.extracts`
+# reads the same host through the same limiter for that reason. A stage that
 # wants its own spacing still passes its own `polite_transport`, and a test
 # passes a callable that reads no socket.
-DEFAULT_TRANSPORT: Transport = polite_transport()
+DEFAULT_TRANSPORT: Transport = WIKI_TRANSPORT
 
 # A bucket name is lowercase snake_case. CLAUDE.md records this as a rule
 # learned the hard way: `spawn_table` works and `Spawn table` does not.
@@ -136,11 +138,6 @@ BUCKET_NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 # could end the Lua string or open a call: a quote, a backslash, a bracket, a
 # space, and a dot.
 FIELD_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*\Z")
-
-# A revision names a cache generation, so it must be readable in the index file
-# and must hold no separator that would make two revisions collide. A Minecraft
-# version ID such as `26.2` and a date such as `2026-08-27` both pass.
-REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 # The comparisons that `where()` accepts. A whitelist rather than a pattern:
 # these reach the query as bare text, outside the quoting that a value gets.
@@ -386,7 +383,7 @@ def fetch_bucket_rows(
     `edition` field, while `droptable` splits the editions inside its `json`
     column and `trade` splits them across two probability fields.
     """
-    _checked_identifier(revision, REVISION, "cache revision")
+    check_revision(revision)
     if page_size < 1 or page_size > PAGE_SIZE:
         raise FetchError(f"a Bucket page size must be between 1 and {PAGE_SIZE}, not {page_size}.")
     store = ContentCache() if cache is None else cache
