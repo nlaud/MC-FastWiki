@@ -23,3 +23,9 @@ web/dist/
 # Such a rule also matches /data/dist and breaks the static build.
 # tests/test_repo_invariants.py fails when one half of this rule breaks.
 /data/.cache/
+
+# Lavish review surfaces. Scratch artifacts for plan review, not project content.
+.lavish/
+
+# Build diagnostics. The pipeline regenerates these; they are not site payload.
+/data/reports/
