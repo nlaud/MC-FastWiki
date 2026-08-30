@@ -34,7 +34,7 @@ seven were checked against `https://minecraft.wiki/api.php` on 2026-08-30.
 2. **Two rewrite maps, both must be followed, exactly as `extracts.py` reads
    them.** `query.normalized` maps `creeper` to `Creeper` (the wiki
    capitalizing the request); `query.redirects` maps `Creepers` to `Creeper`
-   (the wiki following a redirect page). `_resolve_title` below is the same
+   (the wiki following a redirect page). `resolve_title` below is the same
    walk `pipeline.fetch.extracts` uses, because the trap is identical: the
    answered page carries only the final title, so a reader that matched on the
    requested title would find nothing for either kind of rewrite.
@@ -80,6 +80,14 @@ rate the wiki actually sees.
 This module reads what the wiki said and nothing more. It resolves no
 template, strips no markup, and applies no edition filter.
 `pipeline.enrich.markup` and `pipeline.enrich.infobox` do that reading.
+
+The title check, the two-step rewrite walk, and the `error`-object reader below
+used to be copied here from `pipeline.fetch.extracts`, each function's
+docstring saying so outright rather than importing the private original.
+`pipeline.fetch.mediawiki` is their one home now, shared by this module,
+`extracts.py`, and `pipeline.fetch.imageinfo`. This module re-exports
+`MAX_REWRITE_HOPS` and `TITLE_SEPARATOR` under its own name for the callers and
+tests that already read them from here.
 """
 
 from collections.abc import Iterable, Sequence
@@ -90,6 +98,14 @@ from pydantic import BaseModel
 
 from pipeline.fetch import WIKI_API_URL, FetchError, Transport, decode_json
 from pipeline.fetch.cache import ContentCache, check_revision, fetch_and_read
+from pipeline.fetch.mediawiki import (
+    MAX_REWRITE_HOPS,
+    TITLE_SEPARATOR,
+    api_error_text,
+    checked_title,
+    resolve_title,
+    rewrite_map,
+)
 from pipeline.fetch.polite import WIKI_TRANSPORT
 
 __all__ = [
@@ -114,15 +130,6 @@ __all__ = [
 # titles answers `toomanyvalues` and nothing else, so this constant is a
 # courtesy that keeps a caller from writing a request the server would refuse.
 BATCH_SIZE = 50
-
-# What the API reads as the boundary between two titles.
-TITLE_SEPARATOR = "|"
-
-# How many rewrites `_resolve_title` follows before it gives up. Copied from
-# `pipeline.fetch.extracts`, which explains the `+ 1` in the range below: a
-# rewrite chain of the wiki is one normalization and at most one redirect, and
-# a hop and a look are not the same step.
-MAX_REWRITE_HOPS = 4
 
 # The wiki namespace that holds the article about a Minecraft thing. Fact 4:
 # every answer this module reads carries `ns`, so the test is the number
@@ -188,25 +195,6 @@ class WikitextReport(BaseModel, frozen=True):
         return {entry.requested_title: entry.content for entry in self.pages}
 
 
-def _checked_title(title: str) -> str:
-    """Return `title` when it can name one wiki page, or raise `FetchError`.
-
-    Identical to `pipeline.fetch.extracts._checked_title`: a blank title asks
-    for nothing, a title holding the separator asks for two pages under one
-    name, and a control character is a sign the caller built the title wrongly.
-    """
-    if not title.strip():
-        raise FetchError("a wiki title cannot be blank.")
-    if TITLE_SEPARATOR in title:
-        raise FetchError(
-            f"{title!r} holds a {TITLE_SEPARATOR!r}, which this API reads as the boundary "
-            f"between two titles. The request would ask for two pages under one name."
-        )
-    if any(character < " " or character == "\x7f" for character in title):
-        raise FetchError(f"{title!r} holds a control character, so it cannot name a wiki page.")
-    return title
-
-
 def build_wikitext_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) -> str:
     """Return the URL that reads the current wikitext of every title of `titles`.
 
@@ -223,7 +211,7 @@ def build_wikitext_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) ->
             f"a wikitext request cannot name more than {BATCH_SIZE} titles, and this one names "
             f"{len(titles)}. The API answers a larger batch with an error and no pages at all."
         )
-    checked = [_checked_title(title) for title in titles]
+    checked = [checked_title(title) for title in titles]
     if len(set(checked)) != len(checked):
         raise FetchError("a wikitext request names each title once. This one repeats a title.")
     parameters = urlencode(
@@ -242,66 +230,12 @@ def build_wikitext_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) ->
             "rvslots": "main",
             # Follow a redirect page rather than answer it, matching
             # `pipeline.fetch.extracts`. `query.redirects` then records the
-            # move, and `_resolve_title` reads that record.
+            # move, and `resolve_title` reads that record.
             "redirects": "1",
             "titles": TITLE_SEPARATOR.join(checked),
         }
     )
     return f"{api_url}?{parameters}"
-
-
-def _rewrite_map(query: dict[str, Any], name: str, *, source: str) -> dict[str, str]:
-    """Return the `from` to `to` map of `query[name]`, or an empty one.
-
-    Identical in shape and purpose to `pipeline.fetch.extracts._rewrite_map`.
-    """
-    entries = query.get(name)
-    if entries is None:
-        return {}
-    if not isinstance(entries, list):
-        raise FetchError(f"{source} answered a {name!r} of {type(entries).__name__}, not a list.")
-    rewrites: dict[str, str] = {}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise FetchError(f"{source} answered a {name!r} entry of {entry!r}, not an object.")
-        moved_from = entry.get("from")
-        moved_to = entry.get("to")
-        if not isinstance(moved_from, str) or not isinstance(moved_to, str):
-            raise FetchError(f"{source} answered a {name!r} entry with no 'from' and 'to' pair.")
-        rewrites[moved_from] = moved_to
-    return rewrites
-
-
-def _resolve_title(title: str, rewrites: dict[str, str], *, source: str) -> str:
-    """Return the title that the answer holds for the requested `title`.
-
-    Identical to `pipeline.fetch.extracts._resolve_title`; see that function
-    for why the loop runs `MAX_REWRITE_HOPS + 1` times rather than
-    `MAX_REWRITE_HOPS`.
-    """
-    seen = {title}
-    current = title
-    for _ in range(MAX_REWRITE_HOPS + 1):
-        moved_to = rewrites.get(current)
-        if moved_to is None or moved_to == current:
-            return current
-        if moved_to in seen:
-            raise FetchError(f"{source} rewrote {title!r} in a circle, so it names no page.")
-        seen.add(moved_to)
-        current = moved_to
-    raise FetchError(
-        f"{source} rewrote {title!r} more than {MAX_REWRITE_HOPS} times, so the walk was stopped."
-    )
-
-
-def _api_error_text(error: Any) -> str:
-    """Return what the `error` key of a MediaWiki answer says, as one line."""
-    if isinstance(error, dict):
-        code = error.get("code")
-        info = error.get("info")
-        if code is not None or info is not None:
-            return f"{code}: {info}"
-    return str(error)
 
 
 def _page_content(page: dict[str, Any], *, source: str) -> str | None:
@@ -343,7 +277,7 @@ def parse_wikitext_answer(payload: bytes, *, source: str, titles: Sequence[str])
         raise FetchError(f"{source} answered {type(document).__name__}, not an API answer.")
     error = document.get("error")
     if error is not None:
-        raise FetchError(f"{source} refused the query: {_api_error_text(error)}")
+        raise FetchError(f"{source} refused the query: {api_error_text(error)}")
     # Fact 7. An answer that carries `continue` left some of the batch unread,
     # and nothing in the shape says which titles lost their content.
     if "continue" in document:
@@ -360,8 +294,8 @@ def parse_wikitext_answer(payload: bytes, *, source: str, titles: Sequence[str])
     if not isinstance(pages, list):
         raise FetchError(f"{source} answered no 'pages' list, so it holds no pages.")
 
-    rewrites = _rewrite_map(query, "normalized", source=source)
-    rewrites |= _rewrite_map(query, "redirects", source=source)
+    rewrites = rewrite_map(query, "normalized", source=source)
+    rewrites |= rewrite_map(query, "redirects", source=source)
 
     answered: dict[str, dict[str, Any]] = {}
     for index, page in enumerate(pages):
@@ -375,7 +309,7 @@ def parse_wikitext_answer(payload: bytes, *, source: str, titles: Sequence[str])
     found: list[PageWikitext] = []
     misses: list[MissingWikitext] = []
     for title in titles:
-        page_title = _resolve_title(title, rewrites, source=source)
+        page_title = resolve_title(title, rewrites, source=source)
         page = answered.get(page_title)
         if page is None:
             raise FetchError(f"{source} answered no page for {title!r}, which the request named.")
@@ -434,7 +368,7 @@ def fetch_page_wikitext(
     check_revision(revision)
     if batch_size < 1 or batch_size > BATCH_SIZE:
         raise FetchError(f"a wikitext batch holds 1 to {BATCH_SIZE} titles, not {batch_size}.")
-    wanted = sorted({_checked_title(title) for title in titles})
+    wanted = sorted({checked_title(title) for title in titles})
     store = ContentCache() if cache is None else cache
     the_transport = DEFAULT_TRANSPORT if transport is None else transport
     reports: list[WikitextReport] = []
