@@ -1,5 +1,5 @@
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // `eslint .` walks the whole repository. It skips `node_modules` on its own,
 // but it does descend into dot-directories, so anything the config does not
@@ -11,6 +11,23 @@ import { describe, expect, it } from "vitest";
 // No `cwd` option: ESLint defaults to `process.cwd()`, and Vitest runs from
 // the repository root, which is where the paths below are rooted.
 const eslint = new ESLint();
+
+// `new ESLint()` above does not load anything by itself -- `eslint.config.js`
+// and its `typescript-eslint` import are resolved lazily, on the first call
+// that actually needs the config, which is the first `isPathIgnored` below.
+// Timed against this repository: a cold first call took 13.5s, comfortably
+// over Vitest's 5s default `it` timeout, and every call after it took under
+// 10ms. Whichever `it.each` case runs first paid that cost and failed on a
+// timeout that had nothing to do with what it was testing -- observed here as
+// 39.8s and one failure on a first run, 4.3s and all green on the second, with
+// no change to the file in between.
+//
+// So the config is warmed once, here, before any case runs, with its own
+// timeout generous enough for a cold resolve. Every `it.each` case below then
+// starts from a warm config and keeps Vitest's default timeout.
+beforeAll(async () => {
+  await eslint.isPathIgnored("warm-eslint-config.js");
+}, 30_000);
 
 const ignored = [
   ".venv/Lib/site-packages/vendored/bundle.js",

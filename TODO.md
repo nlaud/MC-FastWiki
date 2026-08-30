@@ -11,10 +11,12 @@ reasoning survives even after the choice is made.
 
 ## Phase 2 — Wiki enrichment (Tier B)
 
-- [ ] Wikitext infobox parser for what Bucket does not cover: health, damage, size, usable items
-  - [ ] Strip `{{IN|BE}}` / `{{only|bedrock}}` regions **before** reading any value
-  - [ ] Handle difficulty-tiered damage (easy/normal/hard) rather than assuming one number
-  - [ ] Unresolvable fields go to an `unparsed-report.json`, never a silent guess
+- [x] Wikitext infobox parser for what Bucket does not cover: health, damage, size, usable items
+  (and armor, behavior, mobtype, speed, knockbackresistance -- all nine fields the infobox
+  carries)
+  - [x] Strip `{{IN|BE}}` / `{{only|bedrock}}` regions **before** reading any value
+  - [x] Handle difficulty-tiered damage (easy/normal/hard) rather than assuming one number
+  - [x] Unresolvable fields go to an `unparsed-report.json`, never a silent guess
 - [ ] Pull `spritefile` (paginated past 5000) to build the sprite ID to `File:` name map
 - [ ] Resolve `File:` pages to image URLs via `prop=imageinfo`, download with content-hash caching
 - [ ] Report any entity that ends up with no icon — a missing icon is a broken join, not a
@@ -82,6 +84,10 @@ reasoning survives even after the choice is made.
 - [ ] Visible CC BY-NC-SA attribution and a link back to the source wiki page
 - [ ] Render crafting recipes **collapsed** — "Wooden Stairs — any plank type" rather than
       thirteen near-identical rows (see Decision 9)
+- [ ] **Infobox fields, per the wikitext infobox parser (Phase 2):**
+  - [ ] `armor` — shown beside the HP badge, for the mobs that have it
+  - [ ] `behavior` and `mobtype` — shown as the passive / hostile / neutral signal
+  - [ ] `speed` and `knockbackresistance` — parsed and stored, not rendered
 
 ## Phase 6b — Obtaining, scraped from the wiki
 
