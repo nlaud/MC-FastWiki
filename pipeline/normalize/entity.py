@@ -1,0 +1,893 @@
+"""The `Entity` model, and the discriminated `Section` union it carries.
+
+`pipeline/schema/entity.schema.json` is the contract this module exists to
+satisfy in Python. CLAUDE.md draws the line: the JSON Schema is what the web
+app's TypeScript is generated from, and this module is what the merge stage
+(Phase 3's remaining work, not this task) actually builds and validates
+against before anything is written to `/data/dist`. The two describe the same
+shape from two languages, and `tests/test_schema_contract.py`'s structural
+agreement test is what keeps a field added on one side from going unnoticed
+on the other.
+
+## Two approved decisions, mirrored here exactly
+
+**D1 -- `wikiUrl` is conditionally required.** Real registry IDs have no wiki
+page at all, so `wikiUrl` cannot be an unconditional requirement without making
+those IDs impossible to represent. The JSON Schema expresses the rule as a
+top-level `if`/`then` and
+`Entity._wiki_url_required_when_wiki_authored_content_is_shown` enforces the
+identical rule in Python, which is the side that actually stops a bad build:
+the pipeline constructs `Entity` instances directly and never round-trips
+through a JSON Schema validator.
+
+The trigger is wiki-*authored* content, which is narrower than "any Tier B
+field", and the narrowing was forced by the live data rather than chosen for
+convenience. `blurb` is the wiki's own prose and a section is a table the wiki
+compiled, so either at Tier B requires the attribution link. An `icon` does
+not, because Decision 3 of `TODO.md` records that the sprites are Mojang's
+textures wherever they are fetched from -- the wiki hosts them, it did not
+write them -- and because the id-based icon route reads the hyphenated
+registry path out of Tier A without consulting a wiki article at all.
+Measured against the live 26.2 data on 2026-08-31, 7 biome IDs resolve an icon
+by that route and have no wiki page in the join table. Counting the icon as
+wiki-authored would have demanded a link with nothing to point at and made
+those seven impossible to build, which is the same failure the decision exists
+to prevent, one tier further in.
+
+**D2 -- five sections carry real fields.** `StatBlock`, `SpawnInfo`,
+`DropTable`, `TradeTable`, and `AdvancementInfo` are closed models here, each
+mirroring one Tier B index this pipeline already builds:
+`pipeline.enrich.infobox.EntityInfobox`, `pipeline.enrich.spawn_table.
+SpawnIndex.by_mob`, `pipeline.enrich.droptable.DropIndex.by_mob`,
+`pipeline.enrich.trade.TradeIndex`, and `pipeline.enrich.advancement.
+AdvancementTree`, respectively. The other eight members of the `Section`
+union stay open bags (`model_config = ... extra="allow"`), because the phase
+that fills each one has not run yet; every one of their docstrings names the
+phase that will, matching the schema's own updated descriptions.
+
+## Why `Section` is `Annotated[..., Field(discriminator="type")]`
+
+A plain `Union` asks pydantic to try every member in order and keep the first
+one that validates, which is slow with thirteen members and, worse, ambiguous
+for the eight open `extra="allow"` bags -- almost anything with a `type` field
+would validate against several of them if pydantic had to guess. A
+discriminated union reads `type` first and validates against exactly one
+member, which is also the only reading that matches how the web app's
+generated TypeScript already treats this field: a discriminator, not a
+guess.
+
+## The `name`/`ref` pattern, and why it repeats across three sections
+
+`ItemAmount.ref`, `SpawnEntry.biome_ref`, `DropEntry.item_ref`, and
+`TradeEntry.profession_ref` all share one shape: a display `name` that is
+always present, because Tier B tables are keyed by the wiki's own display
+name and not by registry ID, plus an optional `ref` that the merge fills in
+only when it can resolve that name to a registry ID. Where `ref` is present a
+renderer prints a link; where it is absent, it prints `name` as plain text.
+`TODO.md`'s Phase 6 lint pass ("flag any renderer printing a known entity
+name as plain text instead of a link") reads that absence as its signal, so
+`ref` being optional is not a gap to be filled in later -- it is the data
+this pipeline is supposed to produce for a name it genuinely could not
+resolve.
+
+## Field naming: explicit aliases, not `alias_generator`
+
+The JSON Schema is camelCase (`wikiUrl`, `sourceTiers`, `mobType`); Python
+convention is snake_case. Every model here uses `Field(alias="camelCase")` on
+the handful of fields where the two differ, plus `populate_by_name=True` so a
+caller can still construct one by its Python name. `Field(alias=...)` was
+chosen over `alias_generator=to_camel` specifically because
+`pyproject.toml` turns on the pydantic mypy plugin's
+`warn_required_dynamic_aliases`: that option exists to catch exactly the
+situation an `alias_generator` creates -- mypy cannot statically resolve a
+generated alias, so it cannot check whether a required field's synthesized
+`__init__` keyword is the field name or the alias, and it warns rather than
+silently getting it wrong. A literal string alias has no such ambiguity, so
+mypy resolves it without a warning, and every model uses the same mechanism
+for the same reason -- there is no model here where a dynamic alias would
+have been more convenient.
+
+## Provenance is written where the value is written, never reconstructed
+
+`EntityDraft` exists because a merge that writes a dozen fields and then
+tries to reconstruct which tier produced each one, after the fact, is
+guessing -- the tier that a merge step is currently reading from is a fact it
+knows at that moment and nowhere else. `EntityDraft.set` and
+`EntityDraft.add_aliases` both take the contributing tier as a required
+argument and record it in the same call that writes the value, so there is no
+code path that can write a field and forget its provenance.
+"""
+
+import re
+from collections.abc import Iterable, Mapping
+from enum import StrEnum
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from pipeline.normalize import NormalizeError
+
+__all__ = [
+    "ENTITY_ID_PATTERN",
+    "AdvancementInfo",
+    "BreedingInfo",
+    "ChestLoot",
+    "DamageValue",
+    "DistributionEntry",
+    "DropEntry",
+    "DropNote",
+    "DropTable",
+    "EffectSources",
+    "EnchantInfo",
+    "Entity",
+    "EntityDraft",
+    "EntityKind",
+    "EntityRef",
+    "GenerationInfo",
+    "IntegerRange",
+    "ItemAmount",
+    "JavaProbability",
+    "LabelledText",
+    "LabelledValue",
+    "LinkList",
+    "LootingDrop",
+    "Measure",
+    "ObtainList",
+    "Ratio",
+    "RecipeTree",
+    "Section",
+    "SizeValue",
+    "SourceTier",
+    "SpawnEntry",
+    "SpawnInfo",
+    "StatBlock",
+    "TradeEntry",
+    "TradeTable",
+]
+
+# Mirrors `pipeline.schema.entity.schema.json`'s `$defs.entityId.pattern`
+# exactly. A namespaced identifier: `minecraft:creeper`, `collection:compostable`.
+ENTITY_ID_PATTERN = re.compile(r"^[a-z0-9_-]+:[a-z0-9_./-]+$")
+
+
+class SourceTier(StrEnum):
+    """The tier that produced one field, mirroring the schema's `sourceTier`.
+
+    A is vanilla game data from mcmeta, the completeness layer. B is the
+    Minecraft Wiki, the presentation layer. C is a curated override, hand
+    maintained where upstream has nothing or is wrong. The three are ordered
+    A < B < C, and a later tier wins where two disagree on the same field --
+    the same precedence CLAUDE.md states for the pipeline as a whole.
+    """
+
+    A = "A"
+    B = "B"
+    C = "C"
+
+
+# The rank of each tier for the "a later tier wins" comparisons this module
+# needs -- `EntityDraft.add_aliases` uses it to keep the highest tier that
+# ever contributed a given alias. Kept as an explicit mapping rather than
+# relying on enum declaration order staying meaningful, so a reordering of
+# `SourceTier`'s members for some unrelated reason cannot silently invert it.
+_TIER_RANK: Mapping[SourceTier, int] = {SourceTier.A: 0, SourceTier.B: 1, SourceTier.C: 2}
+
+
+class EntityKind(StrEnum):
+    """The discriminator of `Entity`, mirroring the schema's `entityKind` enum.
+
+    Selects the renderer on the web side. CLAUDE.md names these nine kinds of
+    searchable thing.
+    """
+
+    MOB = "mob"
+    ITEM = "item"
+    BLOCK = "block"
+    EFFECT = "effect"
+    ADVANCEMENT = "advancement"
+    ENCHANTMENT = "enchantment"
+    STRUCTURE = "structure"
+    BIOME = "biome"
+    COLLECTION = "collection"
+
+
+class EntityRef(BaseModel, frozen=True, populate_by_name=True):
+    """A cross-reference to another entity, mirroring the schema's `entityRef`.
+
+    A renderer never prints an entity name as plain text; it prints this
+    object as a link. `id` follows the same `entityId` shape as `Entity.id`,
+    validated here with a plain string pattern rather than
+    `Entity`'s dedicated `NormalizeError`-raising validator, because an
+    `EntityRef` is a value nested inside a larger model rather than the
+    build's own unit of merge -- a malformed one is still a shape fault, and
+    pydantic's own `ValidationError` names it precisely.
+    """
+
+    id: str = Field(pattern=ENTITY_ID_PATTERN.pattern)
+    name: str = Field(min_length=1)
+
+
+class Measure(BaseModel, frozen=True, populate_by_name=True):
+    """A number, or a span of them, mirroring `pipeline.enrich.infobox.Measure`.
+
+    A fixed value is a measure whose `minimum` equals its `maximum` -- every
+    plain `{{hp|N}}` on the wiki produces one of these.
+    """
+
+    minimum: float
+    maximum: float
+
+
+class IntegerRange(BaseModel, frozen=True, populate_by_name=True):
+    """A whole number, or a span of them, mirroring `pipeline.enrich.IntegerRange`.
+
+    A wiki table cell such as a spawn group size or a trade quantity can be a
+    single figure or a range, and this one shape covers both without a second
+    field to check.
+    """
+
+    minimum: int
+    maximum: int
+
+
+class Ratio(BaseModel, frozen=True, populate_by_name=True):
+    """An exact fraction, mirroring `pipeline.enrich.droptable.Ratio`.
+
+    Kept as a numerator and a denominator rather than one float, because that
+    is how the wiki states a drop chance or an average, and rounding it once
+    here would be a loss no later stage could see or undo.
+    """
+
+    numerator: int
+    denominator: int
+
+    @property
+    def value(self) -> float:
+        """Return the fraction as a float, for a renderer that wants one."""
+        return self.numerator / self.denominator
+
+
+class LabelledText(BaseModel, frozen=True, populate_by_name=True):
+    """Plain text read for a labelled variant, mirroring the infobox's own `LabelledText`.
+
+    `StatBlock` reuses this one shape for `behavior`, `speed`, and
+    `knockback_resistance` rather than declaring the same two fields three
+    times.
+    """
+
+    labels: tuple[str, ...]
+    text: str
+
+
+class LabelledValue(BaseModel, frozen=True, populate_by_name=True):
+    """A `Measure` read for a labelled variant of a mob.
+
+    `StatBlock` reuses this one shape for `health` and `armor` rather than
+    declaring the same two fields twice.
+    """
+
+    labels: tuple[str, ...]
+    value: Measure
+
+
+class ItemAmount(BaseModel, frozen=True, populate_by_name=True):
+    """One item and how many, the shape a wiki drop or a trade side reduces to.
+
+    See the module docstring's section on the `name`/`ref` pattern: `name` is
+    always present because Tier B is keyed by display name, and `ref` is
+    present only where the merge could resolve that name to a registry ID.
+    """
+
+    name: str = Field(min_length=1)
+    ref: EntityRef | None = None
+    quantity: IntegerRange
+    note: str | None = None
+
+
+# --- StatBlock ------------------------------------------------------------
+
+
+class DamageValue(BaseModel, frozen=True, populate_by_name=True):
+    """One damage figure, its variant, and the difficulty tier(s) it applies at.
+
+    Mirrors `pipeline.enrich.infobox.DamageValue`. `difficulties` stays a
+    tuple of plain strings rather than importing `infobox.Difficulty`,
+    because this model mirrors the JSON contract -- which declares the field
+    as an array of strings -- and not the enrich stage's own intermediate
+    parsing types.
+    """
+
+    labels: tuple[str, ...]
+    difficulties: tuple[str, ...]
+    value: Measure
+
+
+class SizeValue(BaseModel, frozen=True, populate_by_name=True):
+    """One height/width pair, and the variant it describes.
+
+    Mirrors `pipeline.enrich.infobox.SizeValue`.
+    """
+
+    labels: tuple[str, ...]
+    height: float
+    width: float
+
+
+class StatBlock(BaseModel, frozen=True, populate_by_name=True):
+    """Named numbers of an entity, mirroring `pipeline.enrich.infobox.EntityInfobox`.
+
+    `speed` and `knockback_resistance` are carried here but deliberately not
+    rendered, per `TODO.md` Phase 6 -- they are stored so a later renderer can
+    use them without a pipeline change, not because today's renderer shows
+    them.
+    """
+
+    type: Literal["StatBlock"] = "StatBlock"
+    health: tuple[LabelledValue, ...] = ()
+    damage: tuple[DamageValue, ...] = ()
+    armor: tuple[LabelledValue, ...] = ()
+    size: tuple[SizeValue, ...] = ()
+    behavior: tuple[LabelledText, ...] = ()
+    mob_type: tuple[str, ...] = Field(default=(), alias="mobType")
+    speed: tuple[LabelledText, ...] = ()
+    knockback_resistance: tuple[LabelledText, ...] = Field(default=(), alias="knockbackResistance")
+
+
+# --- SpawnInfo --------------------------------------------------------------
+
+
+class SpawnEntry(BaseModel, frozen=True, populate_by_name=True):
+    """One mob spawning in one biome, at one weight.
+
+    Mirrors `pipeline.enrich.spawn_table.SpawnEntry`. `biome_ref` follows the
+    module docstring's `name`/`ref` pattern: present only where the merge
+    resolved the wiki's biome name to a `worldgen/biome` registry ID.
+    """
+
+    biome: str
+    biome_ref: EntityRef | None = Field(default=None, alias="biomeRef")
+    category: str
+    weight: float
+    total_weight: float = Field(alias="totalWeight")
+    group_size: IntegerRange = Field(alias="groupSize")
+    note: str | None = None
+    note_name: str | None = Field(default=None, alias="noteName")
+
+
+class SpawnInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Where the entity spawns, and under which conditions.
+
+    Mirrors `pipeline.enrich.spawn_table.SpawnIndex.by_mob`: one entry per
+    biome the wiki records a Java spawn weight for.
+    """
+
+    type: Literal["SpawnInfo"] = "SpawnInfo"
+    entries: tuple[SpawnEntry, ...] = ()
+
+
+# --- DropTable ---------------------------------------------------------------
+
+
+class DropNote(BaseModel, frozen=True, populate_by_name=True):
+    """One condition on a drop, as wikitext. Mirrors `pipeline.enrich.droptable.DropNote`."""
+
+    name: str | None = None
+    content: str
+
+
+class DistributionEntry(BaseModel, frozen=True, populate_by_name=True):
+    """One `{count, chance}` pair of a `LootingDrop.distribution`.
+
+    The schema represents `pipeline.enrich.droptable.LootingDrop.distribution`
+    -- a `Mapping[int, Ratio]` on the Python enrich side -- as an array of
+    these pairs sorted by `count` rather than as a JSON object keyed by the
+    count, because a JSON object key must be a string and a numeric-looking
+    string key such as `"10"` is exactly the kind of value that sorts wrong
+    the moment something reads it as text instead of as a number. See
+    `pipeline/schema/entity.schema.json`'s `lootingDrop` definition for the
+    same reasoning on the schema side.
+    """
+
+    count: int
+    chance: Ratio
+
+
+class LootingDrop(BaseModel, frozen=True, populate_by_name=True):
+    """What one mob drops of one item at one looting level.
+
+    Mirrors `pipeline.enrich.droptable.LootingDrop`, with `distribution`
+    reshaped as `DistributionEntry`'s docstring explains.
+    """
+
+    looting_level: int = Field(alias="lootingLevel")
+    minimum: int
+    maximum: int
+    average: Ratio
+    drop_chance: Ratio = Field(alias="dropChance")
+    quantity_text: str = Field(alias="quantityText")
+    distribution: tuple[DistributionEntry, ...] = ()
+
+
+class DropEntry(BaseModel, frozen=True, populate_by_name=True):
+    """What one mob drops of one item, across every looting level the wiki records.
+
+    `item_ref` follows the module docstring's `name`/`ref` pattern.
+    """
+
+    item: str
+    item_ref: EntityRef | None = Field(default=None, alias="itemRef")
+    notes: tuple[DropNote, ...] = ()
+    by_looting_level: tuple[LootingDrop, ...] = Field(default=(), alias="byLootingLevel")
+
+
+class DropTable(BaseModel, frozen=True, populate_by_name=True):
+    """What the entity drops, per looting level.
+
+    Mirrors `pipeline.enrich.droptable.DropIndex.by_mob`. Java only, per
+    non-negotiable 1 of CLAUDE.md.
+    """
+
+    type: Literal["DropTable"] = "DropTable"
+    drops: tuple[DropEntry, ...] = ()
+
+
+# --- TradeTable --------------------------------------------------------------
+
+
+class JavaProbability(BaseModel, frozen=True, populate_by_name=True):
+    """How likely a trade is to be offered, mirroring `pipeline.enrich.trade.Probability`.
+
+    Only the Java figure is carried through the merge at all -- see
+    `TradeEntry`'s docstring.
+    """
+
+    text: str
+    low: float
+    high: float
+
+
+class TradeEntry(BaseModel, frozen=True, populate_by_name=True):
+    """One trade a profession offers at one level.
+
+    Mirrors `pipeline.enrich.trade.WikiTrade`. `profession_ref` is expected
+    to stay absent for now: villager profession entities arrive in Phase 6c,
+    so there is nothing yet for the merge to link a profession name to. Only
+    `java_probability` is carried; `bedrock_probability` is dropped upstream
+    in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.
+    """
+
+    profession: str
+    profession_ref: EntityRef | None = Field(default=None, alias="professionRef")
+    level: str
+    wanted: tuple[ItemAmount, ...] = ()
+    given: ItemAmount
+    java_probability: JavaProbability | None = Field(default=None, alias="javaProbability")
+    max_trades: IntegerRange | None = Field(default=None, alias="maxTrades")
+    villager_xp: int | None = Field(default=None, alias="villagerXp")
+    price_multiplier: float | None = Field(default=None, alias="priceMultiplier")
+
+
+class TradeTable(BaseModel, frozen=True, populate_by_name=True):
+    """Villager and wandering trader trades, grouped by profession and level.
+
+    Mirrors `pipeline.enrich.trade.TradeIndex`.
+    """
+
+    type: Literal["TradeTable"] = "TradeTable"
+    trades: tuple[TradeEntry, ...] = ()
+
+
+# --- AdvancementInfo -----------------------------------------------------
+
+
+class AdvancementInfo(BaseModel, frozen=True, populate_by_name=True):
+    """How the player earns an advancement, and the parent chain.
+
+    Mirrors `pipeline.enrich.advancement.WikiAdvancement`, with `parent`
+    resolved to an `EntityRef` where the merge can, alongside the raw
+    `parent_title` the wiki wrote -- `WikiAdvancement`'s own docstring gives
+    the reason a title that resolves to nothing is worth keeping rather than
+    hiding.
+    """
+
+    type: Literal["AdvancementInfo"] = "AdvancementInfo"
+    internal_id: str = Field(alias="internalId")
+    title: str
+    description: str | None = None
+    game_description: str | None = Field(default=None, alias="gameDescription")
+    parent: EntityRef | None = None
+    parent_title: str | None = Field(default=None, alias="parentTitle")
+    children: tuple[EntityRef, ...] = ()
+    experience: int | None = None
+    reward: str | None = None
+    background: str | None = None
+
+
+# --- The eight sections whose payload arrives in a later phase -------------
+#
+# Each carries only its own `type` discriminator today and accepts any other
+# keys (`extra="allow"`), mirroring the schema's `additionalProperties: true`
+# for these members. Every docstring names the phase that replaces the open
+# payload with real fields, matching the schema's own updated descriptions.
+
+
+class RecipeTree(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """The obtain tree of an item. Brewing is a node of this tree.
+
+    The payload of this section arrives later, as the unified obtain tree
+    `TODO.md`'s Phase 3 describes.
+    """
+
+    type: Literal["RecipeTree"] = "RecipeTree"
+
+
+class ObtainList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """Every acquisition path that the wiki Obtaining section lists.
+
+    The payload of this section arrives in Phase 6b, scraped from the wiki's
+    own Obtaining section.
+    """
+
+    type: Literal["ObtainList"] = "ObtainList"
+
+
+class BreedingInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """The items that breed a mob, and the result.
+
+    The payload of this section arrives in Phase 6.
+    """
+
+    type: Literal["BreedingInfo"] = "BreedingInfo"
+
+
+class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """Every source of a status effect.
+
+    The payload of this section arrives in Phase 6.
+    """
+
+    type: Literal["EffectSources"] = "EffectSources"
+
+
+class ChestLoot(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """The chest loot tables that hold the item.
+
+    The payload of this section arrives in Phase 6c.
+    """
+
+    type: Literal["ChestLoot"] = "ChestLoot"
+
+
+class EnchantInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """Levels, applicable items, costs, and the exclusive set.
+
+    The payload of this section arrives in Phase 6c.
+    """
+
+    type: Literal["EnchantInfo"] = "EnchantInfo"
+
+
+class GenerationInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """Where a block, a structure, or a biome generates.
+
+    The payload of this section arrives in Phase 6c.
+    """
+
+    type: Literal["GenerationInfo"] = "GenerationInfo"
+
+
+class LinkList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+    """A plain list of links to other entities.
+
+    The payload of this section arrives in Phase 6.
+    """
+
+    type: Literal["LinkList"] = "LinkList"
+
+
+# The discriminated union. See the module docstring for why `discriminator`
+# rather than a plain `Union`.
+Section = Annotated[
+    StatBlock
+    | SpawnInfo
+    | DropTable
+    | RecipeTree
+    | ObtainList
+    | BreedingInfo
+    | EffectSources
+    | AdvancementInfo
+    | TradeTable
+    | ChestLoot
+    | EnchantInfo
+    | GenerationInfo
+    | LinkList,
+    Field(discriminator="type"),
+]
+
+
+# The Entity fields a `sourceTiers` key may legitimately name, beyond a
+# `sections.<Type>` key -- see `Entity._every_source_tier_key_names_something_real`.
+# Kept separate from `Entity.model_fields` itself rather than computed from it,
+# because `sourceTiers` and `sections` are never themselves the *subject* of a
+# provenance entry -- a provenance map does not describe its own presence, and
+# a whole section's provenance is recorded under `sections.<Type>`, not under
+# the literal key `"sections"`.
+_PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
+
+# The thirteen `type` values a `sections.<Type>` provenance key may name,
+# matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
+# own `Section` union members exactly.
+_SECTION_TYPES = frozenset(
+    {
+        "StatBlock",
+        "SpawnInfo",
+        "DropTable",
+        "RecipeTree",
+        "ObtainList",
+        "BreedingInfo",
+        "EffectSources",
+        "AdvancementInfo",
+        "TradeTable",
+        "ChestLoot",
+        "EnchantInfo",
+        "GenerationInfo",
+        "LinkList",
+    }
+)
+
+_VALID_PROVENANCE_KEYS = _PROVENANCE_FIELDS | {
+    f"sections.{section_type}" for section_type in _SECTION_TYPES
+}
+
+
+class Entity(BaseModel, frozen=True, populate_by_name=True):
+    """One searchable thing, mirroring `pipeline/schema/entity.schema.json`.
+
+    Every field name below has a camelCase alias where it differs from its
+    schema counterpart; see the module docstring's naming section for why
+    that is an explicit `Field(alias=...)` rather than an `alias_generator`.
+    """
+
+    id: str
+    kind: EntityKind
+    name: str
+    aliases: tuple[str, ...]
+    icon: str | None = None
+    blurb: str | None = None
+    wiki_url: str | None = Field(default=None, alias="wikiUrl")
+    source_tiers: Mapping[str, SourceTier] = Field(alias="sourceTiers")
+    sections: tuple[Section, ...]
+
+    @field_validator("id")
+    @classmethod
+    def _id_matches_the_entity_id_pattern(cls, value: str) -> str:
+        """Refuse an ID that is not `<namespace>:<path>`, lowercase.
+
+        `pipeline/schema/entity.schema.json`'s `$defs.entityId.pattern` states
+        the same rule for the web side; this is the pipeline side's copy of
+        it, checked at the point an `Entity` is actually built rather than
+        only at JSON-Schema-validation time, which this pipeline never runs.
+        """
+        if not ENTITY_ID_PATTERN.fullmatch(value):
+            raise NormalizeError(
+                f"{value!r} is not a valid entity ID. An entity ID is a namespace and a path, "
+                f"lowercase, matching {ENTITY_ID_PATTERN.pattern!r} -- 'minecraft:creeper' and "
+                f"'collection:compostable' are both valid, a bare display name is not."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _aliases_are_clean(self) -> "Entity":
+        """Refuse an alias list that wastes a Phase 4 search index slot.
+
+        An alias that repeats the entity's own name (casefolded, so `Creeper`
+        and `creeper` both count) is matched by the name already, so keeping
+        it doubles an index entry for nothing. An empty string matches every
+        query prefix, which would make every search return everything. A
+        duplicate wastes the same slot twice. All three are refused here
+        rather than silently deduplicated, because a merge step that produced
+        one of them has a bug worth surfacing, not smoothing over.
+        """
+        casefolded_name = self.name.casefold()
+        seen: set[str] = set()
+        for alias in self.aliases:
+            if not alias:
+                raise NormalizeError(f"{self.id!r} carries an empty string as an alias.")
+            if alias.casefold() == casefolded_name:
+                raise NormalizeError(
+                    f"{self.id!r} carries {alias!r} as an alias, which is its own name "
+                    f"({self.name!r}) casefolded. The name is already matched directly; "
+                    f"repeating it as an alias only doubles the Phase 4 search index."
+                )
+            if alias in seen:
+                raise NormalizeError(f"{self.id!r} carries the alias {alias!r} more than once.")
+            seen.add(alias)
+        return self
+
+    @field_validator("source_tiers")
+    @classmethod
+    def _every_source_tier_key_names_something_real(
+        cls, value: Mapping[str, SourceTier]
+    ) -> Mapping[str, SourceTier]:
+        """Refuse a provenance entry for a field this model does not declare.
+
+        `sourceTiers` is keyed by field name, per the schema's own
+        description of it. A key that is not one of `Entity`'s own fields and
+        is not a `sections.<Type>` key is a typo -- the kind that would
+        otherwise sit in the build output silently, naming a field that
+        cannot be traced back to anything, forever.
+        """
+        unknown = sorted(set(value) - _VALID_PROVENANCE_KEYS)
+        if unknown:
+            raise NormalizeError(
+                f"sourceTiers names fields this Entity model does not declare: {unknown}. "
+                f"A provenance key must be one of {sorted(_VALID_PROVENANCE_KEYS)}."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _wiki_url_required_when_wiki_authored_content_is_shown(self) -> "Entity":
+        """Enforce decision D1 in Python, the same rule the schema's `if`/`then` states.
+
+        The CC BY-NC-SA 3.0 license obliges this project to link back to the
+        wiki page wherever it shows content the wiki *authored*. Two fields
+        can do that: `blurb`, which is the wiki's own prose, and a section,
+        which is a table the wiki compiled. Either one at Tier B requires a
+        `wikiUrl`. An entity with neither -- the `poplar_*` set among them --
+        carries no such obligation and may leave it unset.
+
+        An `icon` is deliberately not one of the triggers, and the reason is
+        the project's own recorded position rather than a convenience.
+        Decision 3 of `TODO.md` says the sprites are Mojang's textures
+        wherever they are fetched from, so the wiki hosts them rather than
+        authoring them. The id-based icon route makes that concrete: it reads
+        the hyphenated registry path straight out of Tier A and consults no
+        wiki article at all. Measured on 2026-08-31, 7 biome IDs resolve an
+        icon that way while having no wiki page in the join table, so
+        counting the icon would demand an attribution link that nothing
+        exists to point at, and those entities could not be built.
+        """
+        if self.wiki_url is not None:
+            return self
+        authored = [
+            field
+            for field, tier in self.source_tiers.items()
+            if tier is SourceTier.B and (field == "blurb" or field.startswith("sections."))
+        ]
+        if authored:
+            fields = ", ".join(sorted(authored))
+            raise NormalizeError(
+                f"{self.id!r} carries wiki-authored content at Tier B ({fields}) but no "
+                f"wikiUrl. The CC BY-NC-SA 3.0 license requires a link back to the wiki "
+                f"page wherever this project shows text or tables the wiki wrote."
+            )
+        return self
+
+
+class EntityDraft:
+    """A mutable accumulator that writes a field's value and its provenance in one call.
+
+    The merge stage reads several tiers and, for each field, decides which
+    one wins. That decision is only ever correct at the moment it is made --
+    the merge step that reads Tier B's `EntityInfobox.health` and writes it
+    onto the draft is the one place that actually knows the value came from
+    Tier B. A second pass that tried to reconstruct `sourceTiers` afterward,
+    by inspecting the final values, would be guessing: a field with the same
+    shape can come from any tier, and nothing about a finished `Entity`
+    proves which one it came from. `set` and `add_aliases` both take the
+    contributing tier as a required argument for that reason, and record it
+    in the same call that writes the value, so there is no code path that can
+    set a field and forget its provenance.
+
+    Not a `BaseModel`. `Entity` is frozen because a finished entity should
+    never be mutated after validation; a draft is the opposite by
+    construction, and pydantic's own mutable-model support (`model_config =
+    ConfigDict(frozen=False)`) would still run full validation on every
+    intermediate `set` call, which is wasted work for a merge that is not
+    finished yet and may not validate until the very last field lands.
+    """
+
+    def __init__(self, *, id: str, kind: EntityKind, name: str, tier: SourceTier) -> None:
+        self._id = id
+        self._kind = kind
+        self._name = name
+        self._icon: str | None = None
+        self._blurb: str | None = None
+        self._wiki_url: str | None = None
+        self._aliases: dict[str, SourceTier] = {}
+        self._sections: dict[str, Section] = {}
+        self._provenance: dict[str, SourceTier] = {"id": tier, "kind": tier, "name": tier}
+
+    @property
+    def wiki_url(self) -> str | None:
+        """The attribution link set so far, or `None`.
+
+        Read by the merge before it attaches a wiki-authored section. D1 makes
+        that pair a hard requirement, so a caller that can add such a section
+        needs to be able to ask whether the link exists *before* adding it --
+        otherwise the only signal is `build` raising at the end of the run,
+        by which point the cheapest thing to report (which row, which table)
+        is already out of scope.
+        """
+        return self._wiki_url
+
+    def set(self, field: str, value: str | None, tier: SourceTier) -> "EntityDraft":
+        """Write one scalar field and its provenance together, and return `self` for chaining.
+
+        `field` names one of `Entity`'s own settable scalar fields, by its
+        schema (camelCase) name -- `"name"`, `"icon"`, `"blurb"`, or
+        `"wikiUrl"`. `id` and `kind` are set once, at construction, because
+        they are the join key this draft was opened for rather than a value a
+        later merge step could overwrite. `aliases` and `sections` have their
+        own accumulating methods below, because unlike a scalar they union
+        rather than replace.
+        """
+        if field == "name":
+            self._name = value if value is not None else self._name
+        elif field == "icon":
+            self._icon = value
+        elif field == "blurb":
+            self._blurb = value
+        elif field == "wikiUrl":
+            self._wiki_url = value
+        else:
+            raise NormalizeError(
+                f"EntityDraft.set does not know a field named {field!r}. Use add_aliases for "
+                f"'aliases' or add_section for a section, or add the field here if it is new."
+            )
+        self._provenance[field] = tier
+        return self
+
+    def add_aliases(self, values: Iterable[str], tier: SourceTier) -> "EntityDraft":
+        """Union `values` into the alias set, and return `self` for chaining.
+
+        Unlike `set`, this never overwrites: registry ID segments (Tier A),
+        wiki-derived shorthand (Tier B), and curated extras (Tier C) all
+        contribute aliases to the same entity, and losing an earlier tier's
+        aliases because a later tier also contributed some would make the
+        Phase 4 search index worse, not more current. The provenance recorded
+        for `"aliases"` is the highest tier that contributed *any* alias --
+        `_TIER_RANK` gives the comparison -- because `sourceTiers` has one
+        slot per field and the field as a whole came from whichever tier
+        contributed most recently by that ordering.
+        """
+        for value in values:
+            current = self._aliases.get(value)
+            if current is None or _TIER_RANK[tier] > _TIER_RANK[current]:
+                self._aliases[value] = tier
+        if self._aliases:
+            self._provenance["aliases"] = max(self._aliases.values(), key=_TIER_RANK.__getitem__)
+        return self
+
+    def add_section(self, section: Section, tier: SourceTier) -> "EntityDraft":
+        """Add one section and its provenance, and return `self` for chaining.
+
+        Keyed internally by the section's own `type`, so a later call for the
+        same section type replaces rather than duplicates it -- a merge that
+        runs twice over the same Tier B table should not double the section
+        list.
+        """
+        section_type = section.type
+        self._sections[section_type] = section
+        self._provenance[f"sections.{section_type}"] = tier
+        return self
+
+    def build(self) -> Entity:
+        """Return the frozen `Entity` this draft describes.
+
+        Runs every validator `Entity` declares, including D1's `wikiUrl`
+        check -- a draft that never called `set("wikiUrl", ...)` despite
+        adding a Tier B section fails here, at the one place the merge can
+        still say which entity and which fields caused it.
+        """
+        return Entity(
+            id=self._id,
+            kind=self._kind,
+            name=self._name,
+            aliases=tuple(self._aliases),
+            icon=self._icon,
+            blurb=self._blurb,
+            wiki_url=self._wiki_url,
+            source_tiers=dict(self._provenance),
+            sections=tuple(self._sections.values()),
+        )

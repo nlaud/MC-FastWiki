@@ -30,15 +30,38 @@ describe("generated schema types", () => {
       sections: [section],
     };
 
-    // `wikiUrl` is not optional, and the annotation is the assertion: the wiki
-    // text is CC BY-NC-SA 3.0, so an entity that carries a blurb and no link to
-    // its source page breaks the license. Widen the schema and this line stops
-    // compiling, because `string | undefined` does not fit `string`.
-    const credit: string = creeper.wikiUrl;
+    // Decision D1: `wikiUrl` is required exactly when `sourceTiers` names
+    // Tier B for some field, not unconditionally -- the unreleased
+    // `poplar_*` registry IDs have no wiki page at all, so an unconditional
+    // requirement would make them impossible to represent. A JSON Schema
+    // `if`/`then` conditional cannot be expressed as a TypeScript conditional
+    // type by this generator, so `wikiUrl` types as optional here for every
+    // entity; the obligation the CC BY-NC-SA 3.0 license actually imposes is
+    // enforced at build time instead, by `Entity`'s own validator in
+    // `pipeline.normalize.entity`. This creeper carries Tier B provenance
+    // (`blurb: "B"`), so the value is present at runtime even though the
+    // type alone does not guarantee it.
+    const credit = creeper.wikiUrl;
 
     expect(creeper.sections[0]?.type).toBe("LinkList");
     expect(creeper.sourceTiers["blurb"]).toBe("B");
     expect(credit).toContain("minecraft.wiki");
+  });
+
+  it("allows wikiUrl to be omitted for an entity with no Tier B provenance", () => {
+    // The other half of decision D1: the `poplar_*` set carries only Tier A
+    // provenance and no wiki page, so it must type-check with `wikiUrl`
+    // absent entirely, not merely set to `undefined`.
+    const poplarBoat: Entity = {
+      id: "minecraft:poplar_boat",
+      kind: "item",
+      name: "Poplar Boat",
+      aliases: ["poplar_boat"],
+      sourceTiers: { name: "A" },
+      sections: [],
+    };
+
+    expect(poplarBoat.wikiUrl).toBeUndefined();
   });
 
   it("describe a build manifest", () => {

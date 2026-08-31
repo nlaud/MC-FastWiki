@@ -12,6 +12,7 @@ for `26.2-summary`, the resolver takes its transport as an argument, and the
 autouse fixture below fails any test that tries to reach the network anyway.
 """
 
+import gzip
 import inspect
 import io
 import json
@@ -501,12 +502,34 @@ def _symlink_member(name: str, target: str) -> tuple[tarfile.TarInfo, bytes | No
 
 
 def _tar_gz(members: list[tuple[tarfile.TarInfo, bytes | None]]) -> bytes:
-    """Return one gzip archive of the given members, built in memory."""
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+    """Return one gzip archive of the given members, built in memory and byte-stable.
+
+    The gzip layer is built by hand with `mtime=0` rather than through
+    `tarfile.open(mode="w:gz")`, and that is load-bearing rather than tidy.
+    The convenience mode stamps the *current* time into the gzip header, so
+    two calls made either side of a second boundary return different bytes for
+    identical content.
+
+    Several tests here compare an archive that went through the cache against
+    a freshly built one -- `test_a_stored_archive_that_no_longer_reads_costs_
+    one_fetch` is the clearest -- and under the convenience mode that
+    comparison fails whenever the clock happens to tick between the two calls.
+    It passes on a rerun, which is the worst possible shape for a failure: it
+    reads as an unrelated flake and trains a reader to rerun the suite instead
+    of believing it.
+
+    `TarInfo.mtime` already defaults to 0, so the tar stream itself was always
+    deterministic. Only the gzip header varied.
+    """
+    tar_buffer = io.BytesIO()
+    with tarfile.open(fileobj=tar_buffer, mode="w") as archive:
         for info, body in members:
             archive.addfile(info, io.BytesIO(body) if body is not None else None)
-    return buffer.getvalue()
+
+    gzip_buffer = io.BytesIO()
+    with gzip.GzipFile(fileobj=gzip_buffer, mode="wb", mtime=0) as compressed:
+        compressed.write(tar_buffer.getvalue())
+    return gzip_buffer.getvalue()
 
 
 def _data_archive(

@@ -5,7 +5,7 @@
   "description": "One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "aliases", "wikiUrl", "sourceTiers", "sections"],
+  "required": ["id", "kind", "name", "aliases", "sourceTiers", "sections"],
   "properties": {
     "id": {
       "$ref": "#/$defs/entityId"
@@ -37,7 +37,7 @@
       "type": "string"
     },
     "wikiUrl": {
-      "description": "The source wiki page. The license is CC BY-NC-SA 3.0, so the user interface shows this link as a visible credit. Every entity carries one, because an entity that shows wiki text without a link to it breaks the license. The host is fixed too: the project reads minecraft.wiki and never Fandom, so the site keeps one scraper and one attribution obligation.",
+      "description": "The source wiki page. The license is CC BY-NC-SA 3.0, so the user interface shows this link as a visible credit. Required whenever this entity carries wiki-authored content -- a `blurb` or any section -- per the `if`/`then` conditional below, because showing wiki text without a link to it breaks the license. An `icon` alone does not require it: the sprites are Mojang's textures that the wiki hosts rather than authored, per Decision 3 of TODO.md. Optional otherwise: registry IDs the wiki has no page for at all cannot carry this field and must not be forced to invent one. The host is fixed too: the project reads minecraft.wiki and never Fandom, so the site keeps one scraper and one attribution obligation.",
       "type": "string",
       "format": "uri",
       "pattern": "^https://minecraft\\.wiki/"
@@ -56,6 +56,42 @@
         "$ref": "#/$defs/section"
       }
     }
+  },
+  "$comment": "`wikiUrl` is required exactly when this entity carries wiki-*authored* content, never unconditionally. Two kinds of provenance trigger it: `sourceTiers.blurb` is `B`, meaning the page shows the wiki's own prose, or some `sourceTiers[\"sections.*\"]` is `B`, meaning it shows a table the wiki compiled. Either way CC BY-NC-SA 3.0 obliges a link back to the page the material came from, and `then` requires one. The second branch reads as 'it is not the case that every `sections.` key is something other than B' -- that is, at least one is `B` -- because JSON Schema has no keyword that asks whether a map holds a value, only `not` composed with `patternProperties`. An entity with no `sections.` key at all makes the inner schema vacuously true and so fails the branch, which is right: nothing wiki-authored is on screen. An `icon` deliberately does NOT trigger the requirement. Decision 3 of TODO.md records this project's position that the sprites are Mojang's textures wherever they are fetched from, so the wiki hosts them rather than authoring them, and the id-based icon route reads the hyphenated registry path out of Tier A without consulting a wiki article at all. Measured on 2026-08-31, 7 biome IDs resolve an icon that way and have no wiki page to link to; requiring one of them would make those entities impossible to build for an obligation nothing incurred. The keywords sit at the top level rather than inside an `allOf` on purpose. The two spellings validate identically, but `json-schema-to-typescript` renders an `allOf` member as an intersection with an open object, which turns the generated `Entity` into `{ [k: string]: unknown } & { ... }` and silently discards the excess-property checking that `additionalProperties: false` above exists to give the web app.",
+  "if": {
+    "required": ["sourceTiers"],
+    "anyOf": [
+      {
+        "properties": {
+          "sourceTiers": {
+            "required": ["blurb"],
+            "properties": {
+              "blurb": {
+                "const": "B"
+              }
+            }
+          }
+        }
+      },
+      {
+        "properties": {
+          "sourceTiers": {
+            "not": {
+              "patternProperties": {
+                "^sections\\.": {
+                  "not": {
+                    "const": "B"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "then": {
+    "required": ["wikiUrl"]
   },
   "$defs": {
     "entityId": {
@@ -101,8 +137,155 @@
         }
       }
     },
+    "measure": {
+      "title": "Measure",
+      "description": "A number, or a span of them, mirroring `pipeline.enrich.infobox.Measure`. A fixed value is a measure whose `minimum` equals its `maximum` -- every plain `{{hp|N}}` on the wiki produces one of these; a two-template line such as an Iron Golem's damage range produces one whose ends differ.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        }
+      }
+    },
+    "integerRange": {
+      "title": "IntegerRange",
+      "description": "A whole number, or a span of them, mirroring `pipeline.enrich.IntegerRange`. A wiki table cell such as a spawn group size or a trade quantity can print a single figure or a range, and this one shape covers both without a second field to check.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "integer"
+        }
+      }
+    },
+    "ratio": {
+      "title": "Ratio",
+      "description": "An exact fraction, mirroring `pipeline.enrich.droptable.Ratio`. Kept as a numerator and a denominator, rather than a single float, because that is how the wiki states a drop chance or an average, and rounding it once here would be a loss no later stage could see or undo.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {
+        "numerator": {
+          "type": "integer"
+        },
+        "denominator": {
+          "type": "integer"
+        }
+      }
+    },
+    "labelledText": {
+      "title": "LabelledText",
+      "description": "A field the infobox parser read as plain text rather than a number, labelled by whichever heading or trailing parenthetical governed the line it came from. `statBlock` reuses this one shape for `behavior`, `speed`, and `knockbackResistance` rather than declaring the same two fields three times.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["labels", "text"],
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "labelledValue": {
+      "title": "LabelledValue",
+      "description": "A `measure` the infobox parser read for a labelled variant of a mob, such as 'Large' or 'Baby'. `statBlock` reuses this one shape for `health` and `armor` rather than declaring the same two fields twice.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["labels", "value"],
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "value": {
+          "$ref": "#/$defs/measure"
+        }
+      }
+    },
+    "itemAmount": {
+      "title": "ItemAmount",
+      "description": "One item and how many, the shape a wiki drop or a trade side reduces to. Tier B tables are keyed by the wiki's own display name, not by registry ID, so `name` is always present. Where the merge can resolve that name to a registry ID it fills `ref`, and a renderer prints it as a link; where it cannot, `ref` is absent and the renderer prints `name` as plain text. `TODO.md`'s Phase 6 lint pass exists to flag exactly that absence on a name the merge already knows is an entity, so a renderer is never allowed to quietly print a link-worthy name as text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "quantity"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "quantity": {
+          "$ref": "#/$defs/integerRange"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "lootingDrop": {
+      "title": "LootingDrop",
+      "description": "What one mob drops of one item at one looting level, mirroring `pipeline.enrich.droptable.LootingDrop`. `distribution` is a JSON array of `{count, chance}` pairs sorted by `count`, rather than an object keyed by the count as the Python model's `Mapping[int, Ratio]` is: a JSON object key must be a string, and a numeric-looking string key such as `\"10\"` is exactly the kind of value that sorts wrong the moment something reads it as text instead of as a number. An array carries the same information with no such trap.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lootingLevel", "minimum", "maximum", "average", "dropChance", "quantityText"],
+      "properties": {
+        "lootingLevel": {
+          "type": "integer"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "integer"
+        },
+        "average": {
+          "$ref": "#/$defs/ratio"
+        },
+        "dropChance": {
+          "$ref": "#/$defs/ratio"
+        },
+        "quantityText": {
+          "type": "string"
+        },
+        "distribution": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["count", "chance"],
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "chance": {
+                "$ref": "#/$defs/ratio"
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
     "section": {
-      "description": "One render block. The `type` field selects the renderer. Phase 3 replaces the open payload of each member with real fields.",
+      "description": "One render block. The `type` field selects the renderer. Five members -- `statBlock`, `spawnInfo`, `dropTable`, `tradeTable`, `advancementInfo` -- carry real, closed fields. The other eight are still open payloads; each one's own description names the later phase that fills it in.",
       "oneOf": [
         {
           "$ref": "#/$defs/statBlock"
@@ -147,43 +330,212 @@
     },
     "statBlock": {
       "title": "StatBlock",
-      "description": "Named numbers of an entity. Health and damage of a mob are two examples. The payload of this section arrives in Phase 3.",
+      "description": "Named numbers of an entity, mirroring `pipeline.enrich.infobox.EntityInfobox`. `speed` and `knockbackResistance` are carried here but deliberately not rendered, per `TODO.md` Phase 6 -- they are stored so a later renderer can use them without a pipeline change, not because today's renderer shows them.",
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {
           "const": "StatBlock"
+        },
+        "health": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/labelledValue"
+          },
+          "default": []
+        },
+        "damage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["labels", "difficulties", "value"],
+            "properties": {
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "difficulties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "value": {
+                "$ref": "#/$defs/measure"
+              }
+            }
+          },
+          "default": []
+        },
+        "armor": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/labelledValue"
+          },
+          "default": []
+        },
+        "size": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["labels", "height", "width"],
+            "properties": {
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "height": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number"
+              }
+            }
+          },
+          "default": []
+        },
+        "behavior": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/labelledText"
+          },
+          "default": []
+        },
+        "mobType": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "speed": {
+          "description": "Stored and never rendered. See this section's own description.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/labelledText"
+          },
+          "default": []
+        },
+        "knockbackResistance": {
+          "description": "Stored and never rendered. See this section's own description.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/labelledText"
+          },
+          "default": []
         }
       }
     },
     "spawnInfo": {
       "title": "SpawnInfo",
-      "description": "Where the entity spawns, and under which conditions. The payload of this section arrives in Phase 3.",
+      "description": "Where the entity spawns, and under which conditions, mirroring `pipeline.enrich.spawn_table.SpawnIndex.by_mob`. One entry per biome the wiki records a Java spawn weight for.",
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {
           "const": "SpawnInfo"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["biome", "category", "weight", "totalWeight", "groupSize"],
+            "properties": {
+              "biome": {
+                "type": "string"
+              },
+              "biomeRef": {
+                "$ref": "#/$defs/entityRef"
+              },
+              "category": {
+                "type": "string"
+              },
+              "weight": {
+                "type": "number"
+              },
+              "totalWeight": {
+                "type": "number"
+              },
+              "groupSize": {
+                "$ref": "#/$defs/integerRange"
+              },
+              "note": {
+                "type": "string"
+              },
+              "noteName": {
+                "type": "string"
+              }
+            }
+          },
+          "default": []
         }
       }
     },
     "dropTable": {
       "title": "DropTable",
-      "description": "What the entity drops, per looting level. The payload of this section arrives in Phase 3.",
+      "description": "What the entity drops, per looting level, mirroring `pipeline.enrich.droptable.DropIndex.by_mob`. Java only, per non-negotiable 1 of CLAUDE.md.",
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {
           "const": "DropTable"
+        },
+        "drops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["item"],
+            "properties": {
+              "item": {
+                "type": "string"
+              },
+              "itemRef": {
+                "$ref": "#/$defs/entityRef"
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["content"],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "default": []
+              },
+              "byLootingLevel": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/lootingDrop"
+                },
+                "default": []
+              }
+            }
+          },
+          "default": []
         }
       }
     },
     "recipeTree": {
       "title": "RecipeTree",
-      "description": "The obtain tree of an item. Brewing is a node of this tree. The payload of this section arrives in Phase 3.",
+      "description": "The obtain tree of an item. Brewing is a node of this tree. The payload of this section arrives later in Phase 3, as the unified obtain tree TODO.md describes.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -195,7 +547,7 @@
     },
     "obtainList": {
       "title": "ObtainList",
-      "description": "Every acquisition path that the wiki Obtaining section lists. The payload of this section arrives in Phase 3.",
+      "description": "Every acquisition path that the wiki Obtaining section lists. The payload of this section arrives in Phase 6b, scraped from the wiki's own Obtaining section.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -207,7 +559,7 @@
     },
     "breedingInfo": {
       "title": "BreedingInfo",
-      "description": "The items that breed a mob, and the result. The payload of this section arrives in Phase 3.",
+      "description": "The items that breed a mob, and the result. The payload of this section arrives in Phase 6.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -219,7 +571,7 @@
     },
     "effectSources": {
       "title": "EffectSources",
-      "description": "Every source of a status effect. The payload of this section arrives in Phase 3.",
+      "description": "Every source of a status effect. The payload of this section arrives in Phase 6.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -231,31 +583,120 @@
     },
     "advancementInfo": {
       "title": "AdvancementInfo",
-      "description": "How the player earns an advancement, and the parent chain. The payload of this section arrives in Phase 3.",
+      "description": "How the player earns an advancement, and the parent chain, mirroring `pipeline.enrich.advancement.WikiAdvancement`.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": ["type", "internalId", "title"],
       "properties": {
         "type": {
           "const": "AdvancementInfo"
+        },
+        "internalId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "gameDescription": {
+          "type": "string"
+        },
+        "parent": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "parentTitle": {
+          "type": "string"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        },
+        "experience": {
+          "type": "integer"
+        },
+        "reward": {
+          "type": "string"
+        },
+        "background": {
+          "type": "string"
         }
       }
     },
     "tradeTable": {
       "title": "TradeTable",
-      "description": "Villager trades, grouped by profession and level. The payload of this section arrives in Phase 3.",
+      "description": "Villager and wandering trader trades, grouped by profession and level, mirroring `pipeline.enrich.trade.TradeIndex`. `professionRef` is expected to stay absent for now: villager profession entities arrive in Phase 6c, so there is nothing yet for the merge to link a profession name to. Only the Java probability is carried into `javaProbability`; `bedrock_probability` is dropped upstream in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.",
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {
           "const": "TradeTable"
+        },
+        "trades": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["profession", "level", "given"],
+            "properties": {
+              "profession": {
+                "type": "string"
+              },
+              "professionRef": {
+                "$ref": "#/$defs/entityRef"
+              },
+              "level": {
+                "type": "string"
+              },
+              "wanted": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/itemAmount"
+                },
+                "default": []
+              },
+              "given": {
+                "$ref": "#/$defs/itemAmount"
+              },
+              "javaProbability": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["text", "low", "high"],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "low": {
+                    "type": "number"
+                  },
+                  "high": {
+                    "type": "number"
+                  }
+                }
+              },
+              "maxTrades": {
+                "$ref": "#/$defs/integerRange"
+              },
+              "villagerXp": {
+                "type": "integer"
+              },
+              "priceMultiplier": {
+                "type": "number"
+              }
+            }
+          },
+          "default": []
         }
       }
     },
     "chestLoot": {
       "title": "ChestLoot",
-      "description": "The chest loot tables that hold the item. The payload of this section arrives in Phase 3.",
+      "description": "The chest loot tables that hold the item. The payload of this section arrives in Phase 6c.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -267,7 +708,7 @@
     },
     "enchantInfo": {
       "title": "EnchantInfo",
-      "description": "Levels, applicable items, costs, and the exclusive set. The payload of this section arrives in Phase 3.",
+      "description": "Levels, applicable items, costs, and the exclusive set. The payload of this section arrives in Phase 6c.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -279,7 +720,7 @@
     },
     "generationInfo": {
       "title": "GenerationInfo",
-      "description": "Where a block, a structure, or a biome generates. The payload of this section arrives in Phase 3.",
+      "description": "Where a block, a structure, or a biome generates. The payload of this section arrives in Phase 6c.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],
@@ -291,7 +732,7 @@
     },
     "linkList": {
       "title": "LinkList",
-      "description": "A plain list of links to other entities. The payload of this section arrives in Phase 3.",
+      "description": "A plain list of links to other entities. The payload of this section arrives in Phase 6.",
       "type": "object",
       "additionalProperties": true,
       "required": ["type"],

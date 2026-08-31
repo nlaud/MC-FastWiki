@@ -11,14 +11,15 @@ reasoning survives even after the choice is made.
 
 ## Phase 3 — Normalization and emit
 
-- [ ] Define the `Entity` model and the `Section` discriminated union in shared types
-- [ ] Merge tiers with per-field provenance (`sourceTiers`)
-- [ ] Curated override loader; warn when `verifiedFor` is behind the target version
-- [ ] Alias generation — the quality bar for search. Cover:
-  - [ ] Registry ID segments (`golden_apple` matches "golden", "apple")
-  - [ ] Effect and potion cross-linking (`weak` finds Weakness *and* Potion of Weakness)
-  - [ ] Common community shorthand (`gapple`, `efficiency 5`, `pearl`, `blaze rod`)
-  - [ ] Hand-written extras in `/data/curated/aliases.json`
+- [ ] Potion cross-linking, the one half of alias generation still outstanding. `weak` already
+      finds Weakness; it cannot yet find Potion of Weakness, because there is no such registry ID
+      to find. Every brewed potion is `minecraft:potion` carrying a `minecraft:potion_contents`
+      component, and the wiki's own join table maps all 26 potion names onto that one ID. Giving
+      each potion a page means synthesising entities from the component rather than from the
+      registry, so it belongs with the brewing work in the obtain-tree below, not with aliases.
+- [ ] Give `entity_type` IDs a renderer that is not `mob`. `EntityKind` stops at `mob`, so an
+      arrow, an item frame and a spawner minecart all currently render as mobs. The merge already
+      reports every ID this affects. Either add an `entity` kind or decide these are items.
 - [ ] Build one unified obtain-tree: recipes, smelting, **brewing**, loot, chest loot, trades,
       natural generation. Brewing is a node type in this tree, not a separate structure — a potion
       expands into its brewing step, each ingredient expands into whatever produces it (fermented
