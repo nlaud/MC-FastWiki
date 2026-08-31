@@ -1,6 +1,6 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-written search shorthand that no registry ID segment or wiki display name spells out on its own. Every entry here is community shorthand the maintainer is genuinely confident is unambiguous mid-match -- a wrong alias sends a player to the wrong page mid-match, which is worse than a missing one, so this file stays conservative and small on purpose. Add an entry only when the shorthand is widely used, has exactly one sensible target, and is not already produced by pipeline.normalize.aliases.generate_aliases (a whole-phrase or a plain underscore-segment of the entity's own registry ID needs no curated entry). See pipeline/normalize/curated.py for the loader and pipeline/normalize/aliases.py for how a curated alias is weighted against a generated one.",
+  "note": "Hand-written search shorthand that no registry ID segment or wiki display name spells out on its own. Every entry here is community shorthand the maintainer is genuinely confident is unambiguous mid-match -- a wrong alias sends a player to the wrong page mid-match, which is worse than a missing one, so this file stays conservative and small on purpose. Add an entry only when the shorthand is widely used, has exactly one sensible target, and is not already produced by pipeline.normalize.aliases.generate_aliases (a whole-phrase or a plain underscore-segment of the entity's own registry ID needs no curated entry). See pipeline/normalize/curated.py for the loader and pipeline/normalize/aliases.py for how a curated alias is weighted against a generated one. One rejected entry is worth recording, because it looked obvious: `fort` for Fortune. This tool is built for draftout matches, and in that setting `fort` means the Nether Fortress far more often than it means the enchantment. Structures are not enumerated yet, so `fort` would resolve to Fortune today and quietly start answering the wrong question the moment Phase 6c lands.",
   "aliases": {
     "minecraft:golden_apple": ["gapple"],
     "minecraft:enchanted_golden_apple": ["napple", "notch apple"],
@@ -10,7 +10,6 @@
     "minecraft:protection": ["prot"],
     "minecraft:sharpness": ["sharp"],
     "minecraft:efficiency": ["eff"],
-    "minecraft:fortune": ["fort"],
     "minecraft:totem_of_undying": ["totem"],
     "minecraft:experience_bottle": ["xp bottle"],
     "minecraft:fire_resistance": ["fire res"],
