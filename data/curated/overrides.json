@@ -1,0 +1,5 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Hand-written corrections to one entity's name, kind, icon, blurb, or wikiUrl, for the rare case where Tier A or Tier B is simply wrong for that one ID and nobody upstream is going to fix it before the next build. There is nothing to correct as of this file's creation, so 'entities' is empty on purpose -- an empty, self-documenting file is more useful than a fabricated correction invented to give this file content. See pipeline/normalize/curated.py for the loader and the shape each entry may carry.",
+  "entities": {}
+}

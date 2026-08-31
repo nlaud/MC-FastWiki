@@ -4,6 +4,19 @@ Nothing else reads them yet. The pipeline stages that validate against them
 arrive in later phases, and the TypeScript generator runs on the other side of
 the repository. These tests hold the invariants that both sides need, so a
 broken contract fails here instead of failing in a build that ships wrong data.
+
+The bottom section, from `PYDANTIC_SECTION_MODELS` on, is a different kind of
+test: a structural agreement check between `pipeline.normalize.entity`'s
+Pydantic models and `entity.schema.json`, rather than an invariant of the
+schema file alone. The `jsonschema` package -- the normal way to check that a
+model's *instances* satisfy a schema -- is not available in this environment
+and cannot be installed here, so there is no way to hand a built `Entity` to a
+real validator and see if it passes. Comparing the two sides' declared shapes
+directly is the next best thing: it cannot catch a validator that mishandles
+a legal instance, but it catches the much more common drift, a field renamed,
+added, or dropped on one side and forgotten on the other, which is exactly
+what would otherwise surface as a silent mismatch between what the pipeline
+writes and what the web app's generated types expect.
 """
 
 import json
@@ -11,7 +24,26 @@ import re
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
+from pipeline.normalize.entity import (
+    AdvancementInfo,
+    BreedingInfo,
+    ChestLoot,
+    DropTable,
+    EffectSources,
+    EnchantInfo,
+    Entity,
+    EntityKind,
+    GenerationInfo,
+    LinkList,
+    ObtainList,
+    RecipeTree,
+    SourceTier,
+    SpawnInfo,
+    StatBlock,
+    TradeTable,
+)
 from pipeline.schema import SCHEMA_DIR, SCHEMA_SUFFIX, load_schema, schema_names, schema_paths
 
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
@@ -137,10 +169,11 @@ def test_every_definition_is_used_or_named(name: str) -> None:
     """An unused definition is dead weight, or it is a forgotten reference."""
     schema = load_schema(name)
     used = {ref.removeprefix("#/$defs/") for ref in _refs(schema)}
-    # `entityRef` is the one exception. Every section payload arrives in Phase 3,
-    # so nothing points at it yet. CLAUDE.md still names it as part of the
-    # contract, and the generator exports it through `unreachableDefinitions`.
-    unused = set(schema.get("$defs", {})) - used - {"entityRef"}
+    # Phase 3's five real section payloads (`statBlock`, `spawnInfo`, `dropTable`,
+    # `tradeTable`, `advancementInfo`) all reference `entityRef` now, through
+    # fields like `itemRef` and `professionRef`, so no exception is needed for
+    # it any more -- it is reached the same way every other shared `$def` is.
+    unused = set(schema.get("$defs", {})) - used
     assert unused == set()
 
 
@@ -158,6 +191,56 @@ def test_schema_declares_a_title(name: str) -> None:
     assert schema.get("title") == _pascal_case(name)
 
 
+# Keywords that compose several subschemas against the *same* JSON instance,
+# rather than stepping down into a nested one. `entity.schema.json`'s D1
+# conditional is a top-level `if` with `then: {"required": ["wikiUrl"]}`, and
+# `then` declares no `properties` of its own -- `wikiUrl` is a property of the
+# entity schema those branches all still describe, not of the branch. A
+# `required` list found under one of these keywords is therefore checked
+# against every `properties` block reachable through the composition, not only
+# the properties declared on the same dict as the `required` list.
+_COMPOSING_KEYWORDS = ("allOf", "anyOf", "oneOf", "if", "then", "else")
+
+
+def _required_offenders(node: Any, declared: frozenset[str] = frozenset()) -> list[str]:
+    """Return every `required` name under `node` that no reachable `properties` declares.
+
+    `declared` carries the property names of the nearest enclosing schema that
+    still describes the same instance as `node`. A plain object schema's own
+    `properties` extends it; `allOf`/`anyOf`/`oneOf`/`if`/`then`/`else` pass it
+    through unchanged, because those keywords do not change which instance is
+    being validated. Any other key -- `properties`' own values, `items`,
+    `$defs`, and so on -- steps into a different instance, so the search there
+    starts over with nothing inherited: a nested object's `required` list has
+    nothing to do with its parent's fields.
+    """
+    if isinstance(node, list):
+        offenders: list[str] = []
+        for item in node:
+            offenders.extend(_required_offenders(item, declared))
+        return offenders
+    if not isinstance(node, dict):
+        return []
+
+    local_declared = declared | set(node.get("properties", {}))
+    offenders = []
+    required = node.get("required")
+    if isinstance(required, list):
+        offenders.extend(field for field in required if field not in local_declared)
+
+    for key, value in node.items():
+        if key in INSTANCE_KEYWORDS:
+            continue
+        if key in _COMPOSING_KEYWORDS:
+            offenders.extend(_required_offenders(value, local_declared))
+        elif key == "properties":
+            for prop_schema in value.values():
+                offenders.extend(_required_offenders(prop_schema))
+        else:
+            offenders.extend(_required_offenders(value))
+    return offenders
+
+
 @pytest.mark.parametrize("name", SCHEMA_NAMES)
 def test_every_required_name_is_a_declared_property(name: str) -> None:
     """A misspelled `required` entry fails in two directions at once.
@@ -168,25 +251,64 @@ def test_every_required_name_is_a_declared_property(name: str) -> None:
     name and marks the real field optional, so the web app compiles against a
     contract that the pipeline can no longer satisfy. Neither side names the
     typo.
+
+    `_required_offenders` walks conditional composition (`allOf`/`if`/`then`/
+    ...) as part of the same instance rather than as a nested schema, which
+    `entity.schema.json`'s D1 conditional needs: its `then` branch requires
+    `wikiUrl` without declaring `properties` of its own, because `wikiUrl` is
+    already declared on the entity schema those keywords apply to.
     """
-    offenders: list[str] = []
-    for node in _nodes(load_schema(name)):
-        required = node.get("required")
-        if not isinstance(required, list):
-            continue
-        declared = node.get("properties", {})
-        offenders.extend(field for field in required if field not in declared)
-    assert offenders == []
+    assert _required_offenders(load_schema(name)) == []
 
 
-def test_every_entity_carries_its_attribution_link() -> None:
-    """CLAUDE.md: "every entity keeps a `wikiUrl`".
+def test_wiki_url_is_required_only_when_a_field_is_tier_b() -> None:
+    """CLAUDE.md: "every entity keeps a `wikiUrl`" -- narrowed by decision D1.
 
-    The wiki text is CC BY-NC-SA 3.0, so a blurb without a link to its source
-    page breaks the license. An optional field lets the pipeline ship one.
+    The wiki text is CC BY-NC-SA 3.0, so an entity that shows wiki-authored
+    content without a link to its source page breaks the license. But real
+    registry IDs have no wiki page at all, so `wikiUrl` cannot be
+    unconditionally required. `entity.schema.json` instead requires it exactly
+    when `sourceTiers` marks `blurb` or some `sections.*` key as Tier B,
+    through a top-level `if`/`then`; this test pins that structure down so a
+    future edit cannot quietly turn `wikiUrl` back into an unconditional
+    requirement, or drop the conditional and lose it entirely.
+
+    The `anyOf` has two branches on purpose and both are asserted below. An
+    `icon` at Tier B triggers neither, because the sprites are Mojang's
+    textures the wiki hosts rather than authored (Decision 3 of `TODO.md`) and
+    the id-based icon route never reads a wiki article. Widening the condition
+    back to "any Tier B field" made 7 live biome IDs impossible to build, so
+    the branch list is the part that must not quietly grow.
+
+    The keywords sit at the top level rather than inside an `allOf`, and the
+    assertion below is what holds them there. Both spellings validate the same
+    instances, so nothing about validation would notice the difference. The
+    generator does: it renders an `allOf` member as an intersection with an
+    open object, so the exported `Entity` becomes
+    `{ [k: string]: unknown } & { ... }` and the web app loses the
+    excess-property checking that `additionalProperties: false` exists to give
+    it. A schema edit that reaches for `allOf` here fails this test rather than
+    silently widening a type nobody reads.
     """
     schema = load_schema("entity")
-    assert "wikiUrl" in schema["required"]
+    assert "wikiUrl" not in schema["required"]
+    assert "sourceTiers" in schema["required"]
+    assert "allOf" not in schema
+    assert schema["if"]["required"] == ["sourceTiers"]
+    assert schema["then"]["required"] == ["wikiUrl"]
+
+    branches = schema["if"]["anyOf"]
+    assert len(branches) == 2, "the trigger list must not grow without a reason recorded here"
+
+    blurb_branch, sections_branch = branches
+    tiers = blurb_branch["properties"]["sourceTiers"]
+    assert tiers["required"] == ["blurb"]
+    assert tiers["properties"]["blurb"] == {"const": "B"}
+
+    # "not (every `sections.` key is not B)", i.e. at least one is B. JSON
+    # Schema has no keyword that asks whether a map holds a value.
+    patterned = sections_branch["properties"]["sourceTiers"]["not"]["patternProperties"]
+    assert patterned == {"^sections\\.": {"not": {"const": "B"}}}
 
 
 def test_the_attribution_link_points_at_minecraft_wiki() -> None:
@@ -242,3 +364,109 @@ def test_the_files_hold_no_trailing_whitespace_and_end_with_one_newline() -> Non
         assert text.endswith("\n")
         assert not text.endswith("\n\n")
         assert json.loads(text)
+
+
+# --- Structural agreement: `pipeline.normalize.entity` vs `entity.schema.json` ---
+#
+# The module docstring explains why this is a structural comparison rather
+# than an instance validation. `PYDANTIC_SECTION_MODELS` maps every section's
+# schema `$defs` key to the Pydantic class that mirrors it, covering all 13
+# union members; `REAL_SECTION_MODELS` narrows that to the five decision-D2
+# sections whose schema definitions are closed (`additionalProperties: false`).
+
+PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
+    "statBlock": StatBlock,
+    "spawnInfo": SpawnInfo,
+    "dropTable": DropTable,
+    "recipeTree": RecipeTree,
+    "obtainList": ObtainList,
+    "breedingInfo": BreedingInfo,
+    "effectSources": EffectSources,
+    "advancementInfo": AdvancementInfo,
+    "tradeTable": TradeTable,
+    "chestLoot": ChestLoot,
+    "enchantInfo": EnchantInfo,
+    "generationInfo": GenerationInfo,
+    "linkList": LinkList,
+}
+
+# Decision D2's five sections: the schema closes these with
+# `additionalProperties: false` and declares every field by name, so their
+# property sets can be compared to the Pydantic side exactly, field for field.
+REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
+    "statBlock": StatBlock,
+    "spawnInfo": SpawnInfo,
+    "dropTable": DropTable,
+    "tradeTable": TradeTable,
+    "advancementInfo": AdvancementInfo,
+}
+
+
+def _serialization_aliases(model: type[BaseModel]) -> set[str]:
+    """Return the name each of `model`'s fields serializes under with `by_alias=True`.
+
+    A field with no explicit `Field(alias=...)` serializes under its own
+    Python name, so this falls back to the field name rather than requiring
+    every field to declare a redundant alias identical to itself.
+    """
+    return {
+        info.alias if info.alias is not None else name for name, info in model.model_fields.items()
+    }
+
+
+def _required_field_names(model: type[BaseModel]) -> set[str]:
+    """Return the serialization alias of every field of `model` that has no default."""
+    return {
+        (info.alias if info.alias is not None else name)
+        for name, info in model.model_fields.items()
+        if info.is_required()
+    }
+
+
+def test_entity_top_level_properties_match_the_pydantic_fields() -> None:
+    """A field added to one side and forgotten on the other must fail here."""
+    schema_properties = set(load_schema("entity")["properties"])
+    assert schema_properties == _serialization_aliases(Entity)
+
+
+def test_entity_top_level_required_matches_the_pydantic_required_fields() -> None:
+    """D1's conditional `wikiUrl` requirement is checked separately; this is the plain list."""
+    schema_required = set(load_schema("entity")["required"])
+    assert schema_required == _required_field_names(Entity)
+
+
+def test_entity_kind_enum_matches_the_python_enum() -> None:
+    schema = load_schema("entity")
+    assert set(schema["$defs"]["entityKind"]["enum"]) == {member.value for member in EntityKind}
+
+
+def test_source_tier_enum_matches_the_python_enum() -> None:
+    schema = load_schema("entity")
+    assert set(schema["$defs"]["sourceTier"]["enum"]) == {member.value for member in SourceTier}
+
+
+def test_every_section_union_member_has_a_matching_pydantic_model() -> None:
+    """`SECTION_TYPES` names 13 render blocks; `PYDANTIC_SECTION_MODELS` must cover all 13."""
+    assert set(PYDANTIC_SECTION_MODELS) == {
+        ref.removeprefix("#/$defs/") for ref in _refs(load_schema("entity")["$defs"]["section"])
+    }
+
+
+def test_section_type_constants_match_the_python_type_literals() -> None:
+    """The schema's 13 `type` consts and the Python models' 13 `type` literal defaults agree."""
+    schema = load_schema("entity")
+    schema_constants = {
+        schema["$defs"][def_name]["properties"]["type"]["const"]
+        for def_name in PYDANTIC_SECTION_MODELS
+    }
+    python_literals = {
+        model.model_fields["type"].default for model in PYDANTIC_SECTION_MODELS.values()
+    }
+    assert schema_constants == python_literals == SECTION_TYPES
+
+
+@pytest.mark.parametrize("def_name", sorted(REAL_SECTION_MODELS))
+def test_a_real_sections_declared_properties_match_its_pydantic_model(def_name: str) -> None:
+    """For each of decision D2's five sections, the schema and the model declare the same fields."""
+    schema_properties = set(load_schema("entity")["$defs"][def_name]["properties"])
+    assert schema_properties == _serialization_aliases(REAL_SECTION_MODELS[def_name])
