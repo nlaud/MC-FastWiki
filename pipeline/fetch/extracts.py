@@ -40,7 +40,8 @@ error, so each one has a guard here. All five were checked against
    `Creeper`, which is the wiki following a redirect page. The answered page
    carries the final title alone, so a reader that matched the requested title
    against `pages[].title` would find nothing for either of those requests.
-   `_resolve_title` walks both maps, and `PageExtract` keeps both titles.
+   `pipeline.fetch.mediawiki.resolve_title` walks both maps, and `PageExtract`
+   keeps both titles.
 
 5. **A `|` inside a title splits that title into two.** The character is the
    title separator of this API, and the server accepted `Weird|Title` as two
@@ -67,6 +68,14 @@ version. The weekly wiki refresh of Phase 9 passes a date.
 This module reads what the wiki said and nothing more. It writes no entity, and
 it joins no blurb to a registry ID. `pipeline.enrich.resource_location` owns
 that join, and the normalize stage owns the entity.
+
+The title check, the two-step rewrite walk, and the `error`-object reader below
+used to live here as private functions. `pipeline.fetch.mediawiki` is where
+they live now, because `pipeline.fetch.wikitext` needed the same four functions
+and had copied them near-verbatim rather than import a private name, and
+`pipeline.fetch.imageinfo` needed three of the four as a third reader of this
+same API. This module re-exports `MAX_REWRITE_HOPS` and `TITLE_SEPARATOR` under
+its own name for the callers and tests that already read them from here.
 """
 
 from collections.abc import Iterable, Sequence
@@ -77,6 +86,14 @@ from pydantic import BaseModel
 
 from pipeline.fetch import WIKI_API_URL, FetchError, Transport, decode_json
 from pipeline.fetch.cache import ContentCache, check_revision, fetch_and_read
+from pipeline.fetch.mediawiki import (
+    MAX_REWRITE_HOPS,
+    TITLE_SEPARATOR,
+    api_error_text,
+    checked_title,
+    resolve_title,
+    rewrite_map,
+)
 from pipeline.fetch.polite import WIKI_TRANSPORT
 
 __all__ = [
@@ -101,15 +118,6 @@ __all__ = [
 # the `exlimit` cap of the extension, and an answer to more titles than the cap
 # drops the extracts of the rest without an error.
 BATCH_SIZE = 20
-
-# What the API reads as the boundary between two titles.
-TITLE_SEPARATOR = "|"
-
-# How many rewrites `_resolve_title` follows before it gives up. A rewrite chain
-# of the wiki is one normalization and at most one redirect, so four is
-# generous. The limit is here to end a loop that a cyclic map would otherwise
-# run forever.
-MAX_REWRITE_HOPS = 4
 
 # The wiki namespace that holds the article about a Minecraft thing.
 #
@@ -200,26 +208,6 @@ class ExtractReport(BaseModel, frozen=True):
         return {entry.requested_title: entry.extract for entry in self.extracts}
 
 
-def _checked_title(title: str) -> str:
-    """Return `title` when it can name one wiki page, or raise `FetchError`.
-
-    A blank title asks for nothing. A title that holds the separator asks for
-    two pages under one name, which is fact 5 of the module docstring. A control
-    character is a sign that the caller built the title wrongly, the way it is
-    in `pipeline.fetch.bucket`.
-    """
-    if not title.strip():
-        raise FetchError("a wiki title cannot be blank.")
-    if TITLE_SEPARATOR in title:
-        raise FetchError(
-            f"{title!r} holds a {TITLE_SEPARATOR!r}, which this API reads as the boundary "
-            f"between two titles. The request would ask for two pages under one name."
-        )
-    if any(character < " " or character == "\x7f" for character in title):
-        raise FetchError(f"{title!r} holds a control character, so it cannot name a wiki page.")
-    return title
-
-
 def build_extracts_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) -> str:
     """Return the URL that reads the intro blurb of every title of `titles`.
 
@@ -237,7 +225,7 @@ def build_extracts_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) ->
             f"an extracts request cannot name more than {BATCH_SIZE} titles, and this one names "
             f"{len(titles)}. The API answers the extra pages with no extract and no error."
         )
-    checked = [_checked_title(title) for title in titles]
+    checked = [checked_title(title) for title in titles]
     if len(set(checked)) != len(checked):
         raise FetchError("an extracts request names each title once. This one repeats a title.")
     parameters = urlencode(
@@ -254,75 +242,12 @@ def build_extracts_url(titles: Sequence[str], *, api_url: str = WIKI_API_URL) ->
             "explaintext": "1",
             "exlimit": str(BATCH_SIZE),
             # Follow a redirect page rather than answer it. `query.redirects`
-            # then records the move, and `_resolve_title` reads that record.
+            # then records the move, and `resolve_title` reads that record.
             "redirects": "1",
             "titles": TITLE_SEPARATOR.join(checked),
         }
     )
     return f"{api_url}?{parameters}"
-
-
-def _rewrite_map(query: dict[str, Any], name: str, *, source: str) -> dict[str, str]:
-    """Return the `from` to `to` map of `query[name]`, or an empty one.
-
-    `normalized` and `redirects` have the same shape and the same job: each one
-    records that the wiki answered a title other than the one that was asked
-    for. An absent key means the wiki rewrote nothing.
-    """
-    entries = query.get(name)
-    if entries is None:
-        return {}
-    if not isinstance(entries, list):
-        raise FetchError(f"{source} answered a {name!r} of {type(entries).__name__}, not a list.")
-    rewrites: dict[str, str] = {}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise FetchError(f"{source} answered a {name!r} entry of {entry!r}, not an object.")
-        moved_from = entry.get("from")
-        moved_to = entry.get("to")
-        if not isinstance(moved_from, str) or not isinstance(moved_to, str):
-            raise FetchError(f"{source} answered a {name!r} entry with no 'from' and 'to' pair.")
-        rewrites[moved_from] = moved_to
-    return rewrites
-
-
-def _resolve_title(title: str, rewrites: dict[str, str], *, source: str) -> str:
-    """Return the title that the answer holds for the requested `title`.
-
-    This walks fact 4 of the module docstring. A request can be rewritten twice:
-    `creepers` is normalized to `Creepers` and then redirected to `Creeper`. So
-    the walk repeats until the map stops moving the title.
-
-    The range is `MAX_REWRITE_HOPS + 1` because a hop and a look are not the
-    same step. Following `n` hops takes `n` reads of the map to move the title
-    and one more to see that it has stopped moving, so a plain
-    `range(MAX_REWRITE_HOPS)` would follow one hop fewer than the constant names
-    and would refuse a chain of exactly `MAX_REWRITE_HOPS` with a message saying
-    it was rewritten more times than it was.
-    """
-    seen = {title}
-    current = title
-    for _ in range(MAX_REWRITE_HOPS + 1):
-        moved_to = rewrites.get(current)
-        if moved_to is None or moved_to == current:
-            return current
-        if moved_to in seen:
-            raise FetchError(f"{source} rewrote {title!r} in a circle, so it names no page.")
-        seen.add(moved_to)
-        current = moved_to
-    raise FetchError(
-        f"{source} rewrote {title!r} more than {MAX_REWRITE_HOPS} times, so the walk was stopped."
-    )
-
-
-def _api_error_text(error: Any) -> str:
-    """Return what the `error` key of a MediaWiki answer says, as one line."""
-    if isinstance(error, dict):
-        code = error.get("code")
-        info = error.get("info")
-        if code is not None or info is not None:
-            return f"{code}: {info}"
-    return str(error)
 
 
 def _left_the_main_namespace(requested: str, answered: str, page: dict[str, Any]) -> bool:
@@ -373,7 +298,7 @@ def parse_extracts_answer(payload: bytes, *, source: str, titles: Sequence[str])
         raise FetchError(f"{source} answered {type(document).__name__}, not an API answer.")
     error = document.get("error")
     if error is not None:
-        raise FetchError(f"{source} refused the query: {_api_error_text(error)}")
+        raise FetchError(f"{source} refused the query: {api_error_text(error)}")
     # The guard for fact 2. An answer that carries `continue` left pages
     # unread, and an answer with no `batchcomplete` did not finish the batch.
     # Neither one says which extracts are missing, so neither one can be read.
@@ -391,8 +316,8 @@ def parse_extracts_answer(payload: bytes, *, source: str, titles: Sequence[str])
     if not isinstance(pages, list):
         raise FetchError(f"{source} answered no 'pages' list, so it holds no pages.")
 
-    rewrites = _rewrite_map(query, "normalized", source=source)
-    rewrites |= _rewrite_map(query, "redirects", source=source)
+    rewrites = rewrite_map(query, "normalized", source=source)
+    rewrites |= rewrite_map(query, "redirects", source=source)
 
     answered: dict[str, dict[str, Any]] = {}
     for index, page in enumerate(pages):
@@ -406,7 +331,7 @@ def parse_extracts_answer(payload: bytes, *, source: str, titles: Sequence[str])
     extracts: list[PageExtract] = []
     misses: list[MissingExtract] = []
     for title in titles:
-        page_title = _resolve_title(title, rewrites, source=source)
+        page_title = resolve_title(title, rewrites, source=source)
         page = answered.get(page_title)
         if page is None:
             # Every requested title is echoed by this API, rewritten or not. A
@@ -483,7 +408,7 @@ def fetch_page_extracts(
     check_revision(revision)
     if batch_size < 1 or batch_size > BATCH_SIZE:
         raise FetchError(f"an extracts batch holds 1 to {BATCH_SIZE} titles, not {batch_size}.")
-    wanted = sorted({_checked_title(title) for title in titles})
+    wanted = sorted({checked_title(title) for title in titles})
     store = ContentCache() if cache is None else cache
     the_transport = DEFAULT_TRANSPORT if transport is None else transport
     reports: list[ExtractReport] = []

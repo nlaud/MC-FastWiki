@@ -1,0 +1,141 @@
+{
+  "captured": "2026-08-30",
+  "api_url": "https://minecraft.wiki/api.php",
+  "note": "Chosen rows and family samples of the Minecraft Wiki spritefile bucket, one per trap pipeline.enrich.sprite has to survive. Rebuilt by tests/fixtures/build_sprite_snapshot.py. Content is CC BY-NC-SA 3.0.",
+  "rows": [
+    {
+      "page_name": "File:Invicon Raw Iron.png",
+      "name": "InvSprite",
+      "id": "Raw Iron",
+      "file": "File:Invicon Raw Iron.png"
+    },
+    {
+      "page_name": "File:Invicon Pancake Stack.png",
+      "name": "InvSprite",
+      "id": "Pancake Stack",
+      "file": "File:PancakeInvSprite.png"
+    },
+    {
+      "page_name": "File:Invicon Sculk Block.png",
+      "name": "InvSprite",
+      "id": "Sculk Block",
+      "file": "File:Sculk JE1 BE1.gif",
+      "deprecated": ""
+    },
+    {
+      "page_name": "File:Invicon Acacia Wood Button.png",
+      "name": "InvSprite",
+      "id": "Acacia Wood Button",
+      "file": "File:Invicon Acacia Button.png",
+      "deprecated": ""
+    },
+    {
+      "page_name": "File:Invicon Acacia Button.png",
+      "name": "InvSprite",
+      "id": "Acacia Button",
+      "file": "File:Invicon Acacia Button.png"
+    },
+    {
+      "page_name": "File:Invicon Cave Air.png",
+      "name": "InvSprite",
+      "id": "Cave Air",
+      "file": "File:Blank.png"
+    },
+    {
+      "page_name": "File:BlockSprite acacia-button.png",
+      "name": "BlockSprite",
+      "id": "acacia-button",
+      "file": "File:BlockSprite acacia-button.png"
+    },
+    {
+      "page_name": "File:BlockSprite acacia-door.png",
+      "name": "BlockSprite",
+      "id": "acacia-door",
+      "file": "File:BlockSprite acacia-door.png"
+    },
+    {
+      "page_name": "File:ItemSprite iron-sword.png",
+      "name": "ItemSprite",
+      "id": "iron-sword",
+      "file": "File:ItemSprite iron-sword.png"
+    },
+    {
+      "page_name": "File:EntitySprite zombie-villager-desert-shepherd.png",
+      "name": "EntitySprite",
+      "id": "zombie-villager-desert-shepherd",
+      "file": "File:EntitySprite zombie-villager-desert-shepherd.png"
+    },
+    {
+      "page_name": "File:EffectSprite absorption.png",
+      "name": "EffectSprite",
+      "id": "absorption",
+      "file": "File:EffectSprite absorption.png"
+    },
+    {
+      "page_name": "File:BiomeSprite deep-ocean.png",
+      "name": "BiomeSprite",
+      "id": "deep-ocean",
+      "file": "File:BiomeSprite deep-ocean.png"
+    },
+    {
+      "page_name": "File:EnvSprite abandoned-village.png",
+      "name": "EnvSprite",
+      "id": "abandoned-village",
+      "file": "File:EnvSprite abandoned-village.png"
+    },
+    {
+      "page_name": "File:AchievementSprite acquire-hardware.png",
+      "name": "AchievementSprite",
+      "id": "acquire-hardware",
+      "file": "File:AchievementSprite acquire-hardware.png"
+    },
+    {
+      "page_name": "File:NewAchievementSprite atlantis?.png",
+      "name": "NewAchievementSprite",
+      "id": "atlantis?",
+      "file": "File:NewAchievementSprite atlantis?.png"
+    },
+    {
+      "page_name": "File:DungeonsItemSprite burst-gust-bow.png",
+      "name": "DungeonsItemSprite",
+      "id": "burst-gust-bow",
+      "file": "File:DungeonsItemSprite burst-gale-bow.png"
+    },
+    {
+      "page_name": "File:DungeonsItemSprite diamond-mountaineer-pick.png",
+      "name": "DungeonsItemSprite",
+      "id": "diamond-mountaineer-pick",
+      "file": "File:DungeonsItemSprite diamond-mountaineer-axe.png"
+    },
+    {
+      "page_name": "File:DungeonsItemSprite echo-of-the-valley-bow.png",
+      "name": "DungeonsItemSprite",
+      "id": "echo-of-the-valley-bow",
+      "file": "File:DungeonsItemSprite echo-of-the-valley.png"
+    },
+    {
+      "page_name": "File:LegacyBlockSprite sand-je1.png",
+      "name": "LegacyBlockSprite",
+      "id": "sand-je1",
+      "file": "File:LegacyBlockSprite sand-je1.png"
+    },
+    {
+      "page_name": "File:LegacyBlockSprite gravel-je1.png",
+      "name": "LegacyBlockSprite",
+      "id": "gravel-je1",
+      "file": "File:LegacyBlockSprite gravel-je1.png"
+    },
+    {
+      "page_name": "File:SkinSprite dragon-slayer.png",
+      "name": "SkinSprite",
+      "id": "dragon-slayer",
+      "file": "File:SkinSprite dragon-slayer.png"
+    },
+    {
+      "page_name": "File:SkinSprite desert-archer.png",
+      "name": "SkinSprite",
+      "id": "desert-archer",
+      "file": "File:SkinSprite desert-archer.png"
+    }
+  ]
+}

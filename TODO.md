@@ -9,20 +9,6 @@ reasoning survives even after the choice is made.
 
 ---
 
-## Phase 2 — Wiki enrichment (Tier B)
-
-- [x] Wikitext infobox parser for what Bucket does not cover: health, damage, size, usable items
-  (and armor, behavior, mobtype, speed, knockbackresistance -- all nine fields the infobox
-  carries)
-  - [x] Strip `{{IN|BE}}` / `{{only|bedrock}}` regions **before** reading any value
-  - [x] Handle difficulty-tiered damage (easy/normal/hard) rather than assuming one number
-  - [x] Unresolvable fields go to an `unparsed-report.json`, never a silent guess
-- [ ] Pull `spritefile` (paginated past 5000) to build the sprite ID to `File:` name map
-- [ ] Resolve `File:` pages to image URLs via `prop=imageinfo`, download with content-hash caching
-- [ ] Report any entity that ends up with no icon — a missing icon is a broken join, not a
-      cosmetic gap
-- [ ] Reconcile Tier A against Tier B: report entities present in one but missing in the other
-
 ## Phase 3 — Normalization and emit
 
 - [ ] Define the `Entity` model and the `Section` discriminated union in shared types
