@@ -112,7 +112,8 @@
         "enchantment",
         "structure",
         "biome",
-        "collection"
+        "collection",
+        "entity"
       ]
     },
     "sourceTier": {

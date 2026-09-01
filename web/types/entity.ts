@@ -17,7 +17,7 @@ export type EntityId = string;
  * via the `definition` "entityKind".
  */
 export type EntityKind =
-  "mob" | "item" | "block" | "effect" | "advancement" | "enchantment" | "structure" | "biome" | "collection";
+  "mob" | "item" | "block" | "effect" | "advancement" | "enchantment" | "structure" | "biome" | "collection" | "entity";
 /**
  * The tier that produced one field. A is vanilla game data from mcmeta. B is the Minecraft Wiki. C is a curated override. A later tier wins.
  *

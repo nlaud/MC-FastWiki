@@ -34,6 +34,7 @@ from pipeline.enrich.resource_location import parse_resource_locations
 from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
+from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.fetch.extracts import ExtractReport, PageExtract
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
@@ -62,8 +63,28 @@ REGISTRIES: dict[str, list[str]] = {
     # documents only the item. That combination is the one that broke the
     # first live merge -- see the regression test near the bottom of this
     # file -- so it is in the shared fixture rather than a private one.
-    "entity_type": ["creeper", "chicken", "acacia_boat", "ender_pearl"],
-    "block": [],
+    #
+    # `arrow`, `tnt`, and `lightning_bolt` exercise the demotion rule of
+    # `pipeline.extract.entity_class`: all three classify as `NEITHER` below,
+    # and none of the three has a wiki row that names it, so nothing but the
+    # demotion decides where each one lands -- `arrow` into `item` (it also
+    # sits there), `tnt` into `block` (it also sits there), and
+    # `lightning_bolt` into the new `EntityKind.ENTITY` (it sits nowhere
+    # else). `undecided_default` and `undecided_overridden` exercise clause 2:
+    # both classify as `LOOT_TABLE_ONLY` and sit in no other registry, so
+    # both default to `kind="mob"` unless a curated override says otherwise.
+    "entity_type": [
+        "creeper",
+        "chicken",
+        "acacia_boat",
+        "ender_pearl",
+        "arrow",
+        "tnt",
+        "lightning_bolt",
+        "undecided_default",
+        "undecided_overridden",
+    ],
+    "block": ["tnt"],
     "item": [
         "gunpowder",
         "emerald",
@@ -75,11 +96,39 @@ REGISTRIES: dict[str, list[str]] = {
         "widget_a",
         "widget_b",
         "mystery_thing",
+        "arrow",
     ],
     "mob_effect": [],
     "worldgen/biome": ["jungle"],
     "enchantment": ["efficiency"],
 }
+
+# Every `entity_type` path of `REGISTRIES` must appear here, or
+# `merge_entities` raises `NormalizeError` for a classifier gone out of sync
+# with the registries payload -- see the shape-fault tests near the bottom of
+# this file. `creeper` and `chicken` are real mobs with a spawn egg.
+# `acacia_boat` and `ender_pearl` are `LOOT_TABLE_ONLY` here on purpose, not
+# `NEITHER`: both already resolve to `item` through the wiki-name-match
+# mechanism `_registry_the_wiki_names_the_id_under` applies (see the
+# regression tests below), so classifying them `NEITHER` as the real 26.2
+# data does would make the demotion a silent no-op in this fixture and hide
+# whether the name-match mechanism still works on its own. `arrow`, `tnt`,
+# and `lightning_bolt` carry no matching wiki row at all, so they are the
+# fixture's proof that the demotion does real work with no help from a name
+# match.
+ENTITY_CLASSIFICATION = EntityClassification(
+    by_path={
+        "creeper": EntityClass.SPAWN_EGG,
+        "chicken": EntityClass.SPAWN_EGG,
+        "acacia_boat": EntityClass.LOOT_TABLE_ONLY,
+        "ender_pearl": EntityClass.LOOT_TABLE_ONLY,
+        "arrow": EntityClass.NEITHER,
+        "tnt": EntityClass.NEITHER,
+        "lightning_bolt": EntityClass.NEITHER,
+        "undecided_default": EntityClass.LOOT_TABLE_ONLY,
+        "undecided_overridden": EntityClass.LOOT_TABLE_ONLY,
+    }
+)
 
 ADVANCEMENT_IDS = ("story/root", "story/mine_stone", "adventure/nothing_here")
 
@@ -300,6 +349,10 @@ CURATED = CuratedData(
         ),
         "minecraft:mystery_thing": EntityOverride(kind=EntityKind.BLOCK),
         "minecraft:does_not_exist": EntityOverride(name="Ghost"),
+        # Beats the clause-2 default of `kind="mob"` for an undecided
+        # `entity_type` ID, the same way `data/curated/overrides.json`
+        # itself beats it for `minecraft:armor_stand` and `minecraft:player`.
+        "minecraft:undecided_overridden": EntityOverride(kind=EntityKind.ITEM),
     },
     stale=(StaleDocument(document="aliases.json", verified_for="26.1", current="26.2"),),
 )
@@ -318,6 +371,7 @@ def run_merge() -> MergeResult:
         advancement_tree=ADVANCEMENT_TREE,
         extract_report=EXTRACT_REPORT,
         curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
     )
 
 
@@ -355,6 +409,103 @@ def test_an_ambiguous_display_name_attaches_nothing_and_is_reported() -> None:
     assert len(unplaced) == 1
     assert unplaced[0].table == "trade"
     assert "ambiguous" in unplaced[0].reason
+
+
+# --- entity_type classification: the three clauses, and the demotion -------------
+
+
+def test_clause_one_spawn_egg_keeps_entity_type_precedence() -> None:
+    """`SPAWN_EGG` is a mob outright, and `entity_type` never moves for it."""
+    result = run_merge()
+    creeper = result.by_id["minecraft:creeper"]
+    assert creeper.kind is EntityKind.MOB
+
+
+def test_clause_two_undecided_defaults_to_mob_and_is_named_in_the_report() -> None:
+    """An `entity_type` ID with a loot table but no spawn egg defaults to `mob`.
+
+    `undecided_default` sits in no other registry, so nothing but the clause
+    2 default decides its kind. The report names it, the same way
+    `multi_registry` names every ID whose registry membership took a
+    decision -- see `MergeReport.undecided_entity_types`'s own docstring.
+    """
+    result = run_merge()
+    entity = result.by_id["minecraft:undecided_default"]
+    assert entity.kind is EntityKind.MOB
+
+    entry = next(
+        u for u in result.report.undecided_entity_types if u.id == "minecraft:undecided_default"
+    )
+    assert entry.kind is EntityKind.MOB
+
+
+def test_a_curated_override_beats_the_clause_two_default() -> None:
+    """A curated override changes the kind clause 2 would otherwise default to.
+
+    `data/curated/overrides.json` does exactly this live, for
+    `minecraft:armor_stand` (to `item`) and `minecraft:player` (to `entity`).
+    `undecided_overridden` is the synthetic stand-in.
+    """
+    result = run_merge()
+    entity = result.by_id["minecraft:undecided_overridden"]
+    assert entity.kind is EntityKind.ITEM
+
+    # The report names the kind the ID actually ended up with, not the
+    # clause 2 default it would have gotten without the override.
+    entry = next(
+        u for u in result.report.undecided_entity_types if u.id == "minecraft:undecided_overridden"
+    )
+    assert entry.kind is EntityKind.ITEM
+
+
+def test_clause_three_demotion_lets_an_item_registry_membership_win() -> None:
+    """`arrow` carries no wiki row at all, so only the demotion decides it.
+
+    Unlike `acacia_boat` and `ender_pearl` below, nothing about `arrow`'s
+    wiki row could have picked `item` for it -- there is no row to match.
+    The demotion is the only mechanism doing anything here.
+    """
+    result = run_merge()
+    arrow = result.by_id["minecraft:arrow"]
+    assert arrow.kind is EntityKind.ITEM
+
+
+def test_clause_three_demotion_lets_a_block_registry_membership_win() -> None:
+    result = run_merge()
+    tnt = result.by_id["minecraft:tnt"]
+    assert tnt.kind is EntityKind.BLOCK
+
+
+def test_clause_three_demotion_with_no_other_registry_becomes_kind_entity() -> None:
+    """`lightning_bolt` sits in no registry but `entity_type`, and classifies `NEITHER`.
+
+    Demoting `entity_type` to the bottom of a one-element list still leaves
+    it at the top, so the demotion alone cannot place this ID anywhere else
+    -- `EntityKind.ENTITY` is what an `entity_type` ID gets when it is
+    demoted and there was nowhere else to land.
+    """
+    result = run_merge()
+    lightning_bolt = result.by_id["minecraft:lightning_bolt"]
+    assert lightning_bolt.kind is EntityKind.ENTITY
+
+
+def test_clause_one_fires_before_the_demotion_so_a_mob_with_an_item_form_stays_a_mob() -> None:
+    """`chicken` must never be reopened by the demotion logic.
+
+    `minecraft:chicken` has a spawn egg, so it classifies `SPAWN_EGG` and the
+    demotion step in `_registries_of_id` never runs for it at all --
+    `entity_class is EntityClass.NEITHER` is false before it is ever
+    reached. `pipeline.normalize.merge`'s module docstring records this as
+    the safety property the demotion must never violate: `chicken`, `cod`,
+    `salmon`, `pufferfish`, `tropical_fish`, and `rabbit` are all real mobs
+    that also share their registry ID with a raw-meat item, and resolving
+    one of them through the item's wiki row is the wrong-answer failure
+    `_own_row`'s own docstring records as a real past failure.
+    """
+    result = run_merge()
+    chicken = result.by_id["minecraft:chicken"]
+    assert chicken.kind is EntityKind.MOB
+    assert chicken.name == "Chicken"
 
 
 # --- The five sections ---------------------------------------------------------
@@ -545,6 +696,7 @@ def test_an_empty_registries_mapping_is_refused() -> None:
             advancement_tree=ADVANCEMENT_TREE,
             extract_report=EXTRACT_REPORT,
             curated=CURATED,
+            entity_classification=ENTITY_CLASSIFICATION,
         )
 
 
@@ -563,6 +715,7 @@ def test_an_empty_join_table_is_refused() -> None:
             advancement_tree=ADVANCEMENT_TREE,
             extract_report=EXTRACT_REPORT,
             curated=CURATED,
+            entity_classification=ENTITY_CLASSIFICATION,
         )
 
 
@@ -581,6 +734,26 @@ def test_an_empty_sprite_index_is_refused() -> None:
             advancement_tree=ADVANCEMENT_TREE,
             extract_report=EXTRACT_REPORT,
             curated=CURATED,
+            entity_classification=ENTITY_CLASSIFICATION,
+        )
+
+
+def test_an_empty_entity_classification_is_refused() -> None:
+    empty_classification = EntityClassification(by_path={})
+    with pytest.raises(NormalizeError, match="no paths"):
+        merge_entities(
+            registries=REGISTRIES,
+            advancement_ids=ADVANCEMENT_IDS,
+            join_table=JOIN_TABLE,
+            sprite_index=SPRITE_INDEX,
+            infobox_report=INFOBOX_REPORT,
+            spawn_index=SPAWN_INDEX,
+            drop_index=DROP_INDEX,
+            trade_index=TRADE_INDEX,
+            advancement_tree=ADVANCEMENT_TREE,
+            extract_report=EXTRACT_REPORT,
+            curated=CURATED,
+            entity_classification=empty_classification,
         )
 
 
@@ -600,6 +773,37 @@ def test_a_precedence_registry_missing_from_the_mcmeta_payload_is_a_shape_fault(
             advancement_tree=ADVANCEMENT_TREE,
             extract_report=EXTRACT_REPORT,
             curated=CURATED,
+            entity_classification=ENTITY_CLASSIFICATION,
+        )
+
+
+def test_an_entity_type_id_missing_from_the_classification_is_a_shape_fault() -> None:
+    """`_registries_of_id` must refuse to guess when the classifier and the registries disagree.
+
+    A classification built from a different registries payload than the one
+    this call was given is a caller bug, per `merge_entities`'s own
+    docstring -- not a fact about the game that should silently fall back to
+    some default classification for the ID nobody named.
+    """
+    partial = EntityClassification(
+        by_path={
+            path: cls for path, cls in ENTITY_CLASSIFICATION.by_path.items() if path != "creeper"
+        }
+    )
+    with pytest.raises(NormalizeError, match="creeper"):
+        merge_entities(
+            registries=REGISTRIES,
+            advancement_ids=ADVANCEMENT_IDS,
+            join_table=JOIN_TABLE,
+            sprite_index=SPRITE_INDEX,
+            infobox_report=INFOBOX_REPORT,
+            spawn_index=SPAWN_INDEX,
+            drop_index=DROP_INDEX,
+            trade_index=TRADE_INDEX,
+            advancement_tree=ADVANCEMENT_TREE,
+            extract_report=EXTRACT_REPORT,
+            curated=CURATED,
+            entity_classification=partial,
         )
 
 

@@ -45,15 +45,58 @@ publishes -- `loot_table`, `sound_event`, `particle_type`, and the rest --
 name nothing this project has a renderer or a `kind` for, and are left alone
 by this stage exactly as they are left alone by `ICON_RULES`.
 
-**Known simplification, named rather than hidden.** `EntityKind` has no
-`entity` member -- CLAUDE.md's nine kinds stop at `mob` -- so every
-`entity_type` ID becomes `kind="mob"` here, including the handful that are
-not really mobs at all: an arrow, an item frame, and a spawner minecart are
-entity types and none of them are mobs in the sense a player means the word.
-`kind` selects a renderer, so which renderer an arrow gets is a Phase 6
-concern and not this module's to invent an answer for. It is named here, in
-the report as every other `entity_type` ID's kind, and again in the top-level
-task report, rather than quietly quirking around it.
+**`entity_type` is classified, not assumed.** This module used to map every
+`entity_type` ID onto `kind="mob"` unconditionally, which was named in this
+docstring as a known simplification rather than fixed -- an arrow, an item
+frame, and a spawner minecart are entity types and none of them are mobs in
+the sense a player means the word. `pipeline.extract.entity_class.
+classify_entity_types` closes that gap, from two Tier A signals the pipeline
+already downloads: a spawn egg item, `<path>_spawn_egg` in the `item`
+registry, and an entity loot table, `loot_table/entities/<path>.json` in the
+vanilla data pack. Measured against the cached 26.2 mcmeta payloads on
+2026-08-31, `entity_type` holds 158 paths, 88 have a spawn egg, and 93 have a
+loot table -- and the spawn-egg set is a *strict subset* of the loot-table
+set, so the two signals never disagree, they only differ in reach.
+
+Three ordered clauses follow, and `entity_class.EntityClass` names each one:
+
+1. **A spawn egg -> a mob.** `entity_type` keeps the top of `_REGISTRY_
+   PRECEDENCE` for this ID, exactly as it always has.
+2. **No spawn egg, but a loot table -> undecided.** Defaults to `kind=
+   "mob"`, the same default the whole registry used to get, but every such ID
+   is now named in `MergeReport.undecided_entity_types` alongside the kind it
+   ended up with, so a future version's new one cannot slip in silently the
+   way all 158 used to. This clause is exactly 5 IDs, because it is precisely
+   the 93-ID loot-table set minus the 88-ID spawn-egg subset: `armor_stand`,
+   `giant`, `illusioner`, `mannequin`, `player`. `data/curated/overrides.json`
+   corrects two of the five -- see that file's own note for which two and
+   why the other three keep the default.
+3. **Neither -> demoted.** Not a living thing by either signal, so
+   `entity_type` is moved to the *bottom* of that ID's own registry
+   precedence, letting a `block` or `item` membership win instead. Only an ID
+   with no other registry membership at all becomes the new
+   `EntityKind.ENTITY`. This clause holds 65 IDs: 1 also sits in `block`
+   (`tnt`), 41 also sit in `item`, and 23 sit nowhere else and become
+   `kind="entity"`.
+
+The demotion is what finally closes a split this module's own precedence
+used to leave open. `acacia_boat` resolved to `item` before this rule existed
+-- the wiki's `Acacia Boat` row names the ID exactly, so `_registry_the_wiki_
+names_the_id_under` fired -- but `acacia_chest_boat` resolved to `mob`,
+because the wiki titles that row `Boat with Chest` and nothing fired. Two
+halves of the same concept, split by how the wiki happened to title a row.
+The demotion settles both the same way regardless of wiki phrasing, because
+neither boat has a spawn egg or a loot table.
+
+**The demotion runs after clause 1, never before it**, which is the property
+`tests/test_normalize_merge.py` pins as a regression test. `minecraft:
+chicken` is a mob with a raw-meat item sharing its ID, and so are `cod`,
+`salmon`, `pufferfish`, `tropical_fish`, and `rabbit` -- every one of them
+has a spawn egg, so clause 1 fires first and `entity_type` keeps precedence
+before the demotion logic ever runs. Resolving one of those mobs through its
+item's wiki row instead of its own is a real past failure this module's
+`_own_row` docstring records in full; the demotion exists to fix a different
+problem and must never reopen that one.
 
 Advancements enumerate separately, from `advancement_ids` --
 `pipeline.extract.advancement.extract_advancement_ids`'s output -- as
@@ -168,6 +211,7 @@ from pipeline.enrich import spawn_table as enrich_spawn_table
 from pipeline.enrich import trade as enrich_trade
 from pipeline.enrich.resource_location import NAMESPACE, JoinTable, ResourceLocation
 from pipeline.enrich.sprite import SpriteIndex
+from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.aliases import AliasStrength, generate_aliases
@@ -209,6 +253,7 @@ __all__ = [
     "MissingBlurb",
     "MissingIconEntity",
     "MultiRegistryId",
+    "UndecidedEntityType",
     "UnplacedRow",
     "merge_entities",
     "write_report",
@@ -232,14 +277,37 @@ _REGISTRY_PRECEDENCE: tuple[str, ...] = (
     "enchantment",
 )
 
+# `entity_type` is deliberately absent from this mapping. Its `EntityKind`
+# depends on the ID's `entity_class.EntityClass` -- `MOB` for `SPAWN_EGG` and
+# `LOOT_TABLE_ONLY`, `ENTITY` for a `NEITHER`-classified ID that reaches
+# `entity_type` at all (which, after the demotion, only happens when
+# `entity_type` is the ID's sole registry) -- so `_entity_type_kind` answers
+# it instead of a static lookup. Every other registry's kind never varies by
+# ID, so a static mapping is still the right shape for the other five.
 _REGISTRY_KIND: Mapping[str, EntityKind] = {
-    "entity_type": EntityKind.MOB,
     "block": EntityKind.BLOCK,
     "item": EntityKind.ITEM,
     "mob_effect": EntityKind.EFFECT,
     "worldgen/biome": EntityKind.BIOME,
     "enchantment": EntityKind.ENCHANTMENT,
 }
+
+
+def _entity_type_kind(entity_class: EntityClass) -> EntityKind:
+    """Return the default `EntityKind` of an `entity_type` ID from its classification.
+
+    Only ever called for the registry `_registries_of_id` chose as an ID's
+    own -- which for `entity_type` means either the ID has a spawn egg or a
+    loot table (clause 1 or 2, both default to `EntityKind.MOB`), or the ID
+    was demoted for clause 3 (`EntityClass.NEITHER`) and had no other
+    registry to fall back to, in which case `EntityKind.ENTITY` is the only
+    honest answer -- see `EntityKind`'s own docstring for what that kind
+    holds and, explicitly, what it never holds.
+    """
+    if entity_class is EntityClass.NEITHER:
+        return EntityKind.ENTITY
+    return EntityKind.MOB
+
 
 # The wiki `Type` value(s) that name an ID of one Tier A registry, for
 # narrowing a display-name join the way `IconRule.join_kinds` narrows the
@@ -281,6 +349,21 @@ class MultiRegistryId(BaseModel, frozen=True):
     kind: EntityKind
 
 
+class UndecidedEntityType(BaseModel, frozen=True):
+    """One `entity_type` ID that clause 2 of the classification rule left undecided.
+
+    Named alongside `kind`, the same shape `MultiRegistryId` already uses for
+    the same auditability reason: the module docstring's classification
+    section explains why the clause 2 default is `EntityKind.MOB` and why a
+    curated override may have moved it since. Every ID here has no spawn egg
+    but does have an entity loot table -- see `pipeline.extract.entity_class`
+    for the two signals in full.
+    """
+
+    id: str
+    kind: EntityKind
+
+
 class MissingIconEntity(BaseModel, frozen=True):
     """One entity whose icon chain never resolved, across every registry it belongs to."""
 
@@ -305,6 +388,7 @@ class MergeReport(BaseModel, frozen=True):
 
     unplaced: tuple[UnplacedRow, ...] = ()
     multi_registry: tuple[MultiRegistryId, ...] = ()
+    undecided_entity_types: tuple[UndecidedEntityType, ...] = ()
     missing_icons: tuple[MissingIconEntity, ...] = ()
     missing_blurbs: tuple[MissingBlurb, ...] = ()
     unknown_curated_overrides: tuple[str, ...] = ()
@@ -339,9 +423,7 @@ def _fallback_name(path: str) -> str:
     return path.replace("_", " ").title()
 
 
-def _wiki_rows(
-    name: str, registry: str, join_table: JoinTable
-) -> tuple[ResourceLocation, ...]:
+def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[ResourceLocation, ...]:
     """Return the rows of `join_table.by_display_name[name]` whose kind fits `registry`.
 
     `_WIKI_KIND` is not optional here, for the reason `IconRule.join_kinds`'s
@@ -716,6 +798,7 @@ def _convert_trade_entry(
 def _registries_of_id(
     registries: Mapping[str, Sequence[str]],
     join_table: JoinTable,
+    classification: EntityClassification,
 ) -> dict[str, tuple[str, ...]]:
     """Return every path of the six precedence registries, mapped to the registries it sits in.
 
@@ -723,11 +806,13 @@ def _registries_of_id(
     `value[0]` is the entity's chosen registry: it decides the `kind` and it
     is the first registry `_own_row` looks for a wiki row under.
 
-    That order is `_REGISTRY_PRECEDENCE`, with one override that comes first
-    when it applies: **the registry whose wiki row calls the ID by its own
-    name wins.** Precedence alone is a guess about which of two meanings a
-    player wants, and the wiki has already answered the question by choosing
-    what to call each row.
+    The starting order is `_REGISTRY_PRECEDENCE`, and two adjustments run on
+    top of it, in this order, for an ID that sits in more than one registry:
+
+    **First, the registry whose wiki row calls the ID by its own name wins.**
+    Precedence alone is a guess about which of two meanings a player wants,
+    and the wiki has already answered the question by choosing what to call
+    each row.
 
     `minecraft:ender_pearl` is the case that forced this. It is an
     `entity_type` and an `item`, and the wiki writes two rows: `Ender Pearl`
@@ -743,15 +828,42 @@ def _registries_of_id(
     matters. Its rows are `Chicken` for the mob and `Raw Chicken` for the
     food; `chicken` matches the mob's row, `entity_type` keeps its
     precedence, and the mob still owns the page. Measured against the live
-    26.2 registries on 2026-08-31 the override fires for 14 IDs and every one
-    is a fix: the nine boats and the bamboo raft become items rather than
+    26.2 registries on 2026-08-31 this adjustment fires for 14 IDs and every
+    one is a fix: the nine boats and the bamboo raft become items rather than
     mobs, `egg` stops being `Thrown Egg`, `tnt` stops being `Primed TNT`, and
-    `wheat` stops being `Wheat Crops`.
+    `wheat` stops being `Wheat Crops`. The boats and the raft are also fixed
+    by the second adjustment below on their own merits -- neither has a spawn
+    egg or an entity loot table -- so for those ten this one is no longer the
+    only thing holding the answer up, but it still fires first and still
+    gives the same answer.
 
-    Where both registries' rows carry the same name -- `arrow` and `snowball`
-    are the two -- nothing distinguishes them and precedence still decides.
-    The name is right either way, so all that rides on it is which renderer
-    Phase 6 picks.
+    **Second, an `entity_type` ID that classifies as `EntityClass.NEITHER`
+    is demoted to the bottom of its own list.** This runs after the name
+    adjustment and unconditionally overrides whatever it decided, which is
+    what makes the demotion a real settlement rather than one more input to a
+    tie-break: `pipeline.extract.entity_class.classify_entity_types` already
+    proved this ID has no spawn egg and no entity loot table, so nothing the
+    wiki calls it changes what it is. `minecraft:arrow` and `minecraft:
+    snowball` are the case that used to fall through every other rule: both
+    registries' wiki rows carry the identical name, so the name adjustment
+    above cannot distinguish them and precedence alone used to decide --
+    silently picking `mob` for an arrow, correct in the sense that the name
+    was right either way, but wrong about what was choosing it, since nothing
+    about "arrow" is a mob. The demotion is what actually settles it now:
+    `arrow` and `snowball` are both `NEITHER`-classified, so `entity_type`
+    drops to the bottom of their lists regardless of the name tie, and
+    `item` wins on its own registry membership rather than on a coin flip
+    dressed up as precedence. See `EntityClassification` and the module
+    docstring's classification section for the full rule and its measured
+    counts, and `EntityKind`'s own docstring for what `EntityKind.ENTITY`
+    holds when the demotion leaves an ID with nowhere else to land.
+
+    Raises `NormalizeError` when a registry `_REGISTRY_PRECEDENCE` names is
+    missing from `registries`, or when an ID sits in `entity_type` and
+    `classification` names nothing for it -- the second is a sign that
+    `classification` was built from a different registries payload than the
+    one this call was given, which is a caller bug rather than a fact about
+    the game.
     """
     per_id: dict[str, list[str]] = {}
     for registry in _REGISTRY_PRECEDENCE:
@@ -772,6 +884,20 @@ def _registries_of_id(
             named = _registry_the_wiki_names_the_id_under(path, regs, rows)
             if named is not None:
                 regs = [named] + [registry for registry in regs if registry != named]
+
+        if "entity_type" in regs:
+            entity_class = classification.by_path.get(path)
+            if entity_class is None:
+                raise NormalizeError(
+                    f"{path!r} sits in the entity_type registry, and the entity classification "
+                    f"this merge was given names nothing for it. The classifier and the "
+                    f"registries payload have gone out of sync."
+                )
+            if entity_class is EntityClass.NEITHER and len(regs) > 1:
+                regs = [registry for registry in regs if registry != "entity_type"] + [
+                    "entity_type"
+                ]
+
         ordered[path] = tuple(regs)
     return ordered
 
@@ -811,19 +937,26 @@ def merge_entities(
     advancement_tree: enrich_advancement.AdvancementTree,
     extract_report: ExtractReport,
     curated: CuratedData,
+    entity_classification: EntityClassification,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
     `registries` is the full mcmeta registries payload, matching `pipeline.
     normalize.reconcile.reconcile`'s own parameter of the same name.
     `advancement_ids` is `pipeline.extract.advancement.extract_advancement_ids`'s
-    output. Every other argument is the Tier B index (or Tier C `CuratedData`)
-    the module docstring names as that section's source.
+    output. `entity_classification` is `pipeline.extract.entity_class.
+    classify_entity_types`'s output, built from the same mcmeta payloads as
+    `registries` -- the module docstring's classification section names the
+    three-way rule it drives. Every other argument is the Tier B index (or
+    Tier C `CuratedData`) the module docstring names as that section's
+    source.
 
     Raises `NormalizeError` for a shape fault: an empty `registries` mapping,
-    an empty `join_table`, an empty `sprite_index`, or a registry this
-    module's precedence names that `registries` does not publish. Never
-    raises for a per-entity gap -- see the module docstring's closing section.
+    an empty `join_table`, an empty `sprite_index`, an empty `entity_
+    classification`, a registry this module's precedence names that
+    `registries` does not publish, or an `entity_type` ID that `entity_
+    classification` names nothing for. Never raises for a per-entity gap --
+    see the module docstring's closing section.
     """
     if not registries:
         raise NormalizeError(
@@ -840,10 +973,17 @@ def merge_entities(
             "merge_entities was given a sprite index with no entries. An empty spritefile read "
             "is a failed scrape, not a wiki with no sprites."
         )
+    if not entity_classification.by_path:
+        raise NormalizeError(
+            "merge_entities was given an entity classification with no paths. An empty "
+            "classification is a failed extract, not a version of Minecraft with no entity "
+            "types to classify."
+        )
 
-    per_id = _registries_of_id(registries, join_table)
+    per_id = _registries_of_id(registries, join_table, entity_classification)
 
     multi_registry: list[MultiRegistryId] = []
+    undecided_entity_types: list[UndecidedEntityType] = []
     unplaced: list[UnplacedRow] = []
     missing_icons: list[MissingIconEntity] = []
     missing_blurbs: list[MissingBlurb] = []
@@ -851,11 +991,25 @@ def merge_entities(
     blurbs = extract_report.blurbs()
     drafts: dict[str, EntityDraft] = {}
     entity_registries: dict[str, tuple[str, ...]] = {}
+    entity_type_kind_counts: dict[EntityKind, int] = {}
 
     for path, regs in per_id.items():
         entity_id = f"{NAMESPACE}:{path}"
         chosen_registry = regs[0]
-        kind = _REGISTRY_KIND[chosen_registry]
+        entity_class = entity_classification.by_path.get(path) if "entity_type" in regs else None
+        if chosen_registry == "entity_type":
+            if entity_class is None:
+                # `_registries_of_id` already raised for this shape, so this
+                # branch is unreachable in practice; the guard stays because
+                # it is what lets mypy narrow `entity_class` to `EntityClass`
+                # for `_entity_type_kind` below rather than `EntityClass | None`.
+                raise NormalizeError(
+                    f"{entity_id!r} chose the entity_type registry with no classification. "
+                    f"The classifier and the registries payload have gone out of sync."
+                )
+            kind = _entity_type_kind(entity_class)
+        else:
+            kind = _REGISTRY_KIND[chosen_registry]
         override = curated.overrides.get(entity_id)
         if override is not None and override.kind is not None:
             # See the module docstring's section on the curated `kind`
@@ -865,6 +1019,10 @@ def merge_entities(
         entity_registries[entity_id] = regs
         if len(regs) > 1:
             multi_registry.append(MultiRegistryId(id=entity_id, registries=regs, kind=kind))
+        if entity_class is EntityClass.LOOT_TABLE_ONLY:
+            undecided_entity_types.append(UndecidedEntityType(id=entity_id, kind=kind))
+        if entity_class is not None:
+            entity_type_kind_counts[kind] = entity_type_kind_counts.get(kind, 0) + 1
 
         fallback_name = _fallback_name(path)
         draft = EntityDraft(id=entity_id, kind=kind, name=fallback_name, tier=SourceTier.A)
@@ -1040,10 +1198,23 @@ def merge_entities(
     counts = {registry: len(registries[registry]) for registry in _REGISTRY_PRECEDENCE}
     counts["advancement"] = len(advancement_ids)
     counts["entities"] = len(entities)
+    # The per-kind breakdown of the 158 entity_type IDs, once the
+    # classification, the demotion, and any curated override have all run.
+    # Before an override moves one of the five clause-2 IDs, the module
+    # docstring's classification section measures this as 93 `mob` (88
+    # `SPAWN_EGG` plus the 5 `LOOT_TABLE_ONLY` defaults), 1 `block`, 41
+    # `item`, and 23 `entity` on the live 26.2 data. `data/curated/
+    # overrides.json` moves two of those 93 -- `armor_stand` to `item` and
+    # `player` to `entity` -- so the counts written here, keyed by the kind
+    # each ID actually ended up with, land at 91/42/1/24 once that build's
+    # curated overrides are the ones in this repository.
+    for kind, count in entity_type_kind_counts.items():
+        counts[f"entity_type_kind.{kind.value}"] = count
 
     report = MergeReport(
         unplaced=tuple(unplaced),
         multi_registry=tuple(multi_registry),
+        undecided_entity_types=tuple(undecided_entity_types),
         missing_icons=tuple(missing_icons),
         missing_blurbs=tuple(missing_blurbs),
         unknown_curated_overrides=tuple(sorted(unknown_overrides)),

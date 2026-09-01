@@ -53,6 +53,12 @@
 /tests/fixtures/mcmeta_*_block_tags.json linguist-generated=true
 /tests/fixtures/mcmeta_*_block_harvest.json linguist-generated=true
 
+# Collapse the entity_type classification snapshot for the same reason.
+# `tests/fixtures/build_entity_class_snapshot.py` writes it, it carries the
+# `entity_type` and `item` registries plus every `loot_table/entities/**`
+# path of the pinned version, and a version bump rewrites the whole thing.
+/tests/fixtures/mcmeta_*_entity_class.json linguist-generated=true
+
 # Collapse the wiki Bucket row snapshot of the enrich tests, for the reason
 # above: `tests/fixtures/build_bucket_row_snapshot.py` writes it, it is several
 # thousand lines, and a refresh rewrites all of them at once.
