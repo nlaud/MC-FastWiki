@@ -113,6 +113,7 @@ __all__ = [
     "UsableItem",
     "parse_infobox",
     "parse_infoboxes",
+    "select_infobox_pages",
     "write_report",
 ]
 
@@ -756,6 +757,55 @@ def parse_infobox(
         knockback_resistance=read(FIELD_KNOCKBACK_RESISTANCE, _parse_scalar_field),
     )
     return entity, tuple(unparsed), tuple(filtered)
+
+
+def select_infobox_pages(pages: Mapping[str, str]) -> tuple[dict[str, str], tuple[str, ...]]:
+    """Split `pages` into the ones that carry an entity infobox and the ones that do not.
+
+    `parse_infoboxes` -- by way of `_infobox_fields` -- raises `EnrichError` the
+    moment it meets a page with no `{{Infobox entity}}` template at all, and it
+    is right to: a page this module was told is a mob page and cannot find the
+    template on is a shape this module no longer understands, not a field it
+    could not read. That rule only stays true, though, if the caller keeps its
+    own promise not to hand `parse_infoboxes` a page that was never going to
+    carry the template in the first place. This function is how a caller keeps
+    that promise: it reads every page once, keeps the ones with the template,
+    and returns the rest as titles rather than as a fault.
+
+    A page with no infobox is a Tier B gap, not a shape fault -- the same
+    distinction `pipeline.enrich`'s own package docstring draws for every other
+    row a wiki page turns out not to carry: a half-edited or miscategorised
+    page is expected here and there, and a caller reports it and carries on
+    rather than stopping the whole read over one page. Filtering here, before
+    `parse_infoboxes` ever sees the title, is what turns that expected gap into
+    a report entry instead of a build-stopping exception.
+
+    The measured live case naming why this function exists at all is Armor
+    Stand. `pipeline.normalize.merge`'s own module docstring calls
+    `minecraft:armor_stand` a mob the mcmeta signals leave "undecided, defaults
+    to a mob" -- it has an entity loot table and no spawn egg, so Tier A's own
+    classifier cannot rule it out. The wiki disagrees: the Armor Stand page
+    documents an item, not a `{{Infobox entity}}` mob, so a selection rule
+    built only on the mcmeta side of that disagreement hands `parse_infoboxes`
+    a page that was never going to have the template, and the whole build dies
+    on the one page where Tier A and Tier B genuinely do not agree. Filtering
+    on the template's own presence is what lets that disagreement become one
+    name in the second half of this function's return value instead of a
+    build fault.
+
+    Returns `(with_template, sorted_titles_without)`. `with_template` keeps
+    `pages`' own text unchanged, ready for `parse_infoboxes`. The titles
+    without a template come back sorted, because a caller reports them, and a
+    report a person reads should not depend on dictionary iteration order.
+    """
+    with_template: dict[str, str] = {}
+    without_template: list[str] = []
+    for title, text in pages.items():
+        if find_template(text, INFOBOX_TEMPLATE_NAME):
+            with_template[title] = text
+        else:
+            without_template.append(title)
+    return with_template, tuple(sorted(without_template))
 
 
 def parse_infoboxes(

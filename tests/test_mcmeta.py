@@ -973,3 +973,51 @@ def test_the_data_fetcher_refuses_an_empty_group_list() -> None:
     with pytest.raises(FetchError, match="at least one group"):
         fetch_data_files(_data_tag(), groups=[], transport=transport)
     assert transport.urls == []
+
+
+def test_the_resolver_reads_a_second_time_from_the_cache(tmp_path: Path) -> None:
+    """A cached tag lookup costs one request, not one per build.
+
+    The reason a cache is safe here at all, where it is not for the version
+    manifest, is that the URL names the version: `.../git/ref/tags/26.2-summary`
+    cannot answer a question about 26.3. `resolve_mcmeta_tag` therefore keys the
+    entry by the URL alone, with no caller revision, and this test is what says
+    a warm store answers without a transport call.
+    """
+    cache = ContentCache(tmp_path)
+    transport = _fixture_transport()
+
+    first = resolve_mcmeta_tag("26.2", "summary", cache=cache, transport=transport)
+    second = resolve_mcmeta_tag("26.2", "summary", cache=cache, transport=transport)
+
+    assert first == second
+    assert len(transport.urls) == 1
+
+
+def test_the_resolver_still_reads_the_network_with_no_cache() -> None:
+    """The default is unchanged: no cache argument means a request every time.
+
+    Worth pinning rather than assuming. The cache is opt-in precisely so that
+    adding it to one caller could not quietly change what every other caller
+    does, and a test is the only thing that keeps that true.
+    """
+    transport = _fixture_transport()
+
+    resolve_mcmeta_tag("26.2", "summary", transport=transport)
+    resolve_mcmeta_tag("26.2", "summary", transport=transport)
+
+    assert len(transport.urls) == 2
+
+
+def test_a_reference_body_that_is_not_json_never_enters_the_cache(tmp_path: Path) -> None:
+    """The read-before-store rule of `fetch_and_read` covers the tag lookup too.
+
+    Same reasoning as the archive and summary cases above: a proxy that answers
+    200 with an HTML page must cost one build, not every build after it.
+    """
+    cache = ContentCache(tmp_path)
+
+    with pytest.raises(FetchError):
+        resolve_mcmeta_tag("26.2", "summary", cache=cache, transport=RecordingTransport(b"<html>"))
+
+    assert list(tmp_path.rglob("*")) == []

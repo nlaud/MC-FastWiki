@@ -12,12 +12,20 @@ data generator as JSON, so the pipeline needs no JVM.
 
 Two things this module does not do:
 
-* It keeps no disk cache. CLAUDE.md asks for a content-hash cache on network
-  fetches, and that rule protects the large mcmeta payloads and the several
-  thousand sprites, which are immutable per version tag. This read asks what the
-  current release is. A cached answer to that question is a stale answer, and a
-  stale answer defeats the command. Mojang sends `Cache-Control: max-age=120`,
-  so the service expects a reader to come back.
+* It caches nothing by default. CLAUDE.md asks for a content-hash cache on
+  network fetches, and that rule protects the large mcmeta payloads and the
+  several thousand sprites, which are immutable per version tag. This read asks
+  what the current release is. A cached answer to that question is a stale
+  answer, and a stale answer defeats the command. Mojang sends `Cache-Control:
+  max-age=120`, so the service expects a reader to come back.
+
+  A caller that already knows its release is asking the other question this
+  document answers -- for `versions`, the ordered release history that dates a
+  curated file -- and that one is safe to store. `fetch_version_manifest` takes
+  an optional cache for exactly that case, keyed by a caller revision so the
+  entry can never stand in for "what is current". Its docstring holds the whole
+  rule, including why the cache and the revision are optional together rather
+  than separately.
 * It does not trust `latest.release` on its own. See below.
 """
 
@@ -26,6 +34,7 @@ from typing import Any, Self
 from pydantic import BaseModel, ValidationError, model_validator
 
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
+from pipeline.fetch.cache import ContentCache, check_revision, fetch_and_read
 
 __all__ = [
     "RELEASE_TYPE",
@@ -128,13 +137,63 @@ def parse_version_manifest(
         raise FetchError(f"{source} is not a usable version manifest: {error}") from error
 
 
-def fetch_version_manifest(*, transport: Transport = get_bytes) -> VersionManifest:
+def fetch_version_manifest(
+    *,
+    cache: ContentCache | None = None,
+    revision: str | None = None,
+    transport: Transport = get_bytes,
+) -> VersionManifest:
     """Read the manifest from Mojang and return the checked model.
 
     Pass `transport` to read the bytes from somewhere else. A test passes a
     callable of its own, so no test of this module opens a socket.
+
+    `cache` and `revision` are the opt-in read-through store, and they are
+    optional together rather than separately. Left out -- which is what every
+    caller asking "what is the current release?" does -- this function opens
+    the network every time, exactly as the module docstring's second bullet
+    requires.
+
+    Passing both is the other question this manifest answers, and it is a
+    different question. A build that already knows which release it targets
+    reads the manifest only for `versions`, the ordered release list that
+    `pipeline.normalize.curated.load_curated` judges a curated document's
+    `verifiedFor` against. That list is a historical record: 26.2 sat at the
+    same position in it yesterday and will tomorrow. Keying the entry by a
+    caller revision is the same device `pipeline.fetch.bucket` uses for the
+    wiki, and it is what lets `python -m pipeline build --offline
+    --minecraft-version 26.2` run with no network at all after one online
+    build of 26.2 has primed the store.
+
+    `cache` without `revision` raises `FetchError` rather than falling back to
+    a URL key. A URL key here would name one mutable document forever, so the
+    first read of "the current release" would be the last one this project
+    ever performed -- the precise staleness the module docstring rules out.
+    Refusing the combination keeps that trap unreachable instead of merely
+    undocumented.
     """
-    return parse_version_manifest(transport(VERSION_MANIFEST_URL))
+    if cache is None:
+        if revision is not None:
+            raise FetchError(
+                "fetch_version_manifest was given a revision and no cache. The revision names a "
+                "cache entry, so it means nothing without the store it would name one in."
+            )
+        return parse_version_manifest(transport(VERSION_MANIFEST_URL))
+    if revision is None:
+        raise FetchError(
+            "fetch_version_manifest was given a cache and no revision. A cache entry keyed by "
+            "this URL alone would answer 'what is the current release' with the first answer "
+            "this project ever read. Pass the release the build targets as the revision, or "
+            "pass no cache and read the network."
+        )
+    check_revision(revision)
+    return fetch_and_read(
+        cache,
+        VERSION_MANIFEST_URL,
+        transport=transport,
+        read=parse_version_manifest,
+        key=f"version-manifest/{revision}/{VERSION_MANIFEST_URL}",
+    )
 
 
 def fetch_latest_release_id(*, transport: Transport = get_bytes) -> str:
