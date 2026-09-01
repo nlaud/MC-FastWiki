@@ -5,13 +5,14 @@ CLAUDE.md names this package's job: take the vanilla registry data of Tier A
 and produce the one `Entity` per registry ID that `pipeline.emit` writes into
 the site's search index and shards.
 
-**This package holds no `Entity` model yet.** Phase 2 -- the phase this module
-was added in -- stops one step short of the merge: it proves that the two
-tiers *can* be joined by building the join tables and the icon chain, and it
-reports where that join succeeds and where it does not. `reconcile.py` is that
-report. Phase 3 is where the `Entity` model itself is defined and the report's
-findings are actually applied to every field of every entity, one merge at a
-time rather than one reconciliation count at a time.
+**`reconcile.py` stops one step short of the merge, and `entity.py`/`merge.py`
+are the step after it.** Phase 2 -- the phase `reconcile.py` was added in --
+only proves that Tier A and Tier B *can* be joined, by building the join
+tables and the icon chain, and reports where that join succeeds and where it
+does not. `entity.py` now defines the `Entity` model itself, and `merge.py`'s
+`merge_entities` is what actually applies the reconciled join, field by field,
+to build one `Entity` per registry ID rather than one reconciliation count per
+registry.
 
 Two consequences follow from that scope, and both are deliberate rather than
 temporary shortcuts.
