@@ -176,8 +176,32 @@ _TIER_RANK: Mapping[SourceTier, int] = {SourceTier.A: 0, SourceTier.B: 1, Source
 class EntityKind(StrEnum):
     """The discriminator of `Entity`, mirroring the schema's `entityKind` enum.
 
-    Selects the renderer on the web side. CLAUDE.md names these nine kinds of
-    searchable thing.
+    Selects the renderer on the web side. CLAUDE.md documents this project's
+    phases and decisions, but it does not actually enumerate the kinds
+    anywhere -- a claim used to sit here that it did, and that claim was
+    wrong regardless of how many members this class carried. This class and
+    its mirror in `pipeline/schema/entity.schema.json` are the only source of
+    truth for how many kinds there are and what each one is.
+
+    There are ten now. `ENTITY` is the newest, added when `pipeline.
+    normalize.merge` stopped mapping every `entity_type` registry ID onto
+    `MOB` unconditionally. `pipeline.extract.entity_class.classify_entity_
+    types` sorts each `entity_type` path into one of three classes from two
+    Tier A signals -- a spawn egg item, an entity loot table -- and the merge
+    stage demotes `entity_type` out of that ID's own registry precedence
+    whenever neither signal applies, so a `block` or `item` registry
+    membership wins the ID instead. `ENTITY` is what is left over: an
+    `entity_type` ID with neither signal AND no other registry membership at
+    all. Measured against the live 26.2 data on 2026-08-31, 23 IDs land here
+    -- `experience_orb`, `lightning_bolt`, and `marker` among them.
+
+    `ENTITY` is deliberately never the kind of anything that also has an item
+    or a block form. `arrow` and every minecart keep `kind="item"`, and `tnt`
+    keeps `kind="block"`, even though all three are also `entity_type` IDs --
+    the demotion only ever lowers `entity_type`'s place in an ID's own
+    precedence order, it never changes which registry wins when more than one
+    still claims the ID after the demotion. An ID reaches `ENTITY` only when
+    `entity_type` is demoted and nothing else was there to win in its place.
     """
 
     MOB = "mob"
@@ -189,6 +213,7 @@ class EntityKind(StrEnum):
     STRUCTURE = "structure"
     BIOME = "biome"
     COLLECTION = "collection"
+    ENTITY = "entity"
 
 
 class EntityRef(BaseModel, frozen=True, populate_by_name=True):

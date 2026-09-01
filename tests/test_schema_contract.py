@@ -67,7 +67,11 @@ SECTION_TYPES = {
     "LinkList",
 }
 
-# CLAUDE.md names these 9 kinds of searchable thing.
+# `pipeline.normalize.entity.EntityKind` is the source of truth for this
+# list, not CLAUDE.md -- CLAUDE.md documents phases and decisions, but it
+# does not enumerate the kinds anywhere. `ENTITY` is the newest of the ten,
+# added when `pipeline.normalize.merge` stopped mapping every `entity_type`
+# registry ID onto `MOB` unconditionally; see that class's own docstring.
 ENTITY_KINDS = {
     "mob",
     "item",
@@ -78,6 +82,7 @@ ENTITY_KINDS = {
     "structure",
     "biome",
     "collection",
+    "entity",
 }
 
 SCHEMA_NAMES = schema_names()

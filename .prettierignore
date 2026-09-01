@@ -28,6 +28,11 @@ data/dist/
 tests/fixtures/mcmeta_*_block_tags.json
 tests/fixtures/mcmeta_*_block_harvest.json
 
+# The entity_type classification snapshot, written by `tests/fixtures/
+# build_entity_class_snapshot.py` the same way, and excluded for the same
+# reason: two writers cannot own one file.
+tests/fixtures/mcmeta_*_entity_class.json
+
 # The wiki Bucket row snapshot of the enrich tests, written by
 # `tests/fixtures/build_bucket_row_snapshot.py` with `json.dumps(indent=2)`.
 #

@@ -17,15 +17,12 @@ reasoning survives even after the choice is made.
       component, and the wiki's own join table maps all 26 potion names onto that one ID. Giving
       each potion a page means synthesising entities from the component rather than from the
       registry, so it belongs with the brewing work in the obtain-tree below, not with aliases.
-- [ ] Give `entity_type` IDs a renderer that is not `mob`. `EntityKind` stops at `mob`, so an
-      arrow, an item frame and a spawner minecart all currently render as mobs. The merge already
-      reports every ID this affects. Either add an `entity` kind or decide these are items.
 - [ ] Build one unified obtain-tree: recipes, smelting, **brewing**, loot, chest loot, trades,
       natural generation. Brewing is a node type in this tree, not a separate structure — a potion
       expands into its brewing step, each ingredient expands into whatever produces it (fermented
       spider eye into its crafting recipe, and on down), and the brewing stand expands into its own
       recipe. One set of rules, no special cases.
-  - [ ] Cycle detection and memoization
+  - [ ] Cycle detection and memoization (Additional Note: Cycles (like iron ingot -> iron nuggets -> iron ingot, should not show up in the final tree rendering). 
   - [ ] Depth cap with expandable nodes
   - [ ] Repeated-subtree collapse to back-reference
 - [ ] Pack all sprites into a single atlas image plus a JSON coordinate map (keeps the site under
