@@ -25,10 +25,14 @@ reasoning survives even after the choice is made.
   - [ ] Cycle detection and memoization (Additional Note: Cycles (like iron ingot -> iron nuggets -> iron ingot, should not show up in the final tree rendering). 
   - [ ] Depth cap with expandable nodes
   - [ ] Repeated-subtree collapse to back-reference
-- [ ] Pack all sprites into a single atlas image plus a JSON coordinate map (keeps the site under
-      Cloudflare's 20,000-file cap and avoids ~4,900 requests)
-- [ ] Emit: `index.json` (search payload), sharded entity JSON, sprite atlas, `manifest.json`
-      (version + build time). Keep shard count in the tens — never one file per entity.
+- [ ] Pack all sprites into a single atlas image plus a JSON coordinate map, and wire that atlas
+      into `pipeline.emit.emit_build` (keeps the site under Cloudflare's 20,000-file cap and avoids
+      ~4,900 requests). The emit stage ships without it: it writes no `sprites.png` and no
+      coordinate map. `Entity.icon` already carries a stable sprite key, so the atlas is one more
+      argument to `emit_build`, not a rewrite of it.
+- [ ] `python -m pipeline build` - the CLI entry point that runs fetch through emit end to end and
+      writes the committed `/data/dist`. Nothing calls `pipeline.emit.emit_build` outside a test
+      until this exists, so it is what makes the emit stage reachable from a real build.
 - [ ] Validation gate: Pydantic models validated against `/pipeline/schema`, plus a regression
       check that fails the build if entity count
       drops more than 5% or a required field disappears across versions
