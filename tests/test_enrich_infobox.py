@@ -19,6 +19,7 @@ from pipeline.enrich.infobox import (
     FilteredLine,
     UnparsedField,
     parse_infobox,
+    select_infobox_pages,
 )
 
 
@@ -511,3 +512,42 @@ def test_knockback_resistance_edition_marked_drops_bedrock_keeps_java() -> None:
     )
     assert [value.text for value in entity.knockback_resistance] == ["70%"]
     assert any(entry.field == "knockbackresistance" for entry in filtered)
+
+
+# --- select_infobox_pages ------------------------------------------------------
+
+
+def test_select_infobox_pages_keeps_a_page_with_the_template() -> None:
+    pages = {"Creeper": infobox(health="{{hp|20}}")}
+    with_template, without_template = select_infobox_pages(pages)
+    assert with_template == pages
+    assert without_template == ()
+
+
+def test_select_infobox_pages_reports_a_page_with_no_template() -> None:
+    """Armor Stand is the measured live case: a mcmeta mob with no wiki infobox."""
+    pages = {"Armor Stand": "Armor Stand is a decorative item, not documented with an infobox."}
+    with_template, without_template = select_infobox_pages(pages)
+    assert with_template == {}
+    assert without_template == ("Armor Stand",)
+
+
+def test_select_infobox_pages_splits_a_mix_and_sorts_the_misses() -> None:
+    pages = {
+        "Zombie": infobox(health="{{hp|20}}"),
+        "Player": "No infobox entity template on this page.",
+        "Creeper": infobox(health="{{hp|20}}"),
+        "Armor Stand": "No infobox entity template on this page either.",
+    }
+    with_template, without_template = select_infobox_pages(pages)
+    assert set(with_template) == {"Zombie", "Creeper"}
+    assert with_template["Zombie"] == pages["Zombie"]
+    assert with_template["Creeper"] == pages["Creeper"]
+    # Sorted, not insertion order -- `pages` names Player before Armor Stand.
+    assert without_template == ("Armor Stand", "Player")
+
+
+def test_select_infobox_pages_of_an_empty_mapping_is_empty() -> None:
+    with_template, without_template = select_infobox_pages({})
+    assert with_template == {}
+    assert without_template == ()

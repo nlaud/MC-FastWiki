@@ -113,7 +113,7 @@ one display name onto zero, one, or more than one registry ID, rather than
 walking the entities and looking a name up -- the forward direction is what
 lets an unresolvable row fall out as one `MergeReport.unplaced` entry instead
 of a silent absence. Every resolution is narrowed by the wiki's own `kind`
-vocabulary for the registry in question -- `_WIKI_KIND` records the mapping,
+vocabulary for the registry in question -- `WIKI_KIND` records the mapping,
 reusing `ICON_RULES["item"].join_kinds` and `ICON_RULES["block"].join_kinds`
 where those already exist and adding the three the icon route never needed
 (`entity_type` is `entity` on the wiki, `mob_effect` is `effect`, `worldgen/
@@ -248,6 +248,7 @@ from pipeline.normalize.reconcile import ICON_RULES, resolve_icon
 
 __all__ = [
     "DEFAULT_REPORT_PATH",
+    "WIKI_KIND",
     "MergeReport",
     "MergeResult",
     "MissingBlurb",
@@ -318,7 +319,15 @@ def _entity_type_kind(entity_class: EntityClass) -> EntityKind:
 # `enchantment` rows carry no `Type` at all -- see `pipeline.enrich.
 # resource_location`'s `KNOWN_KINDS` docstring -- so `None` is the wiki kind
 # that means "an enchantment."
-_WIKI_KIND: Mapping[str, tuple[str | None, ...]] = {
+#
+# Public, and named in `__all__`, because `pipeline.cli.build` needs the exact
+# same rule to pick which wiki pages carry a mob's `{{Infobox entity}}` --
+# "the row's own wiki `Type` reads `entity`" is one of the three clauses of
+# that selection, and duplicating the mapping there would let the two drift
+# the moment a future registry gains a `WIKI_KIND` entry here and not there.
+# It was private until the CLI needed it; nothing about its own meaning
+# changed, so every use inside this module keeps reading it exactly as before.
+WIKI_KIND: Mapping[str, tuple[str | None, ...]] = {
     "item": ICON_RULES["item"].join_kinds,
     "block": ICON_RULES["block"].join_kinds,
     "entity_type": ("entity",),
@@ -426,13 +435,13 @@ def _fallback_name(path: str) -> str:
 def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[ResourceLocation, ...]:
     """Return the rows of `join_table.by_display_name[name]` whose kind fits `registry`.
 
-    `_WIKI_KIND` is not optional here, for the reason `IconRule.join_kinds`'s
+    `WIKI_KIND` is not optional here, for the reason `IconRule.join_kinds`'s
     own docstring gives in full: a raw chicken item and the chicken mob share
     one registry ID and, on some pages, one display name, and reading both
     kinds as candidates is how one gets silently resolved through the
     other's row.
     """
-    wanted = _WIKI_KIND.get(registry, ())
+    wanted = WIKI_KIND.get(registry, ())
     return tuple(row for row in join_table.by_display_name.get(name, ()) if row.kind in wanted)
 
 
@@ -471,7 +480,7 @@ def _own_row(
     """
     all_rows = join_table.by_registry_id.get(entity_id, ())
     for registry in registries:
-        wanted = _WIKI_KIND.get(registry, ())
+        wanted = WIKI_KIND.get(registry, ())
         rows = tuple(row for row in all_rows if row.kind in wanted)
         names = {row.display_name for row in rows}
         if len(names) == 1:
@@ -917,7 +926,7 @@ def _registry_the_wiki_names_the_id_under(
     displaces the one precedence already preferred.
     """
     for registry in registries:
-        wanted = _WIKI_KIND.get(registry, ())
+        wanted = WIKI_KIND.get(registry, ())
         for row in rows:
             if row.kind in wanted and row.display_name.casefold().replace(" ", "_") == path:
                 return registry

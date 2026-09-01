@@ -36,6 +36,7 @@ from pipeline.fetch import (
     decode_json,
     get_bytes,
 )
+from pipeline.fetch.cache import ContentCache
 from pipeline.fetch.version_manifest import (
     VERSION_MANIFEST_URL,
     fetch_latest_release_id,
@@ -441,3 +442,89 @@ def test_the_fetchers_default_to_the_guarded_transport(function: Callable[..., o
     path while this module stays green.
     """
     assert inspect.signature(function).parameters["transport"].default is get_bytes
+
+
+def test_the_fetcher_reads_a_second_time_from_the_cache(tmp_path: Path) -> None:
+    """A cache plus a revision serves the second read without a request.
+
+    This is the manifest's other question. A build that already knows it targets
+    26.2 reads this document for `versions` alone -- the release history that
+    `pipeline.normalize.curated.load_curated` dates a curated file against --
+    and that history does not change for a version already published. The
+    revision keys the entry, so `python -m pipeline build --offline
+    --minecraft-version 26.2` can read it back with no network.
+    """
+    cache = ContentCache(tmp_path)
+    asked: list[str] = []
+
+    def transport(url: str) -> bytes:
+        asked.append(url)
+        return FIXTURE.read_bytes()
+
+    first = fetch_version_manifest(cache=cache, revision="26.2", transport=transport)
+    second = fetch_version_manifest(cache=cache, revision="26.2", transport=transport)
+
+    assert asked == [VERSION_MANIFEST_URL]
+    assert [entry.id for entry in first.versions] == [entry.id for entry in second.versions]
+
+
+def test_a_second_revision_does_not_read_the_first_revision_s_answer(tmp_path: Path) -> None:
+    """The revision is part of the key, so it genuinely separates two builds.
+
+    Without this the cache would hold one manifest forever under one name, and
+    the revision argument would be decoration rather than the thing that makes
+    storing this document safe at all.
+    """
+    cache = ContentCache(tmp_path)
+    asked: list[str] = []
+
+    def transport(url: str) -> bytes:
+        asked.append(url)
+        return FIXTURE.read_bytes()
+
+    fetch_version_manifest(cache=cache, revision="26.2", transport=transport)
+    fetch_version_manifest(cache=cache, revision="26.1", transport=transport)
+
+    assert asked == [VERSION_MANIFEST_URL, VERSION_MANIFEST_URL]
+
+
+def test_the_fetcher_reads_the_network_every_time_with_no_cache() -> None:
+    """The default is unchanged, and that is the whole point of the default.
+
+    "What is the current release" is the question this module exists to answer,
+    and a stored answer to it is a stale answer. Every caller that asks it
+    passes no cache, so this behaviour is the one that must not drift.
+    """
+    asked: list[str] = []
+
+    def transport(url: str) -> bytes:
+        asked.append(url)
+        return FIXTURE.read_bytes()
+
+    fetch_version_manifest(transport=transport)
+    fetch_version_manifest(transport=transport)
+
+    assert asked == [VERSION_MANIFEST_URL, VERSION_MANIFEST_URL]
+
+
+def test_a_cache_without_a_revision_is_refused(tmp_path: Path) -> None:
+    """The combination that would freeze "what is current" forever is unreachable.
+
+    Keying this URL alone would make the first answer this project ever read the
+    last one it ever read. Refusing the pair keeps that trap out of reach rather
+    than merely documented, which is the same standard `ContentCache.object_
+    path` applies to a digest it did not build itself.
+    """
+    with pytest.raises(FetchError, match="cache and no revision"):
+        fetch_version_manifest(cache=ContentCache(tmp_path))
+
+
+def test_a_revision_without_a_cache_is_refused() -> None:
+    """The mirror of the rule above: a revision names an entry in a store.
+
+    Accepting it silently would read the network while the caller believed it
+    had asked for a cached read, which is the failure mode that looks like it
+    worked.
+    """
+    with pytest.raises(FetchError, match="revision and no cache"):
+        fetch_version_manifest(revision="26.2", transport=lambda url: FIXTURE.read_bytes())

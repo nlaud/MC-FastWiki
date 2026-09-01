@@ -411,6 +411,7 @@ def resolve_mcmeta_tag(
     branch: str,
     *,
     allow_prerelease: bool = False,
+    cache: ContentCache | None = None,
     transport: Transport = get_bytes,
 ) -> McmetaTag:
     """Return the pinned mcmeta tag of one branch at one Minecraft version.
@@ -423,13 +424,42 @@ def resolve_mcmeta_tag(
     off. Pass `transport` to read the bytes from somewhere else. A test passes a
     callable of its own, so no test of this module opens a socket.
 
+    Pass `cache` to store the answer, keyed by the URL alone and with no caller
+    revision. That is safe here in a way it is not for
+    `pipeline.fetch.version_manifest.fetch_version_manifest`, and the
+    difference is worth being precise about, because the two reads look alike
+    and only one of them names an immutable thing. The URL this function reads
+    is `.../git/ref/tags/26.2-data`: the version is *in the URL*, so the entry
+    can never answer a question about a different version. A published mcmeta
+    version tag also points at one commit and stays there -- the repository
+    cuts a new tag per Minecraft version rather than moving an old one. The
+    manifest URL names no version at all, which is exactly why that function
+    demands a revision and this one does not.
+
+    Without a cache this function opens the network on every call, which is
+    what it has always done and what a fresh build wants. With one, two
+    lookups of an already-built version cost nothing, and `python -m pipeline
+    build --offline` can pin its tags with no network at all.
+
     Any failure raises `FetchError` and stops the build.
     """
     if not allow_prerelease:
         _reject_a_prerelease(version_id)
     tag = mcmeta_tag_name(version_id, branch)
     url = GITHUB_REF_URL.format(repository=MCMETA_REPOSITORY, tag=tag)
-    reference = parse_git_ref(transport(url), expected_tag=tag, source=url)
+
+    def read(payload: bytes) -> GitRef:
+        return parse_git_ref(payload, expected_tag=tag, source=url)
+
+    # `fetch_and_read` rather than the `_fetch_and_read` alias below: this
+    # function sits above that binding in the file, and naming the import
+    # directly keeps the read order-independent instead of relying on a
+    # module-level name that is bound two hundred lines further down.
+    reference = (
+        read(transport(url))
+        if cache is None
+        else fetch_and_read(cache, url, transport=transport, read=read)
+    )
     return McmetaTag(
         version_id=version_id,
         branch=branch,
