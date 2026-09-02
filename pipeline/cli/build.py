@@ -139,6 +139,7 @@ from pipeline.emit.write import DEFAULT_DIST_PATH, EmitReport, emit_build
 from pipeline.emit.write import DEFAULT_REPORT_PATH as EMIT_REPORT_PATH
 from pipeline.emit.write import write_report as write_emit_report
 from pipeline.enrich.advancement import fetch_advancements
+from pipeline.enrich.brewing import fetch_brewing
 from pipeline.enrich.droptable import fetch_drop_tables
 from pipeline.enrich.infobox import DEFAULT_REPORT_PATH as INFOBOX_REPORT_PATH
 from pipeline.enrich.infobox import InfoboxReport, parse_infoboxes, select_infobox_pages
@@ -149,6 +150,7 @@ from pipeline.enrich.sprite import fetch_sprite_index
 from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
+from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
 from pipeline.fetch.extracts import fetch_page_extracts
@@ -162,12 +164,24 @@ from pipeline.normalize.merge import write_report as write_merge_report
 from pipeline.normalize.reconcile import DEFAULT_REPORT_PATH as RECONCILE_REPORT_PATH
 from pipeline.normalize.reconcile import ReconciliationReport, reconcile
 from pipeline.normalize.reconcile import write_report as write_reconcile_report
+from pipeline.obtain.brewing import BrewingExtractionResult, build_brewing_producers
+from pipeline.obtain.loot import (
+    LootExtractionResult,
+    UnresolvedTradeOrDrop,
+    extract_block_and_chest_loot,
+    producers_from_drop_index,
+    producers_from_trade_index,
+)
+from pipeline.obtain.producer import ProducerIndex
+from pipeline.obtain.recipes import RecipeExtractionResult, SkippedRecipe, extract_recipes
 
 __all__ = [
     "CURATED_DIRECTORY",
+    "OBTAIN_REPORT_NAME",
     "PAGES_WITHOUT_INFOBOX_REPORT_NAME",
     "BuildOptions",
     "BuildOutcome",
+    "ObtainReport",
     "run_build",
 ]
 
@@ -183,6 +197,43 @@ CURATED_DIRECTORY = Path("data") / "curated"
 # existing stage module, so it gets a small file of its own alongside the
 # four stage reports, under the same `--reports` directory.
 PAGES_WITHOUT_INFOBOX_REPORT_NAME = "pages-without-infobox.json"
+
+# `pipeline.obtain` has five adapters (`recipes`, `loot`'s two Tier A tables,
+# `loot`'s two Tier B inversions, `brewing`) and none of them owns a report
+# file of its own the way `pipeline.enrich.infobox` or `pipeline.normalize.
+# merge` do -- each one returns its skips and unresolved rows alongside its
+# producers, for this module to gather into one file, the same way `pages-
+# without-infobox.json` gathers a fact that belongs to no single stage.
+OBTAIN_REPORT_NAME = "obtain-report.json"
+
+
+class ObtainReport(BaseModel, frozen=True):
+    """Every gap `pipeline.obtain`'s adapters found while building the obtain tree.
+
+    `items_with_no_producer` is every `item`/`block` registry path this
+    build enumerates as an entity with zero producers of any kind --
+    expected to be large. Most of it is raw material this pipeline has no
+    obtain method for at all (world generation, fishing, and the wiki's own
+    Obtaining section are `TODO.md` Phase 6b's job, not this one's), so a
+    long list here is not itself a fault; it is the honest boundary of what
+    this phase covers. `potions_with_no_brewing_path` is `pipeline.obtain.
+    brewing.BrewingExtractionResult.uncovered_potions` -- expected to hold
+    exactly `water` and `luck` on the live 26.2 data. `unresolved_tier_b_
+    names` covers what the brief calls "unresolved tag ingredients": every
+    wiki display name `pipeline.obtain.loot`'s two Tier B inversions could
+    not resolve to exactly one registry ID, from `pipeline.enrich.droptable`
+    and `pipeline.enrich.trade`. `unresolved_effect_names` is `pipeline.
+    obtain.brewing.BrewingExtractionResult.unresolved_effects`. `skipped_
+    recipes` is every `crafting_special_*` and otherwise-unhandled recipe
+    type `pipeline.obtain.recipes` skipped, per `TODO.md`'s own instruction
+    to count rather than raise on it.
+    """
+
+    items_with_no_producer: tuple[str, ...] = ()
+    potions_with_no_brewing_path: tuple[str, ...] = ()
+    unresolved_tier_b_names: tuple[UnresolvedTradeOrDrop, ...] = ()
+    unresolved_effect_names: tuple[str, ...] = ()
+    skipped_recipes: tuple[SkippedRecipe, ...] = ()
 
 
 class BuildOptions(BaseModel, frozen=True):
@@ -230,6 +281,7 @@ class BuildOutcome(BaseModel, frozen=True):
     infobox_report: InfoboxReport
     merge_report: MergeReport
     emit_report: EmitReport
+    obtain_report: ObtainReport
 
 
 def _offline_transport(cache: ContentCache) -> Transport:
@@ -306,6 +358,7 @@ def _write_reports(
     merge_report: MergeReport,
     infobox_report: InfoboxReport,
     emit_report: EmitReport,
+    obtain_report: ObtainReport,
     pages_without_infobox: Sequence[str],
 ) -> tuple[Path, ...]:
     """Write every stage report into `reports_root`, and return the paths written.
@@ -314,16 +367,17 @@ def _write_reports(
     basename -- `DEFAULT_REPORT_PATH.name` -- rooted at `reports_root` rather
     than at each module's own `data/reports/` default, so a `--reports` flag
     redirects every one of them without this function knowing anything about
-    their internal shape. `pages_without_infobox` is not a report any stage
-    module owns, so it gets its own small file, written the same way `emit.
-    write.write_report` and its siblings write theirs: indented JSON, sorted
-    keys, one trailing newline.
+    their internal shape. `pages_without_infobox` and `obtain_report` are not
+    the report of any stage module either, so each gets its own small file,
+    written the same way `emit.write.write_report` and its siblings write
+    theirs: indented JSON, sorted keys, one trailing newline.
     """
     reconciliation_path = reports_root / RECONCILE_REPORT_PATH.name
     merge_path = reports_root / MERGE_REPORT_PATH.name
     infobox_path = reports_root / INFOBOX_REPORT_PATH.name
     emit_path = reports_root / EMIT_REPORT_PATH.name
     pages_without_infobox_path = reports_root / PAGES_WITHOUT_INFOBOX_REPORT_NAME
+    obtain_report_path = reports_root / OBTAIN_REPORT_NAME
 
     write_reconcile_report(reconciliation_report, reconciliation_path)
     write_merge_report(merge_report, merge_path)
@@ -335,6 +389,10 @@ def _write_reports(
     pages_without_infobox_path.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    obtain_document = obtain_report.model_dump(mode="json")
+    obtain_report_path.write_text(
+        json.dumps(obtain_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     return (
         reconciliation_path,
@@ -342,6 +400,7 @@ def _write_reports(
         infobox_path,
         emit_path,
         pages_without_infobox_path,
+        obtain_report_path,
     )
 
 
@@ -438,13 +497,26 @@ def run_build(
         registries_payload, source=summary_tag.raw_url(registries_path)
     )
     files = fetch_data_files(
-        data_tag, groups=("advancement", "loot_table"), cache=store, transport=mcmeta_transport
+        data_tag,
+        groups=("advancement", "loot_table", "recipe", "tags"),
+        cache=store,
+        transport=mcmeta_transport,
     )
     advancement_ids = extract_advancement_ids(files)
     classification = classify_entity_types(files, registries)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified"
+    )
+
+    # --- 3b. obtain, Tier A half: crafting/smelting recipes and block/chest loot ---
+    item_tags = TagIndex(files, registry="item")
+    recipe_result: RecipeExtractionResult = extract_recipes(files, tags=item_tags)
+    loot_result: LootExtractionResult = extract_block_and_chest_loot(files)
+    report(
+        f"obtain, tier A: {len(recipe_result.producers)} recipe producers "
+        f"({len(recipe_result.skipped)} recipes skipped), "
+        f"{len(loot_result.producers)} block/chest loot producers"
     )
 
     # --- 4. Tier B buckets -------------------------------------------------------
@@ -461,6 +533,33 @@ def run_build(
         f"{len(sprite_index.entries)} sprites, {len(drop_index.drops)} drops, "
         f"{len(spawn_index.entries)} spawns, {len(trade_index.trades)} trades, "
         f"{len(advancement_tree.advancements)} wiki advancements"
+    )
+
+    # --- 4b. obtain, Tier B half: mob loot, trades, and brewing -----------------
+    mob_loot_producers, unresolved_drops = producers_from_drop_index(
+        drop_index, join_table=join_table
+    )
+    trade_producers, unresolved_trades = producers_from_trade_index(
+        trade_index, join_table=join_table
+    )
+    brewing_index = fetch_brewing(revision=version, cache=store, transport=network_transport)
+    brewing_result: BrewingExtractionResult = build_brewing_producers(
+        brewing_index, registries.get("potion", ())
+    )
+    report(
+        f"obtain, tier B: {len(mob_loot_producers)} mob loot producers, "
+        f"{len(trade_producers)} trade producers, {len(brewing_result.producers)} brewing "
+        f"producers, {len(brewing_result.uncovered_potions)} potions with no brewing path"
+    )
+
+    producer_index = ProducerIndex.merge(
+        [
+            ProducerIndex.from_producers(recipe_result.producers),
+            ProducerIndex.from_producers(loot_result.producers),
+            ProducerIndex.from_producers(mob_loot_producers),
+            ProducerIndex.from_producers(trade_producers),
+            ProducerIndex.from_producers(brewing_result.producers),
+        ]
     )
 
     # --- 5. Tier B page text ------------------------------------------------------
@@ -516,19 +615,46 @@ def run_build(
 
     # --- 8. emit ----------------------------------------------------------------------
     build_info = BuildInfo(minecraft_version=version, mcmeta_ref=data_tag.tag, built_at=built_at)
-    emit_report = emit_build(result, build_info, dist=options.dist, shard_size=options.shard_size)
+    emit_report = emit_build(
+        result,
+        build_info,
+        dist=options.dist,
+        shard_size=options.shard_size,
+        producer_index=producer_index,
+    )
     report(
         f"emit: {emit_report.entity_count} entities in {len(emit_report.shards)} shards, "
-        f"wrote {options.dist}"
+        f"{emit_report.obtain_producer_count} obtain producers ({emit_report.obtain_bytes} "
+        f"bytes), wrote {options.dist}"
     )
 
     # --- 9. reports ---------------------------------------------------------------------
+    obtainable_paths = frozenset(registries.get("item", ())) | frozenset(
+        registries.get("block", ())
+    )
+    items_with_no_producer = tuple(
+        sorted(
+            f"minecraft:{path}"
+            for path in obtainable_paths
+            if not producer_index.producers_of(f"minecraft:{path}")
+        )
+    )
+    obtain_report = ObtainReport(
+        items_with_no_producer=items_with_no_producer,
+        potions_with_no_brewing_path=brewing_result.uncovered_potions,
+        unresolved_tier_b_names=tuple(unresolved_drops) + tuple(unresolved_trades),
+        unresolved_effect_names=tuple(
+            sorted({entry.effect_name for entry in brewing_result.unresolved_effects})
+        ),
+        skipped_recipes=recipe_result.skipped,
+    )
     report_paths = _write_reports(
         reports_root=options.reports,
         reconciliation_report=reconciliation_report,
         merge_report=result.report,
         infobox_report=infobox_report,
         emit_report=emit_report,
+        obtain_report=obtain_report,
         pages_without_infobox=without_box,
     )
     report(f"reports: wrote {len(report_paths)} files to {options.reports}")
@@ -546,4 +672,5 @@ def run_build(
         infobox_report=infobox_report,
         merge_report=result.report,
         emit_report=emit_report,
+        obtain_report=obtain_report,
     )

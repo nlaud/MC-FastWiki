@@ -115,6 +115,7 @@ def test_the_full_file_tree_matches_the_expected_shard_layout(snapshot: Path) ->
 
     assert (snapshot / "index.json").is_file()
     assert (snapshot / "manifest.json").is_file()
+    assert (snapshot / "obtain.json").is_file()
 
 
 def test_every_index_entry_names_a_shard_that_exists_and_holds_that_id(snapshot: Path) -> None:

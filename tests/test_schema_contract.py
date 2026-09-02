@@ -129,7 +129,7 @@ def _pascal_case(name: str) -> str:
 
 def test_the_directory_holds_schema_files() -> None:
     """An empty directory would make every test below pass for the wrong reason."""
-    assert SCHEMA_NAMES == ["entity", "index", "manifest", "shard"]
+    assert SCHEMA_NAMES == ["entity", "index", "manifest", "obtain", "shard"]
 
 
 @pytest.mark.parametrize("name", SCHEMA_NAMES)
@@ -395,13 +395,14 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "linkList": LinkList,
 }
 
-# Decision D2's five sections: the schema closes these with
+# Decision D2's six sections: the schema closes these with
 # `additionalProperties: false` and declares every field by name, so their
 # property sets can be compared to the Pydantic side exactly, field for field.
 REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "statBlock": StatBlock,
     "spawnInfo": SpawnInfo,
     "dropTable": DropTable,
+    "recipeTree": RecipeTree,
     "tradeTable": TradeTable,
     "advancementInfo": AdvancementInfo,
 }

@@ -28,7 +28,7 @@ from pipeline.normalize.entity import (
     Entity,
     EntityDraft,
     EntityKind,
-    RecipeTree,
+    ObtainList,
     Section,
     SourceTier,
     StatBlock,
@@ -79,15 +79,18 @@ def test_a_stat_block_dict_parses_as_stat_block() -> None:
 
 
 def test_an_open_bag_section_keeps_its_extra_fields() -> None:
-    """`RecipeTree` and the other seven open sections still accept `additionalProperties`.
+    """`ObtainList` and the other six still-open sections still accept `additionalProperties`.
 
-    Phase 3 has not filled these in yet, so a section like this arrives with
+    `RecipeTree` closed up when Phase 3's obtain tree landed -- see `pipeline.
+    obtain.tree` and the `RecipeTree`/`RecipeTreeNode` models this module now
+    declares -- so it is no longer one of the open bags this test covers.
+    The rest have not been filled in yet, so a section like this arrives with
     whatever shape a later phase gives it, and `extra="allow"` has to keep
     that shape rather than dropping it.
     """
     adapter: TypeAdapter[Section] = TypeAdapter(Section)
-    parsed = adapter.validate_python({"type": "RecipeTree", "someFutureField": "kept"})
-    assert isinstance(parsed, RecipeTree)
+    parsed = adapter.validate_python({"type": "ObtainList", "someFutureField": "kept"})
+    assert isinstance(parsed, ObtainList)
     assert parsed.model_dump(by_alias=True)["someFutureField"] == "kept"
 
 

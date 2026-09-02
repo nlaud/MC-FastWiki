@@ -137,6 +137,63 @@ def test_a_non_effect_gets_no_potion_of_cross_link() -> None:
     assert not any(alias.startswith("potion of") for alias in aliases)
 
 
+def test_a_potion_entity_gets_a_full_phrase_potion_alias() -> None:
+    """A real potion page now exists, so it gets `FULL_PHRASE`, not a borrowed `CROSS_LINK`.
+
+    `"potion of weakness"` itself is dropped here, not missing -- it equals
+    `name` casefolded, and `generate_aliases` already refuses an alias that
+    only repeats the name. `"weakness potion"` is the phrase that is not
+    also the name, so it is what proves the potion-specific generator ran.
+    """
+    aliases = dict(
+        generate_aliases(
+            entity_id="minecraft:potion/weakness",
+            kind=EntityKind.ITEM,
+            name="Potion of Weakness",
+        )
+    )
+    assert "potion of weakness" not in aliases
+    assert aliases["weakness potion"] is AliasStrength.FULL_PHRASE
+
+
+def test_a_potion_ranks_ahead_of_the_effect_for_the_same_potion_of_query() -> None:
+    """`potion of weakness` now has a real page to land on, and it wins the query.
+
+    The effect still carries its own `CROSS_LINK`-strength `"potion of
+    weakness"` alias -- see the module docstring for why removing it
+    outright would break the many effects with no potion at all -- but the
+    potion's own display name, `Potion of Weakness`, exact-matches this
+    query before alias strength is even consulted. No special case was
+    added anywhere to make this ordering come out right; it falls out of
+    `rank_candidates`' existing tiers.
+    """
+    potion = _candidate("minecraft:potion/weakness", EntityKind.ITEM, "Potion of Weakness")
+    # The effect's own `CROSS_LINK` "potion of weakness" alias is generated
+    # automatically for every `mob_effect`; nothing needs adding here.
+    effect = _candidate("minecraft:weakness", EntityKind.EFFECT, "Weakness")
+    ranked = rank_candidates("potion of weakness", [effect, potion])
+    assert ranked[0].candidate.id == "minecraft:potion/weakness"
+
+
+def test_a_long_or_strong_potion_variant_gets_the_prefix_in_its_alias_too() -> None:
+    aliases = dict(
+        generate_aliases(
+            entity_id="minecraft:potion/long_weakness",
+            kind=EntityKind.ITEM,
+            name="Potion of Weakness (Long)",
+        )
+    )
+    assert aliases["potion of long weakness"] is AliasStrength.FULL_PHRASE
+    assert aliases["long weakness potion"] is AliasStrength.FULL_PHRASE
+
+
+def test_a_non_potion_item_gets_no_potion_of_alias() -> None:
+    aliases = dict(
+        generate_aliases(entity_id="minecraft:potion", kind=EntityKind.ITEM, name="Potion")
+    )
+    assert not any(alias.startswith("potion of") for alias in aliases)
+
+
 # --- Enchantment levels --------------------------------------------------------
 
 

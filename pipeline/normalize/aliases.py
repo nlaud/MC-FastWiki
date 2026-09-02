@@ -40,29 +40,46 @@ matcher; it is the *acceptance spec* this module's own alias output has to
 satisfy, and the table-driven test in `tests/test_normalize_aliases.py`
 exercises it directly rather than trusting the alias data alone to look right.
 
-## Effect and potion cross-linking: what the wiki actually has
+## Effect and potion cross-linking: no longer a one-sided ask
 
 `TODO.md` asks that a query of `weak` finds Weakness *and* Potion of
-Weakness. Modern Minecraft (post-1.20.5, the item-component rewrite this
-project's `26.2` target lives well past) does not carry a separate registry
-entry per potion: every brewed potion is one item, `minecraft:potion`,
+Weakness. This module's docstring used to spend several paragraphs arguing
+that only half of that ask had a real target, because modern Minecraft
+(post-1.20.5, the item-component rewrite this project's `26.2` target lives
+well past) carries every brewed potion as one item, `minecraft:potion`,
 distinguished at the stack level by a `minecraft:potion_contents` component
-rather than by a distinct registry ID. `pipeline.enrich.resource_location`'s
-own `KNOWN_KINDS` docstring corroborates this from the wiki side -- the
-wiki's `Type` column never carries a `potion` kind at all, only `item`,
-`block`, `entity`, `env`, `biome`, and `effect` (plus the 70 unclassified
-enchantment rows). There is therefore no registry ID "Potion of Weakness" for
-an alias to point at, and inventing one -- a fake `minecraft:potion_of_
-weakness` entity, or a fake alias that resolves to nothing -- would be
-exactly the kind of guess CLAUDE.md's Tier B rule refuses to make. What this
-module does instead is implement the half of the ask that has a real target:
-every `mob_effect` entity gets a generated `potion of <name>` alias pointing
-at itself, so a player who types "potion of weakness" lands on the Weakness
-page, which is the only page Minecraft's own data model has for that potion.
-`weak` itself reaching Weakness is a separate, shorter piece of community
-shorthand, curated by hand in `/data/curated/aliases.json` rather than
-generated -- see that file's own note for why a curated entry suits it better
-than a generated rule.
+rather than by a distinct registry ID -- so there was no registry ID "Potion
+of Weakness" for an alias to point at, and inventing one would have been
+exactly the kind of guess CLAUDE.md's Tier B rule refuses to make.
+
+That reasoning is obsolete. `pipeline.normalize.merge` now synthesizes a real
+entity per potion, `minecraft:potion/<path>`, from `registries["potion"]`
+directly rather than from the wiki's `Type` column -- the `/` separator is
+required, not cosmetic, because fifteen potion paths collide with a
+`mob_effect` path of the same name (`weakness`, `poison`, `strength`, and
+twelve more). A potion page to point at now exists, so this module gives
+each potion its own strong aliases -- `potion of weakness`, `weakness
+potion` -- generated the same way `FULL_PHRASE` already covers an ordinary
+registry path, rather than reusing the weaker `CROSS_LINK` mechanism built
+for an effect page standing in for a potion that had nowhere else to go.
+
+The effect's own `potion of <name>` alias stays, deliberately, at its
+original `CROSS_LINK` strength, rather than being removed now that a
+stronger competitor exists. Not every `mob_effect` has a potion counterpart
+-- Hunger, Nausea, Blindness, and a dozen more have no brewable potion at
+all -- so removing the effect's alias unconditionally would leave those
+queries resolving to nothing, and this module has no cheap way to tell,
+entity by entity, which effects a potion exists for and which do not; that
+answer lives in a different registry this module is never handed. Where a
+potion genuinely does exist, `AliasStrength`'s own ordering is what makes it
+win the tie without any special case: `FULL_PHRASE` outranks `CROSS_LINK`,
+so `rank_candidates` already prefers the potion's own alias over the
+effect's borrowed one for the identical query string, the same way it
+already prefers a name match over an alias match. `weak` itself reaching
+Weakness is a separate, shorter piece of community shorthand, curated by
+hand in `/data/curated/aliases.json` rather than generated -- see that
+file's own note for why a curated entry suits it better than a generated
+rule.
 
 ## Enchantment levels: no wired Tier A max-level source
 
@@ -230,8 +247,11 @@ def generate_aliases(
     `entity_id` is the namespaced registry ID, such as `minecraft:golden_
     apple`; the path after the colon is what `FULL_PHRASE` and `SEGMENT`
     aliases are built from. `kind` selects the kind-specific generators: a
-    `mob_effect` gets a `potion of <name>` cross-link, and an `enchantment`
-    gets the level aliases the module docstring describes. `name` is the
+    `mob_effect` gets a `potion of <name>` cross-link at `CROSS_LINK`
+    strength, an `item` whose path starts with `potion/` (a real potion
+    entity) gets `potion of <name>` and `<name> potion` at the stronger
+    `FULL_PHRASE`, and an `enchantment` gets the level aliases the module
+    docstring describes. `name` is the
     entity's own display name, casefolded and compared against every
     generated and curated alias so that an alias which only repeats the name
     is dropped here rather than reaching `Entity`'s own stricter validator,
@@ -253,6 +273,18 @@ def generate_aliases(
     proposals.extend((value, AliasStrength.CURATED) for value in curated)
     if kind is EntityKind.EFFECT:
         proposals.append((f"potion of {path.replace('_', ' ')}", AliasStrength.CROSS_LINK))
+    if kind is EntityKind.ITEM and path.startswith("potion/"):
+        # `path` reads `potion/<potion-path>`, e.g. `potion/long_weakness`.
+        # Strong aliases, matching `FULL_PHRASE`'s own strength: this is a
+        # real page now, not a borrowed one, so it competes for "weakness"
+        # and "potion of weakness" on equal footing with every other entity
+        # whose own name or segments happen to contain those words -- see
+        # the module docstring's cross-linking section for why the effect's
+        # own `CROSS_LINK` alias of the same phrase loses that tie rather
+        # than needing to be removed.
+        effect_words = path.removeprefix("potion/").replace("_", " ")
+        proposals.append((f"potion of {effect_words}", AliasStrength.FULL_PHRASE))
+        proposals.append((f"{effect_words} potion", AliasStrength.FULL_PHRASE))
     if kind is EntityKind.ENCHANTMENT:
         proposals.extend((level, AliasStrength.SEGMENT) for level in _level_aliases(path))
     proposals.extend((segment, AliasStrength.SEGMENT) for segment in _segments(path))

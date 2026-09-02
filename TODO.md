@@ -11,20 +11,10 @@ reasoning survives even after the choice is made.
 
 ## Phase 3 — Normalization and emit
 
-- [ ] Potion cross-linking, the one half of alias generation still outstanding. `weak` already
-      finds Weakness; it cannot yet find Potion of Weakness, because there is no such registry ID
-      to find. Every brewed potion is `minecraft:potion` carrying a `minecraft:potion_contents`
-      component, and the wiki's own join table maps all 26 potion names onto that one ID. Giving
-      each potion a page means synthesising entities from the component rather than from the
-      registry, so it belongs with the brewing work in the obtain-tree below, not with aliases.
-- [ ] Build one unified obtain-tree: recipes, smelting, **brewing**, loot, chest loot, trades,
-      natural generation. Brewing is a node type in this tree, not a separate structure — a potion
-      expands into its brewing step, each ingredient expands into whatever produces it (fermented
-      spider eye into its crafting recipe, and on down), and the brewing stand expands into its own
-      recipe. One set of rules, no special cases.
-  - [ ] Cycle detection and memoization (Additional Note: Cycles (like iron ingot -> iron nuggets -> iron ingot, should not show up in the final tree rendering). 
-  - [ ] Depth cap with expandable nodes
-  - [ ] Repeated-subtree collapse to back-reference
+- [ ] **Natural generation as worldgen placement** is the one branch of the obtain tree with no
+      wired source. Mining a block for an item ships as a `block_drop` producer, but *where* a
+      block generates (Y levels, biomes) is `GenerationInfo`'s section, not an obtain step, and
+      worldgen is not among the four mcmeta data groups the pipeline reads. Phase 6c owns it.
 - [ ] Pack all sprites into a single atlas image plus a JSON coordinate map, and wire that atlas
       into `pipeline.emit.emit_build` (keeps the site under Cloudflare's 20,000-file cap and avoids
       ~4,900 requests). The emit stage ships without it: it writes no `sprites.png` and no
@@ -61,6 +51,16 @@ reasoning survives even after the choice is made.
 - [ ] **Mob** — HP and damage badges beside the name (damage only when hostile), spawn conditions,
       loot table with looting tiers, breeding items when breedable
 - [ ] **Item** — obtain tree, crafting and smelting, with the correct tool shown for blocks
+  - [ ] Walk `data/dist/obtain.json` into the tree at render time, rather than reading a
+        pre-built one out of the entity shard. The pipeline ships the flat producer graph
+        (0.60 MB raw, 48 kB gzipped, 4,002 producers) because materialising a per-entity tree
+        cost 73.8 MB raw / 4.1 MB gzipped and still truncated the deepest chains at a depth cap
+        of 4, where the longest real chain is 15 levels. `pipeline/obtain/tree.py` is the
+        reference implementation this renderer has to match, the same relationship
+        `rank_candidates` has to the Phase 4 matcher, and it owns all four rules: drop cycles
+        rather than draw them, memoize, cap depth into an expandable node, and collapse a
+        repeated subtree to a back-reference. `tests/test_emit_obtain.py` proves the graph is
+        sufficient to rebuild the identical tree.
 - [ ] **Block** — harvest tool and tier, drops, natural generation
 - [ ] **Effect** — every source of the effect, and what it actually does
 - [ ] **Advancement** — how to earn it, parent chain, reward
