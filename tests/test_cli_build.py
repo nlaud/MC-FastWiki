@@ -87,6 +87,121 @@ def _bucket_answer(rows: list[dict[str, str]]) -> bytes:
     return json.dumps({"bucketQuery": "test", "bucket": rows}).encode("utf-8")
 
 
+# A small, structurally valid stand-in for the real `Brewing` page's
+# wikitext -- enough rows to clear `BrewingIndex`'s own too-short guard (10
+# effect recipes, 3 base recipes), in the real section headings and cell
+# shapes `pipeline.enrich.brewing` reads, but with no rowspan and no mixed
+# editions: `tests/test_enrich_brewing.py` exercises those two traps
+# directly against hand-built wikitext, so this fixture only has to prove
+# the wiring from `run_build` down to a working `BrewingIndex`, not the
+# parser's own edge cases a second time.
+_BREWING_WIKITEXT = """
+=== Effect ingredients ===
+{| class="wikitable"
+|-
+! Name
+! Icon
+! Effect
+! Effect when corrupted
+|-
+!{{anchor|Sugar}}[[Sugar]]
+|{{Slot|Sugar}}
+|[[Speed]]
+|None
+|-
+!{{anchor|Rabbit's Foot}}[[Rabbit's Foot]]
+|{{Slot|Rabbit's Foot}}
+|[[Jump Boost]]
+|None
+|-
+!{{anchor|Glistering Melon Slice}}[[Glistering Melon Slice]]
+|{{Slot|Glistering Melon Slice}}
+|[[Instant Health]]
+|None
+|-
+!{{anchor|Spider Eye}}[[Spider Eye]]
+|{{Slot|Spider Eye}}
+|[[Poison]]
+|None
+|-
+!{{anchor|Blaze Powder}}[[Blaze Powder]]
+|{{Slot|Blaze Powder}}
+|[[Strength]]
+|None
+|-
+!{{anchor|Golden Carrot}}[[Golden Carrot]]
+|{{Slot|Golden Carrot}}
+|[[Night Vision]]
+|None
+|-
+!{{anchor|Ghast Tear}}[[Ghast Tear]]
+|{{Slot|Ghast Tear}}
+|[[Regeneration]]
+|None
+|-
+!{{anchor|Pufferfish}}[[Pufferfish (item)|Pufferfish]]
+|{{Slot|Pufferfish}}
+|[[Water Breathing]]
+|None
+|-
+!{{anchor|Magma Cream}}[[Magma Cream]]
+|{{Slot|Magma Cream}}
+|[[Fire Resistance]]
+|None
+|-
+!{{anchor|Turtle Shell}}[[Turtle Shell]]
+|{{Slot|Turtle Shell}}
+|[[Slowness]] + [[Resistance]]
+|None
+|-
+!{{anchor|Fermented Spider Eye}}[[Fermented spider eye|Fermented Spider Eye]]
+|{{Slot|Fermented Spider Eye}}
+|[[Weakness]]
+|None
+|}
+
+== Brewing recipes ==
+=== Base potions ===
+{| class="wikitable"
+|-
+! Potion
+! Recipe(s)
+! Precursor to
+|-
+!{{Inventory slot|Awkward Potion}}<br>Awkward potion
+|{{Brewing Stand
+ |Input= Nether Wart
+ |Output2= Water Bottle
+ }}
+| Effect potions
+|-
+!{{Inventory slot|Mundane Potion}}<br>Mundane potion
+|{{Brewing Stand
+ |Input= Redstone Dust
+ |Output2= Water Bottle
+ }}
+| None
+|-
+!{{Inventory slot|Thick Potion}}<br>Thick potion
+|{{Brewing Stand
+ |Input= Glowstone Dust
+ |Output2= Water Bottle
+ }}
+| None
+|}
+
+==== Enhancement ====
+Redstone extends, glowstone enhances.
+
+==== Splash and lingering potions ====
+By adding gunpowder, a drinking potion becomes a splash potion. Adding
+dragon's breath to a splash potion makes a lingering potion.
+
+=== Un-brewable potions ===
+The ''[[uncraftable potion]]'' and ''[[potion of Luck]]{{only|java|short=JE}}'' cannot be brewed.
+"""
+
+
 def _build_fixtures() -> dict[str, bytes]:
     """Return every URL this test's small build reads, mapped to its canned answer."""
     fixtures: dict[str, bytes] = {}
@@ -118,11 +233,32 @@ def _build_fixtures() -> dict[str, bytes]:
     )
     fixtures[summary_url] = json.dumps(registries).encode("utf-8")
 
+    recipe_json = json.dumps(
+        {
+            "type": "minecraft:crafting_shapeless",
+            "ingredients": ["minecraft:stick"],
+            "result": {"id": "minecraft:creeper_spawn_egg"},
+        }
+    ).encode("utf-8")
+    block_loot_json = json.dumps(
+        {
+            "type": "minecraft:block",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:creeper_spawn_egg"}],
+                }
+            ],
+        }
+    ).encode("utf-8")
+
     data_url = MCMETA_ARCHIVE_URL.format(repository=MCMETA_REPOSITORY, commit_sha=DATA_SHA)
     fixtures[data_url] = _tar_gz(
         {
             "data/minecraft/advancement/story/root.json": b"{}",
             "data/minecraft/loot_table/entities/creeper.json": b"{}",
+            "data/minecraft/recipe/dummy.json": recipe_json,
+            "data/minecraft/loot_table/blocks/dummy.json": block_loot_json,
         },
         root=f"mcmeta-{DATA_SHA}",
     )
@@ -165,6 +301,22 @@ def _build_fixtures() -> dict[str, bytes]:
                         "ns": 0,
                         "title": "Creeper",
                         "extract": "A hissing creature that explodes.",
+                    }
+                ]
+            },
+        }
+    ).encode("utf-8")
+
+    fixtures[build_wikitext_url(["Brewing"])] = json.dumps(
+        {
+            "batchcomplete": True,
+            "query": {
+                "pages": [
+                    {
+                        "pageid": 2,
+                        "ns": 0,
+                        "title": "Brewing",
+                        "revisions": [{"slots": {"main": {"content": _BREWING_WIKITEXT}}}],
                     }
                 ]
             },
@@ -228,6 +380,7 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     dist = tmp_path / "dist"
     assert (dist / "manifest.json").is_file()
     assert (dist / "index.json").is_file()
+    assert (dist / "obtain.json").is_file()
 
     mob_shard = json.loads((dist / "entities" / "mob-0.json").read_text(encoding="utf-8"))
     ids = {entity["id"] for entity in mob_shard["entities"]}
@@ -260,6 +413,7 @@ def test_reports_land_in_the_reports_directory(tmp_path: Path) -> None:
         "unparsed-report.json",
         "emit-report.json",
         "pages-without-infobox.json",
+        "obtain-report.json",
     }
     assert {path.name for path in reports_dir.iterdir()} == expected
     assert {path.name for path in outcome.report_paths} == expected

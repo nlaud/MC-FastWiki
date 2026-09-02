@@ -34,16 +34,22 @@ wiki-authored would have demanded a link with nothing to point at and made
 those seven impossible to build, which is the same failure the decision exists
 to prevent, one tier further in.
 
-**D2 -- five sections carry real fields.** `StatBlock`, `SpawnInfo`,
-`DropTable`, `TradeTable`, and `AdvancementInfo` are closed models here, each
-mirroring one Tier B index this pipeline already builds:
+**D2 -- six sections carry real fields.** `StatBlock`, `SpawnInfo`,
+`DropTable`, `TradeTable`, `AdvancementInfo`, and `RecipeTree` are closed
+models here, each mirroring one shape this pipeline already builds:
 `pipeline.enrich.infobox.EntityInfobox`, `pipeline.enrich.spawn_table.
-SpawnIndex.by_mob`, `pipeline.enrich.droptable.DropIndex.by_mob`,
-`pipeline.enrich.trade.TradeIndex`, and `pipeline.enrich.advancement.
-AdvancementTree`, respectively. The other eight members of the `Section`
-union stay open bags (`model_config = ... extra="allow"`), because the phase
-that fills each one has not run yet; every one of their docstrings names the
-phase that will, matching the schema's own updated descriptions.
+SpawnIndex.by_mob`, `pipeline.enrich.droptable.DropIndex.by_mob`, `pipeline.
+enrich.trade.TradeIndex`, `pipeline.enrich.advancement.AdvancementTree`, and
+`pipeline.obtain.tree.ObtainTree`, respectively. `RecipeTree` is the one
+exception to "this pipeline already builds": no build stage ever constructs
+one any more, only the shape it describes -- see `RecipeTree`'s own
+docstring below for why the field stays fully specified here regardless.
+`tests/test_schema_contract.py`'s `REAL_SECTION_MODELS` checks this module's
+field names against the schema for all six now, not five. The other seven
+members of the `Section` union stay open bags (`model_config = ...
+extra="allow"`), because the phase that fills each one has not run yet;
+every one of their docstrings names the phase that will, matching the
+schema's own updated descriptions.
 
 ## Why `Section` is `Annotated[..., Field(discriminator="type")]`
 
@@ -135,6 +141,9 @@ __all__ = [
     "ObtainList",
     "Ratio",
     "RecipeTree",
+    "RecipeTreeInput",
+    "RecipeTreeNode",
+    "RecipeTreeProducer",
     "Section",
     "SizeValue",
     "SourceTier",
@@ -536,14 +545,100 @@ class AdvancementInfo(BaseModel, frozen=True, populate_by_name=True):
 # payload with real fields, matching the schema's own updated descriptions.
 
 
-class RecipeTree(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
-    """The obtain tree of an item. Brewing is a node of this tree.
+class RecipeTreeInput(BaseModel, frozen=True, populate_by_name=True):
+    """One ingredient slot of a `RecipeTreeProducer`, mirroring `pipeline.obtain.tree.TreeInput`.
 
-    The payload of this section arrives later, as the unified obtain tree
-    `TODO.md`'s Phase 3 describes.
+    **No build stage constructs this model any more.** The pipeline used to
+    walk `pipeline.obtain.tree.build_obtain_tree`'s output into a `RecipeTree`
+    and write it into every entity's own shard; measured against the real
+    26.2 data that cost 73.8 MB raw and 4.1 MB gzipped for a tree capped at
+    depth 4, against 1.05 MB raw and 0.07 MB gzipped for the flat producer
+    graph the pipeline ships instead -- `pipeline.emit.obtain`'s module
+    docstring has the full comparison, including that the graph carries
+    strictly *more* depth than the tree ever did (the deepest real chain is
+    15 levels, past any depth-4 cap). So this model, and its three siblings
+    below, are no longer something a merge stage builds; they are the shape
+    the web app assembles at render time by walking `obtain.json`, using
+    `pipeline.obtain.tree.build_obtain_tree` as the reference implementation
+    of how to do it. They stay in the `Section` union, fully specified,
+    because the renderer's assembled tree still needs a name for its own
+    shape, and `entity.schema.json`'s generated TypeScript still needs to
+    describe that shape to the web app -- removing these four models would
+    not shrink `data/dist` by a single byte (nothing here was writing to it
+    any more) and would only cost the web app its generated type.
+
+    `item` is present for a plain item input (and absent for a tag input);
+    `tag` is present for a tag input and absent otherwise -- the same
+    `name`/`ref`-adjacent shape the module docstring of `pipeline.normalize.
+    entity` already uses elsewhere, except here the raw id (`label`) is
+    always present because an obtain-tree ingredient, unlike a Tier B row,
+    is already a registry id rather than a wiki display name. `node` is the
+    recursive expansion of `item`, absent for a tag input, an untagged
+    alternatives list (`members` still carries the full list), or a
+    cycle-dropped repeat -- see `pipeline.obtain.tree`'s own docstring for
+    why those three cases all leave it unset.
+    """
+
+    label: str
+    item: EntityRef | None = None
+    tag: str | None = None
+    count: int = 1
+    members: tuple[str, ...] = ()
+    node: "RecipeTreeNode | None" = None
+
+
+class RecipeTreeProducer(BaseModel, frozen=True, populate_by_name=True):
+    """One way to get a node's item, mirroring `pipeline.obtain.producer.Producer`.
+
+    See `RecipeTreeInput`'s own docstring for why no build stage constructs
+    this model any more, and what still fills its place in `data/dist`.
+    """
+
+    method: str
+    station: str | None = None
+    note: str | None = None
+    source_id: str = Field(alias="sourceId")
+    inputs: tuple[RecipeTreeInput, ...] = ()
+
+
+class RecipeTreeNode(BaseModel, frozen=True, populate_by_name=True):
+    """One item of the obtain tree, mirroring `pipeline.obtain.tree.ObtainNode`.
+
+    See `RecipeTreeInput`'s own docstring for why no build stage constructs
+    this model any more, and what still fills its place in `data/dist`.
+    `expandable` marks a depth-cap stub: a renderer assembling this shape
+    from `obtain.json` continues the walk by opening `item`'s own entity
+    shard. `back_reference` marks a repeated-subtree collapse: the path of
+    the node where this same subtree was first rendered in this tree. See
+    `pipeline.obtain.tree`'s own docstring for the four rules that decide
+    between these two and an ordinary, fully expanded node -- the same four
+    rules a renderer has to apply to get this shape right.
+    """
+
+    item: EntityRef
+    producers: tuple[RecipeTreeProducer, ...] = ()
+    expandable: bool = False
+    back_reference: str | None = Field(default=None, alias="backReference")
+
+
+RecipeTreeInput.model_rebuild()
+
+
+class RecipeTree(BaseModel, frozen=True, populate_by_name=True):
+    """The obtain tree of an item, rooted at `root`. Brewing is a node of this tree.
+
+    Mirrors `pipeline.obtain.tree.ObtainTree`. See `RecipeTreeInput`'s own
+    docstring for why no build stage constructs one of these any more: the
+    pipeline writes `data/dist/obtain.json`, a flat `pipeline.obtain.
+    producer.ProducerIndex` assembled out of every adapter of `pipeline.
+    obtain` -- crafting and smelting recipes, block and chest loot, mob
+    drops, trades, and brewing -- and the web app walks that file into this
+    exact shape at render time, using `pipeline.obtain.tree.
+    build_obtain_tree` as its reference implementation.
     """
 
     type: Literal["RecipeTree"] = "RecipeTree"
+    root: RecipeTreeNode
 
 
 class ObtainList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):

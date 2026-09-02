@@ -245,6 +245,7 @@ from pipeline.normalize.entity import (
     TradeTable,
 )
 from pipeline.normalize.reconcile import ICON_RULES, resolve_icon
+from pipeline.obtain.brewing import POTION_ID_TEMPLATE
 
 __all__ = [
     "DEFAULT_REPORT_PATH",
@@ -335,6 +336,75 @@ WIKI_KIND: Mapping[str, tuple[str | None, ...]] = {
     "worldgen/biome": ("biome",),
     "enchantment": (None,),
 }
+
+
+# The wiki page title of every non-prefixed potion path that has one,
+# verified live against the `resource_location` bucket on 2026-09-01
+# (`bucket('resource_location').where('resource_location','potion')`). Only
+# 24 of the 46 registry paths have a page at all: every `long_`/`strong_`
+# variant is presentation of the base potion rather than a separate article,
+# so none of the 22 modified paths appears here, and `_potion_name` derives
+# their name instead of reading one.
+#
+# `"awkward"` is deliberately resolved by page title, `"Awkward Potion"`,
+# rather than by the wiki's own `display_name` for it, which is the bare
+# string `"Potion"` -- the same display name the generic `Potion` overview
+# page also carries. Two registry-`minecraft:potion` rows sharing one
+# display name is exactly the ambiguity `pipeline.normalize.resource_
+# location.JoinTable.resolve` refuses to pick between, and matching on the
+# page title this module already knows sidesteps the question entirely
+# instead of asking the join table to break a tie it correctly won't.
+_POTION_PAGE_TITLES: Mapping[str, str] = {
+    "awkward": "Awkward Potion",
+    "water": "Water Bottle",
+    "mundane": "Mundane Potion",
+    "thick": "Thick Potion",
+    "weakness": "Potion of Weakness",
+    "fire_resistance": "Potion of Fire Resistance",
+    "regeneration": "Potion of Regeneration",
+    "strength": "Potion of Strength",
+    "swiftness": "Potion of Swiftness",
+    "harming": "Potion of Harming",
+    "poison": "Potion of Poison",
+    "slowness": "Potion of Slowness",
+    "healing": "Potion of Healing",
+    "night_vision": "Potion of Night Vision",
+    "invisibility": "Potion of Invisibility",
+    "water_breathing": "Potion of Water Breathing",
+    "leaping": "Potion of Leaping",
+    "luck": "Potion of Luck",
+    "turtle_master": "Potion of the Turtle Master",
+    "slow_falling": "Potion of Slow Falling",
+    "weaving": "Potion of Weaving",
+    "oozing": "Potion of Oozing",
+    # Irregular on purpose: the wiki's page and display name are "Potion of
+    # Infestation" and "Potion of Wind Charging", not the effect's own name
+    # ("Infested", "Wind Charged") with "Potion of" glued on the front.
+    "infested": "Potion of Infestation",
+    "wind_charged": "Potion of Wind Charging",
+}
+
+_LONG_POTION_PREFIX = "long_"
+_STRONG_POTION_PREFIX = "strong_"
+
+
+def _potion_name(path: str) -> str:
+    """Return the display name of the potion at `path`.
+
+    Prefers `_POTION_PAGE_TITLES` for the 24 paths with a wiki page. A
+    `long_`/`strong_` path with no page of its own is derived from its base
+    potion's name, `"Potion of Regeneration (Long)"`, per this task's own
+    brief -- there is no page to prefer, per the module docstring's
+    ambiguity note above the title table.
+    """
+    for prefix, modifier in ((_LONG_POTION_PREFIX, "Long"), (_STRONG_POTION_PREFIX, "Strong")):
+        if path.startswith(prefix):
+            base = _potion_name(path[len(prefix) :])
+            return f"{base} ({modifier})"
+    title = _POTION_PAGE_TITLES.get(path)
+    if title is not None:
+        return title
+    return f"Potion of {path.replace('_', ' ').title()}"
 
 
 class UnplacedRow(BaseModel, frozen=True):
@@ -956,9 +1026,19 @@ def merge_entities(
     output. `entity_classification` is `pipeline.extract.entity_class.
     classify_entity_types`'s output, built from the same mcmeta payloads as
     `registries` -- the module docstring's classification section names the
-    three-way rule it drives. Every other argument is the Tier B index (or
-    Tier C `CuratedData`) the module docstring names as that section's
-    source.
+    three-way rule it drives. This function takes no `ProducerIndex`: the
+    obtain graph is no longer part of what a merge produces, and `pipeline.
+    emit.write.emit_build` reads it directly instead -- see `pipeline.emit.
+    obtain`'s module docstring for why the graph moved and `pipeline.obtain.
+    tree`'s own docstring for what this stage no longer needs to know about
+    it. `registries["potion"]` -- present or absent; see the potion
+    enumeration section below -- drives the one entity kind this module
+    enumerates outside the six-registry union: every potion registers as
+    `minecraft:potion/<path>`, per this task's own decision that the `/`
+    namespacing is required, not cosmetic, because fifteen potion paths
+    collide with a `mob_effect` path of the same name. Every other argument
+    is the Tier B index (or Tier C `CuratedData`) the module docstring names
+    as that section's source.
 
     Raises `NormalizeError` for a shape fault: an empty `registries` mapping,
     an empty `join_table`, an empty `sprite_index`, an empty `entity_
@@ -1124,6 +1204,57 @@ def merge_entities(
 
         drafts[entity_id] = draft
 
+    # --- Potions, enumerated separately -------------------------------------
+    #
+    # Every potion shares one mcmeta registry ID, `minecraft:potion`, so
+    # `_registries_of_id`'s per-path enumeration never sees a "potion"
+    # registry to walk -- these 46 IDs are not members of any of the six
+    # `_REGISTRY_PRECEDENCE` registries at all, and enumerate here the same
+    # way advancements do, from a flat list rather than a registry union.
+    # `registries.get("potion", ())` rather than a required key: unlike the
+    # six precedence registries, a build with no potion registry loses one
+    # entity kind, not the ability to resolve which registry an ID belongs
+    # to, so there is nothing here for a missing key to break silently.
+    for path in registries.get("potion", ()):
+        entity_id = POTION_ID_TEMPLATE.format(path=path)
+        kind = EntityKind.ITEM
+        override = curated.overrides.get(entity_id)
+        if override is not None and override.kind is not None:
+            kind = override.kind
+
+        resolved_name = _potion_name(path)
+        draft = EntityDraft(id=entity_id, kind=kind, name=resolved_name, tier=SourceTier.A)
+
+        # Only a non-prefixed path may have a page at all -- see the module
+        # docstring's note above `_POTION_PAGE_TITLES` for why a `long_`/
+        # `strong_` path never does.
+        title = _POTION_PAGE_TITLES.get(path)
+        if title is not None:
+            row = next(
+                (
+                    entry
+                    for entry in join_table.entries
+                    if entry.registry_id == f"{NAMESPACE}:potion" and entry.page == title
+                ),
+                None,
+            )
+            if row is not None:
+                draft.set("wikiUrl", row.wiki_url, SourceTier.B)
+                blurb = blurbs.get(row.page)
+                if blurb is not None:
+                    draft.set("blurb", blurb, SourceTier.B)
+                else:
+                    missing_blurbs.append(MissingBlurb(id=entity_id, page=row.page))
+
+        curated_aliases = curated.aliases.get(entity_id, ())
+        for alias, strength in generate_aliases(
+            entity_id=entity_id, kind=kind, name=resolved_name, curated=curated_aliases
+        ):
+            alias_tier = SourceTier.C if strength is AliasStrength.CURATED else SourceTier.A
+            draft.add_aliases([alias], alias_tier)
+
+        drafts[entity_id] = draft
+
     # --- SpawnInfo, DropTable, TradeTable: forward resolution from Tier B ---
 
     def attach(target: str, section: Section, *, table: str, subject: str) -> None:
@@ -1184,7 +1315,7 @@ def merge_entities(
         trades = tuple(_convert_trade_entry(trade, join_table, drafts) for trade in item_trades)
         attach(target, TradeTable(trades=trades), table="trade", subject=item_name)
 
-    # --- Curated overrides: applied last, so Tier C wins ---------------------
+    # --- Curated overrides: the last field-level write before `.build()` ---
 
     unknown_overrides: list[str] = []
     for entity_id, override in curated.overrides.items():
@@ -1206,6 +1337,7 @@ def merge_entities(
 
     counts = {registry: len(registries[registry]) for registry in _REGISTRY_PRECEDENCE}
     counts["advancement"] = len(advancement_ids)
+    counts["potion"] = len(registries.get("potion", ()))
     counts["entities"] = len(entities)
     # The per-kind breakdown of the 158 entity_type IDs, once the
     # classification, the demotion, and any curated override have all run.

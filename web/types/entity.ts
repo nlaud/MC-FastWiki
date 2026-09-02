@@ -26,7 +26,7 @@ export type EntityKind =
  */
 export type SourceTier = "A" | "B" | "C";
 /**
- * One render block. The `type` field selects the renderer. Five members -- `statBlock`, `spawnInfo`, `dropTable`, `tradeTable`, `advancementInfo` -- carry real, closed fields. The other eight are still open payloads; each one's own description names the later phase that fills it in.
+ * One render block. The `type` field selects the renderer. Six members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo` -- carry real, closed fields. The other seven are still open payloads; each one's own description names the later phase that fills it in.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "section".
@@ -233,14 +233,53 @@ export interface Ratio {
   denominator: number;
 }
 /**
- * The obtain tree of an item. Brewing is a node of this tree. The payload of this section arrives later in Phase 3, as the unified obtain tree TODO.md describes.
+ * The obtain tree of an item, rooted at `root`. Brewing is a node of this tree, mirroring `pipeline.obtain.tree.ObtainTree`. No build stage writes one of these into a shard: the pipeline ships the flat producer graph at data/dist/obtain.json instead, and the web app assembles this exact shape from that graph at render time, using `pipeline.obtain.tree.build_obtain_tree` as the reference implementation of the walk. Measured against the real 26.2 data, materialising this shape into every shard cost 73.8 MB raw and 4.1 MB gzipped at a depth cap of 4, against 1.05 MB raw and 0.07 MB gzipped for the graph with no depth cap at all -- and the graph's deepest real chain is 15 levels, past any depth-4 cap the materialised tree ever reached. This definition stays fully specified, and stays a member of the section union below, because the web app's generated TypeScript still needs to describe the shape a renderer assembles.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "recipeTree".
  */
 export interface RecipeTree {
   type: "RecipeTree";
-  [k: string]: unknown;
+  root: RecipeTreeNode;
+}
+/**
+ * One item of the obtain tree, mirroring `pipeline.obtain.tree.ObtainNode`. See `recipeTree`'s own description for why no build stage writes this shape any more; a renderer assembles it from data/dist/obtain.json instead. `expandable` marks a depth-cap stub: the web app continues the walk by opening `item`'s own entity shard. `backReference` marks a repeated-subtree collapse: the path of the node where this same subtree was first rendered in this tree.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "recipeTreeNode".
+ */
+export interface RecipeTreeNode {
+  item: EntityRef;
+  producers?: RecipeTreeProducer[];
+  expandable?: boolean;
+  backReference?: string;
+}
+/**
+ * One way to get a node's item, mirroring `pipeline.obtain.producer.Producer`. See `recipeTree`'s own description for why no build stage writes this shape any more; a renderer assembles it from data/dist/obtain.json instead.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "recipeTreeProducer".
+ */
+export interface RecipeTreeProducer {
+  method: string;
+  station?: string;
+  note?: string;
+  sourceId: string;
+  inputs?: RecipeTreeInput[];
+}
+/**
+ * One ingredient slot of a `recipeTreeProducer`, mirroring `pipeline.obtain.tree.TreeInput`. See `recipeTree`'s own description for why no build stage writes this shape any more; a renderer assembles it from data/dist/obtain.json instead. `item` is present for a plain item input and absent for a tag input; `tag` is present for a tag input and absent otherwise. `node` is the recursive expansion of `item`, absent for a tag input, an untagged alternatives list (`members` still carries the full list), or a cycle-dropped repeat.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "recipeTreeInput".
+ */
+export interface RecipeTreeInput {
+  label: string;
+  item?: EntityRef;
+  tag?: string;
+  count?: number;
+  members?: string[];
+  node?: RecipeTreeNode;
 }
 /**
  * Every acquisition path that the wiki Obtaining section lists. The payload of this section arrives in Phase 6b, scraped from the wiki's own Obtaining section.

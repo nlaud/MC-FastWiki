@@ -1,12 +1,12 @@
-"""Write one build's shards, index, and manifest into `data/dist`, deterministically.
+"""Write one build's shards, index, manifest, and obtain graph into `data/dist`, deterministically.
 
-`pipeline.emit.shard`, `pipeline.emit.search_index`, and `pipeline.emit.
-manifest` each build one payload in memory. This module is the only one that
-opens a file for writing, and `emit_build` is the one function this whole
-package exists to expose. Four rules govern everything it does, and each one
-earns its own section below because getting any of them wrong corrupts
-`data/dist` in a way that is invisible until a later build, a later diff, or a
-later cache read notices.
+`pipeline.emit.shard`, `pipeline.emit.search_index`, `pipeline.emit.manifest`,
+and `pipeline.emit.obtain` each build one payload in memory. This module is
+the only one that opens a file for writing, and `emit_build` is the one
+function this whole package exists to expose. Four rules govern everything it
+does, and each one earns its own section below because getting any of them
+wrong corrupts `data/dist` in a way that is invisible until a later build, a
+later diff, or a later cache read notices.
 
 ## Rule 1 -- byte-for-byte determinism
 
@@ -45,10 +45,11 @@ behind forever: nothing regenerates it, nothing links to it from a rebuilt
 next reader has no way to tell apart from a shard the current build actually
 produced.
 
-The sweep never looks outside `data/dist/entities/`. `index.json` and
-`manifest.json` are both root-level files this module always rewrites in
-full on every build, so neither one can go stale the way a shard can, and
-nothing about this module's stale-file logic ever walks `data/dist` itself.
+The sweep never looks outside `data/dist/entities/`. `index.json`, `manifest.
+json`, and `obtain.json` are all root-level files this module always rewrites
+in full on every build, so none of the three can go stale the way a shard
+can, and nothing about this module's stale-file logic ever walks `data/dist`
+itself.
 
 ## Rule 3 -- shape faults raise, gaps do not
 
@@ -78,13 +79,13 @@ handed it over.
 
 ## Rule 4 -- all-or-nothing
 
-Every payload this build produces -- every shard, `index.json`, and
-`manifest.json` -- is built as a complete `{Path: bytes}` mapping in memory
-before this function writes a single byte to disk. An entity that somehow
-fails to serialise, or a build that fails the two `EmitError` checks above,
-therefore fails before `data/dist` is touched at all, rather than leaving a
-mix of this build's shards and the previous build's shards on disk with
-nothing to say which is which.
+Every payload this build produces -- every shard, `index.json`, `manifest.
+json`, and `obtain.json` -- is built as a complete `{Path: bytes}` mapping in
+memory before this function writes a single byte to disk. An entity that
+somehow fails to serialise, or a build that fails the two `EmitError` checks
+above, therefore fails before `data/dist` is touched at all, rather than
+leaving a mix of this build's shards and the previous build's shards on disk
+with nothing to say which is which.
 """
 
 import gzip
@@ -95,6 +96,7 @@ from pydantic import BaseModel
 
 from pipeline.emit import EmitError
 from pipeline.emit.manifest import BuildInfo, build_manifest
+from pipeline.emit.obtain import build_obtain_graph
 from pipeline.emit.search_index import build_search_index
 from pipeline.emit.shard import (
     DEFAULT_SHARD_SIZE,
@@ -104,6 +106,7 @@ from pipeline.emit.shard import (
 )
 from pipeline.normalize.entity import EntityKind
 from pipeline.normalize.merge import MergeResult
+from pipeline.obtain.producer import ProducerIndex
 
 __all__ = [
     "DEFAULT_DIST_PATH",
@@ -125,11 +128,21 @@ DEFAULT_DIST_PATH = Path("data") / "dist"
 # redirect it without editing this module.
 DEFAULT_REPORT_PATH = Path("data") / "reports" / "emit-report.json"
 
+# `emit_build`'s default for `producer_index`: an index over no producers at
+# all, so a caller that only cares about entities, the search index, and the
+# manifest -- most of this package's own tests -- does not have to construct
+# one just to call this function. `pipeline.normalize.merge` used to hold an
+# identical module-level constant for the identical reason, before this task
+# moved the obtain graph out of the merge stage and into this one; see
+# `pipeline.emit.obtain`'s module docstring for why it now belongs here.
+_EMPTY_PRODUCER_INDEX = ProducerIndex(by_output={})
+
 # The name every shard file carries under `data/dist/entities/`, and the glob
 # the stale-file sweep reads against that same directory.
 _ENTITIES_DIR_NAME = "entities"
 _INDEX_FILE_NAME = "index.json"
 _MANIFEST_FILE_NAME = "manifest.json"
+_OBTAIN_FILE_NAME = "obtain.json"
 
 
 class ShardSummary(BaseModel, frozen=True):
@@ -148,6 +161,9 @@ class EmitReport(BaseModel, frozen=True):
     shards: tuple[ShardSummary, ...]
     index_bytes: int
     index_gzipped_bytes: int
+    obtain_producer_count: int
+    obtain_bytes: int
+    obtain_gzipped_bytes: int
     removed: tuple[str, ...] = ()
 
 
@@ -186,8 +202,18 @@ def emit_build(
     *,
     dist: Path = DEFAULT_DIST_PATH,
     shard_size: int = DEFAULT_SHARD_SIZE,
+    producer_index: ProducerIndex = _EMPTY_PRODUCER_INDEX,
 ) -> EmitReport:
-    """Write `result` and `build` into `dist`, and return a report of what was written.
+    """Write `result`, `build`, and `producer_index` into `dist`, and return a report of what
+    was written.
+
+    `producer_index` is `pipeline.obtain.producer.ProducerIndex.merge`'s
+    output over every `pipeline.obtain` adapter a build ran; it defaults to
+    an index over no producers, which writes an `obtain.json` with an empty
+    `producers` map rather than forcing a caller who does not care about the
+    obtain graph to construct one. See `pipeline.emit.obtain`'s module
+    docstring for why an empty graph is not a build fault the way an empty
+    `SearchIndex` is.
 
     Raises `EmitError` for a `result` with no entities, a `dist` that exists
     and is not a directory, or a `shard_size` below 1. All three raise before
@@ -209,6 +235,7 @@ def emit_build(
     shards = assign_shards(result.entities, shard_size=shard_size)
     search_index = build_search_index(shards)
     manifest = build_manifest(build)
+    obtain_graph = build_obtain_graph(producer_index)
 
     entities_dir = dist / _ENTITIES_DIR_NAME
     files: dict[Path, bytes] = {}
@@ -225,6 +252,9 @@ def emit_build(
         manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
     )
     files[dist / _MANIFEST_FILE_NAME] = manifest_bytes
+
+    obtain_bytes = _encode(obtain_graph.model_dump(mode="json", by_alias=True, exclude_none=True))
+    files[dist / _OBTAIN_FILE_NAME] = obtain_bytes
 
     # Rule 2: every `*.json` under `entities/` that this build did not just
     # decide to write is stale. Computed before any write, so `removed` in the
@@ -267,6 +297,9 @@ def emit_build(
         # make this figure -- and the byte-for-byte determinism rule above --
         # differ between two runs over identical input.
         index_gzipped_bytes=len(gzip.compress(index_bytes, mtime=0)),
+        obtain_producer_count=sum(len(group) for group in obtain_graph.producers.values()),
+        obtain_bytes=len(obtain_bytes),
+        obtain_gzipped_bytes=len(gzip.compress(obtain_bytes, mtime=0)),
         removed=tuple(path.relative_to(dist).as_posix() for path in stale),
     )
 

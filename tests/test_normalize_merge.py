@@ -101,6 +101,11 @@ REGISTRIES: dict[str, list[str]] = {
     "mob_effect": [],
     "worldgen/biome": ["jungle"],
     "enchantment": ["efficiency"],
+    # Potions enumerate outside the six-registry union entirely -- see the
+    # potion section near the end of this file. `awkward` has a wiki page
+    # in `JOIN_TABLE` below; `long_weakness` does not, which is the shape
+    # every `long_`/`strong_` variant takes on the live wiki.
+    "potion": ["awkward", "long_weakness"],
 }
 
 # Every `entity_type` path of `REGISTRIES` must appear here, or
@@ -155,6 +160,9 @@ JOIN_TABLE = parse_resource_locations(
         rl_row("Jigsaw Block", "jigsaw", "item"),
         rl_row("Jigsaw structure Jigsaw", "jigsaw", "item"),
         # poplar_boat and mystery_thing carry no row at all -- the D1 shape.
+        # Every potion page shares one registry_id, `minecraft:potion` --
+        # this is the one row for `awkward`; `long_weakness` gets none.
+        rl_row("Awkward Potion", "potion", "item"),
     ]
 )
 
@@ -940,3 +948,71 @@ def test_a_section_is_never_attached_to_an_entity_with_no_attribution_link() -> 
     reported = [row for row in result.report.unplaced if "Jigsaw" in row.subject]
     assert reported, "a dropped section must be reported, never silently lost"
     assert "attribution" in reported[0].reason
+
+
+# --- Potions: enumerated outside the six-registry union ------------------------
+
+
+def test_a_potion_entity_gets_the_namespaced_potion_slash_path_id() -> None:
+    """Required, not cosmetic: fifteen potion paths collide with a `mob_effect` path."""
+    result = run_merge()
+    assert "minecraft:potion/awkward" in result.by_id
+    assert result.by_id["minecraft:potion/awkward"].kind is EntityKind.ITEM
+
+
+def test_a_potion_with_a_wiki_page_gets_its_wiki_url() -> None:
+    result = run_merge()
+    awkward = result.by_id["minecraft:potion/awkward"]
+    assert awkward.wiki_url == "https://minecraft.wiki/w/Awkward_Potion"
+    assert awkward.name == "Awkward Potion"
+
+
+def test_a_long_or_strong_potion_variant_has_no_wiki_page_and_still_validates() -> None:
+    """No `long_weakness` page exists on the live wiki; D1 must not need one here.
+
+    This fixture attaches no Tier B section to a potion at all, so the real
+    proof D1 is satisfied is that this entity builds at all: `Entity.build()`
+    would raise if any Tier B section landed on it with no `wikiUrl`.
+    """
+    result = run_merge()
+    long_weakness = result.by_id["minecraft:potion/long_weakness"]
+    assert long_weakness.wiki_url is None
+    assert long_weakness.name == "Potion of Weakness (Long)"
+
+
+def test_a_potion_gets_its_own_potion_of_alias() -> None:
+    result = run_merge()
+    awkward = result.by_id["minecraft:potion/awkward"]
+    assert "potion of awkward" in awkward.aliases
+
+
+def test_a_derived_potion_name_still_gets_the_full_pair_of_aliases() -> None:
+    """`awkward`'s own name IS `"Awkward Potion"`, so that alias is dropped as redundant.
+
+    `long_weakness` has no wiki page, so its name is derived
+    (`"Potion of Weakness (Long)"`) rather than read off one, and neither
+    generated alias collides with it, so both survive.
+    """
+    result = run_merge()
+    long_weakness = result.by_id["minecraft:potion/long_weakness"]
+    assert "potion of long weakness" in long_weakness.aliases
+    assert "long weakness potion" in long_weakness.aliases
+
+
+def test_no_potion_registry_key_means_no_potion_entities() -> None:
+    """Backward compatible: `registries.get("potion", ())` never raises on a missing key."""
+    result = merge_entities(
+        registries={k: v for k, v in REGISTRIES.items() if k != "potion"},
+        advancement_ids=ADVANCEMENT_IDS,
+        join_table=JOIN_TABLE,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+    )
+    assert not any(entity.id.startswith("minecraft:potion/") for entity in result.entities)
