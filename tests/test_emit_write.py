@@ -5,6 +5,7 @@ Every test here writes into `tmp_path`, never into the real `data/dist` --
 its override.
 """
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from pipeline.emit.write import emit_build
 from pipeline.enrich.advancement import Reconciliation
 from pipeline.normalize.entity import Entity, EntityKind
 from pipeline.normalize.merge import MergeReport, MergeResult
+from pipeline.validate import ValidationError
+from pipeline.validate.conformance import GateDocuments
 
 BUILD = BuildInfo(
     minecraft_version="26.2", mcmeta_ref="26.2-data", built_at=datetime(2026, 8, 31, tzinfo=UTC)
@@ -175,3 +178,100 @@ def test_a_shard_size_below_one_is_refused_before_anything_is_written(tmp_path: 
     with pytest.raises(EmitError, match="at least one"):
         emit_build(result, BUILD, dist=dist, shard_size=-1)
     assert not dist.exists()
+
+
+# --- The `gate` keyword: pipeline.validate's hook point, per Option A ------------------
+
+
+def test_a_none_gate_is_the_default_and_changes_nothing(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    report = emit_build(result, BUILD, dist=tmp_path)
+    assert report.entity_count == 1
+
+
+def test_the_gate_sees_the_documents_this_build_is_about_to_write(tmp_path: Path) -> None:
+    result = _merge_result(
+        (_entity("minecraft:apple"), _entity("minecraft:creeper", EntityKind.MOB))
+    )
+    seen: list[GateDocuments] = []
+
+    def gate(documents: GateDocuments) -> None:
+        seen.append(documents)
+
+    emit_build(result, BUILD, dist=tmp_path, gate=gate)
+
+    assert len(seen) == 1
+    documents = seen[0]
+    assert set(documents.shards) == {"item-0", "mob-0"}
+    item_ids = {entity["id"] for entity in documents.shards["item-0"]["entities"]}
+    assert item_ids == {"minecraft:apple"}
+    assert documents.index["schemaVersion"] == 1
+    assert documents.manifest["minecraftVersion"] == "26.2"
+    assert documents.obtain == {"schemaVersion": 1, "producers": {}}
+
+
+def test_the_gate_runs_before_anything_is_written(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    written_before_gate_ran = []
+
+    def gate(documents: GateDocuments) -> None:
+        written_before_gate_ran.append((tmp_path / "index.json").exists())
+
+    emit_build(result, BUILD, dist=tmp_path, gate=gate)
+
+    assert written_before_gate_ran == [False]
+    assert (tmp_path / "index.json").exists()
+
+
+def test_a_build_whose_gate_fails_writes_nothing(tmp_path: Path) -> None:
+    """All-or-nothing extends to the gate: a refusal must leave no trace on disk at all."""
+    result = _merge_result((_entity("minecraft:apple"),))
+    dist = tmp_path / "dist"
+
+    def refusing_gate(documents: GateDocuments) -> None:
+        raise ValidationError("no thank you")
+
+    with pytest.raises(ValidationError, match="no thank you"):
+        emit_build(result, BUILD, dist=dist, gate=refusing_gate)
+
+    assert not dist.exists()
+
+
+def test_a_build_whose_gate_fails_after_a_previous_build_leaves_that_build_untouched(
+    tmp_path: Path,
+) -> None:
+    """A refused *second* build must not disturb what an earlier, accepted build already wrote."""
+    first = _merge_result((_entity("minecraft:apple"),))
+    emit_build(first, BUILD, dist=tmp_path)
+    before = (tmp_path / "index.json").read_bytes()
+
+    second = _merge_result(
+        (_entity("minecraft:apple"), _entity("minecraft:zombie", EntityKind.MOB))
+    )
+
+    def refusing_gate(documents: GateDocuments) -> None:
+        raise ValidationError("refused")
+
+    with pytest.raises(ValidationError):
+        emit_build(second, BUILD, dist=tmp_path, gate=refusing_gate)
+
+    assert (tmp_path / "index.json").read_bytes() == before
+    assert not (tmp_path / "entities" / "mob-0.json").exists()
+
+
+def test_the_gate_receiving_the_same_dicts_that_get_encoded_keeps_writes_deterministic(
+    tmp_path: Path,
+) -> None:
+    """The gate must see the identical payload objects `_encode` serialises, not a second,
+    independently rebuilt copy that could drift from what is actually written.
+    """
+    result = _merge_result((_entity("minecraft:apple"),))
+    seen: list[GateDocuments] = []
+
+    def gate(documents: GateDocuments) -> None:
+        seen.append(documents)
+
+    emit_build(result, BUILD, dist=tmp_path, gate=gate)
+
+    on_disk = json.loads((tmp_path / "entities" / "item-0.json").read_text(encoding="utf-8"))
+    assert seen[0].shards["item-0"] == on_disk

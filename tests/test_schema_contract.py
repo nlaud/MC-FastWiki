@@ -1,22 +1,24 @@
 """The JSON Schema files are the contract between the pipeline and the web app.
 
-Nothing else reads them yet. The pipeline stages that validate against them
-arrive in later phases, and the TypeScript generator runs on the other side of
-the repository. These tests hold the invariants that both sides need, so a
-broken contract fails here instead of failing in a build that ships wrong data.
+`pipeline.validate.conformance` is the pipeline stage that validates real build output against
+these files, with a real `jsonschema.Draft202012Validator` -- see `tests/test_validate_
+conformance.py` for that half of the coverage, including the false-positive test that runs this
+repository's own committed `data/dist` back through it. The TypeScript generator runs on the other
+side of the repository, from the same five files. The tests in this file hold the invariants both
+sides need before either one ever reads a schema, so a broken contract fails here instead of
+failing in a build that ships wrong data, or in a generator that emits `unknown`.
 
-The bottom section, from `PYDANTIC_SECTION_MODELS` on, is a different kind of
-test: a structural agreement check between `pipeline.normalize.entity`'s
-Pydantic models and `entity.schema.json`, rather than an invariant of the
-schema file alone. The `jsonschema` package -- the normal way to check that a
-model's *instances* satisfy a schema -- is not available in this environment
-and cannot be installed here, so there is no way to hand a built `Entity` to a
-real validator and see if it passes. Comparing the two sides' declared shapes
-directly is the next best thing: it cannot catch a validator that mishandles
-a legal instance, but it catches the much more common drift, a field renamed,
-added, or dropped on one side and forgotten on the other, which is exactly
-what would otherwise surface as a silent mismatch between what the pipeline
-writes and what the web app's generated types expect.
+The bottom section, from `PYDANTIC_SECTION_MODELS` on, is a different kind of test: a structural
+agreement check between `pipeline.normalize.entity`'s Pydantic models and `entity.schema.json`,
+rather than an invariant of the schema file alone, and rather than an instance-level check against
+a real `Entity`. It stays, alongside `pipeline.validate.conformance`'s instance check, because the
+two catch different things and neither one subsumes the other. This comparison catches a field
+renamed, added, or dropped on one side and forgotten on the other -- a drift an instance check
+cannot see at all if the two sides happen to still agree on every instance this test process
+builds. `pipeline.validate.conformance` catches the opposite failure: a correctly-declared field
+whose *value* breaks the schema's own rules -- a `wikiUrl` that fails the pattern, a `sourceTiers`
+key naming a field that does not exist -- which this structural comparison cannot see, because it
+never inspects a value at all, only a declared shape.
 """
 
 import json

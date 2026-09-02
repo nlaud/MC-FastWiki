@@ -174,11 +174,13 @@ from pipeline.obtain.loot import (
 )
 from pipeline.obtain.producer import ProducerIndex
 from pipeline.obtain.recipes import RecipeExtractionResult, SkippedRecipe, extract_recipes
+from pipeline.validate import ValidationError, ValidationReport, validate_build
 
 __all__ = [
     "CURATED_DIRECTORY",
     "OBTAIN_REPORT_NAME",
     "PAGES_WITHOUT_INFOBOX_REPORT_NAME",
+    "VALIDATION_REPORT_NAME",
     "BuildOptions",
     "BuildOutcome",
     "ObtainReport",
@@ -205,6 +207,11 @@ PAGES_WITHOUT_INFOBOX_REPORT_NAME = "pages-without-infobox.json"
 # producers, for this module to gather into one file, the same way `pages-
 # without-infobox.json` gathers a fact that belongs to no single stage.
 OBTAIN_REPORT_NAME = "obtain-report.json"
+
+# `pipeline.validate.ValidationGate.report` is not the report of any earlier
+# stage module either -- it is stage 7.5's own report, gathered here the same
+# way `obtain-report.json` gathers stage 3b/4b's.
+VALIDATION_REPORT_NAME = "validation.json"
 
 
 class ObtainReport(BaseModel, frozen=True):
@@ -254,6 +261,11 @@ class BuildOptions(BaseModel, frozen=True):
     shard_size: int = DEFAULT_SHARD_SIZE
     offline: bool = False
     quiet: bool = False
+    # Downgrades a regression-check failure (stage 7.5's second half) to a
+    # warning that is still written to `data/reports/validation.json` in
+    # full. Never downgrades a schema conformance failure -- see `pipeline.
+    # validate`'s own module docstring for why that half stays absolute.
+    allow_regression: bool = False
 
 
 class BuildOutcome(BaseModel, frozen=True):
@@ -266,7 +278,10 @@ class BuildOutcome(BaseModel, frozen=True):
     module docstring's "mob-page rule" section explains in full, carried out
     here specifically so it is visible to a caller and to a person reading
     the stderr summary, rather than silently dropped the moment the infobox
-    stage moves past it.
+    stage moves past it. `validation_report` is stage 7.5's own report --
+    present here even for a passing build, so a caller can see, for instance,
+    every regression check `--allow-regression` downgraded rather than only
+    finding out about them by reading `data/reports/validation.json`.
     """
 
     minecraft_version: str
@@ -282,6 +297,7 @@ class BuildOutcome(BaseModel, frozen=True):
     merge_report: MergeReport
     emit_report: EmitReport
     obtain_report: ObtainReport
+    validation_report: ValidationReport
 
 
 def _offline_transport(cache: ContentCache) -> Transport:
@@ -359,6 +375,7 @@ def _write_reports(
     infobox_report: InfoboxReport,
     emit_report: EmitReport,
     obtain_report: ObtainReport,
+    validation_report: ValidationReport,
     pages_without_infobox: Sequence[str],
 ) -> tuple[Path, ...]:
     """Write every stage report into `reports_root`, and return the paths written.
@@ -367,10 +384,11 @@ def _write_reports(
     basename -- `DEFAULT_REPORT_PATH.name` -- rooted at `reports_root` rather
     than at each module's own `data/reports/` default, so a `--reports` flag
     redirects every one of them without this function knowing anything about
-    their internal shape. `pages_without_infobox` and `obtain_report` are not
-    the report of any stage module either, so each gets its own small file,
-    written the same way `emit.write.write_report` and its siblings write
-    theirs: indented JSON, sorted keys, one trailing newline.
+    their internal shape. `pages_without_infobox`, `obtain_report`, and
+    `validation_report` are not the report of any stage module either, so
+    each gets its own small file, written the same way `emit.write.
+    write_report` and its siblings write theirs: indented JSON, sorted keys,
+    one trailing newline.
     """
     reconciliation_path = reports_root / RECONCILE_REPORT_PATH.name
     merge_path = reports_root / MERGE_REPORT_PATH.name
@@ -378,6 +396,7 @@ def _write_reports(
     emit_path = reports_root / EMIT_REPORT_PATH.name
     pages_without_infobox_path = reports_root / PAGES_WITHOUT_INFOBOX_REPORT_NAME
     obtain_report_path = reports_root / OBTAIN_REPORT_NAME
+    validation_report_path = reports_root / VALIDATION_REPORT_NAME
 
     write_reconcile_report(reconciliation_report, reconciliation_path)
     write_merge_report(merge_report, merge_path)
@@ -393,6 +412,10 @@ def _write_reports(
     obtain_report_path.write_text(
         json.dumps(obtain_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    validation_document = validation_report.model_dump(mode="json")
+    validation_report_path.write_text(
+        json.dumps(validation_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     return (
         reconciliation_path,
@@ -401,6 +424,7 @@ def _write_reports(
         emit_path,
         pages_without_infobox_path,
         obtain_report_path,
+        validation_report_path,
     )
 
 
@@ -613,6 +637,18 @@ def run_build(
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
+    # --- 7.5 validate -------------------------------------------------------------------
+    #
+    # `validate_build` reads `options.dist`'s baseline snapshot now, before emit gets any
+    # chance to overwrite the very directory it reads -- see `pipeline.validate`'s own
+    # module docstring for why that ordering is this call's job, not the gate's own.
+    gate = validate_build(
+        dist=options.dist,
+        merge_result=result,
+        producer_index=producer_index,
+        allow_regression=options.allow_regression,
+    )
+
     # --- 8. emit ----------------------------------------------------------------------
     build_info = BuildInfo(minecraft_version=version, mcmeta_ref=data_tag.tag, built_at=built_at)
     emit_report = emit_build(
@@ -621,6 +657,32 @@ def run_build(
         dist=options.dist,
         shard_size=options.shard_size,
         producer_index=producer_index,
+        gate=gate,
+    )
+    validation_report = gate.report
+    if validation_report is None:
+        # Unreachable in practice: `emit_build` always calls a non-`None` gate before it
+        # writes anything, and it only reached the line above by returning, which only
+        # happens after `ValidationGate.__call__` has already set `.report`. The guard is
+        # what lets mypy narrow `validation_report` to `ValidationReport` below, the same
+        # role `merge_entities`'s own unreachable `NormalizeError` guard plays.
+        raise ValidationError(
+            "emit_build returned without ever calling the validation gate it was given."
+        )
+    documents_checked = sum(validation_report.conformance.checked.values())
+    # The downgraded count is named on its own rather than folded into the blocking count. A build
+    # run with `--allow-regression` has zero blocking failures by construction, so reporting only
+    # that number would print a line that reads as completely clean for the one build that most
+    # needs a second look -- the reader would have to open `validation.json` to learn that anything
+    # failed at all.
+    downgraded = tuple(check for check in validation_report.regression.checks if check.downgraded)
+    downgraded_note = f", {len(downgraded)} downgraded by --allow-regression" if downgraded else ""
+    report(
+        f"validate: {documents_checked} documents checked, "
+        f"{len(validation_report.conformance.failures)} conformance failures, "
+        f"baseline={'present' if validation_report.regression.has_baseline else 'absent'}, "
+        f"{len(validation_report.regression.blocking_failures)} blocking regression failures"
+        f"{downgraded_note}"
     )
     report(
         f"emit: {emit_report.entity_count} entities in {len(emit_report.shards)} shards, "
@@ -655,6 +717,7 @@ def run_build(
         infobox_report=infobox_report,
         emit_report=emit_report,
         obtain_report=obtain_report,
+        validation_report=validation_report,
         pages_without_infobox=without_box,
     )
     report(f"reports: wrote {len(report_paths)} files to {options.reports}")
@@ -673,4 +736,5 @@ def run_build(
         merge_report=result.report,
         emit_report=emit_report,
         obtain_report=obtain_report,
+        validation_report=validation_report,
     )

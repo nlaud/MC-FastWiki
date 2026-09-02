@@ -20,9 +20,6 @@ reasoning survives even after the choice is made.
       ~4,900 requests). The emit stage ships without it: it writes no `sprites.png` and no
       coordinate map. `Entity.icon` already carries a stable sprite key, so the atlas is one more
       argument to `emit_build`, not a rewrite of it.
-- [ ] Validation gate: Pydantic models validated against `/pipeline/schema`, plus a regression
-      check that fails the build if entity count
-      drops more than 5% or a required field disappears across versions
 
 ## Phase 4 — Search
 

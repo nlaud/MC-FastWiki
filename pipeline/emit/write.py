@@ -86,6 +86,20 @@ somehow fails to serialise, or a build that fails the two `EmitError` checks
 above, therefore fails before `data/dist` is touched at all, rather than
 leaving a mix of this build's shards and the previous build's shards on disk
 with nothing to say which is which.
+
+## The optional validation gate, and why it runs inside Rule 4's boundary, not after it
+
+`emit_build` takes one more keyword this task adds: `gate: GateCallback | None`, defaulting to
+`None`. When a caller passes one, `emit_build` calls it with every document this function has
+already built -- the same shard payloads, index, manifest, and obtain graph Rule 4 was already
+going to assemble in full before writing anything -- and only proceeds to its own write loop if the
+gate returns without raising. This is not a second write path or a second all-or-nothing boundary;
+it is one more thing that has to succeed before the write loop Rule 4 already describes is allowed
+to start, so a `gate=None` caller (every test this task's own baseline already has) sees no change
+in behaviour at all. `pipeline.validate`'s own package docstring owns the reasoning for what the
+gate checks and why; this module does not repeat it, because this module still does not know what a
+threshold is -- it only knows how to call a callable it was handed, exactly as `pipeline.emit`'s own
+package docstring now states.
 """
 
 import gzip
@@ -107,6 +121,8 @@ from pipeline.emit.shard import (
 from pipeline.normalize.entity import EntityKind
 from pipeline.normalize.merge import MergeResult
 from pipeline.obtain.producer import ProducerIndex
+from pipeline.validate import GateCallback
+from pipeline.validate.conformance import GateDocuments
 
 __all__ = [
     "DEFAULT_DIST_PATH",
@@ -203,6 +219,7 @@ def emit_build(
     dist: Path = DEFAULT_DIST_PATH,
     shard_size: int = DEFAULT_SHARD_SIZE,
     producer_index: ProducerIndex = _EMPTY_PRODUCER_INDEX,
+    gate: GateCallback | None = None,
 ) -> EmitReport:
     """Write `result`, `build`, and `producer_index` into `dist`, and return a report of what
     was written.
@@ -214,6 +231,13 @@ def emit_build(
     obtain graph to construct one. See `pipeline.emit.obtain`'s module
     docstring for why an empty graph is not a build fault the way an empty
     `SearchIndex` is.
+
+    `gate` defaults to `None`, in which case this function behaves exactly as
+    it always has. When a caller passes one, it is called once every document
+    this build is about to write already exists in memory and before any of
+    them reaches disk -- see the module docstring's validation-gate section.
+    A gate that raises leaves `dist` exactly as it was; this function adds no
+    guard of its own around whatever the gate raises.
 
     Raises `EmitError` for a `result` with no entities, a `dist` that exists
     and is not a directory, or a `shard_size` below 1. All three raise before
@@ -237,23 +261,39 @@ def emit_build(
     manifest = build_manifest(build)
     obtain_graph = build_obtain_graph(producer_index)
 
+    # Every payload below is built once, as the same plain dict `gate` sees and `_encode` then
+    # serialises -- never rebuilt a second time for encoding, so a gate that inspects a document
+    # and the bytes this function goes on to write can never drift from one another.
+    shard_payloads = {shard.name: _shard_payload(shard) for shard in shards}
+    index_payload = search_index.model_dump(mode="json", by_alias=True, exclude_none=True)
+    manifest_payload = manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
+    obtain_payload = obtain_graph.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    if gate is not None:
+        gate(
+            GateDocuments(
+                shards=shard_payloads,
+                index=index_payload,
+                manifest=manifest_payload,
+                obtain=obtain_payload,
+            )
+        )
+
     entities_dir = dist / _ENTITIES_DIR_NAME
     files: dict[Path, bytes] = {}
     shard_bytes: dict[str, bytes] = {}
     for shard in shards:
-        encoded = _encode(_shard_payload(shard))
+        encoded = _encode(shard_payloads[shard.name])
         shard_bytes[shard.name] = encoded
         files[entities_dir / f"{shard.name}.json"] = encoded
 
-    index_bytes = _encode(search_index.model_dump(mode="json", by_alias=True, exclude_none=True))
+    index_bytes = _encode(index_payload)
     files[dist / _INDEX_FILE_NAME] = index_bytes
 
-    manifest_bytes = _encode(
-        manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
-    )
+    manifest_bytes = _encode(manifest_payload)
     files[dist / _MANIFEST_FILE_NAME] = manifest_bytes
 
-    obtain_bytes = _encode(obtain_graph.model_dump(mode="json", by_alias=True, exclude_none=True))
+    obtain_bytes = _encode(obtain_payload)
     files[dist / _OBTAIN_FILE_NAME] = obtain_bytes
 
     # Rule 2: every `*.json` under `entities/` that this build did not just
