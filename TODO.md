@@ -15,22 +15,15 @@ reasoning survives even after the choice is made.
       wired source. Mining a block for an item ships as a `block_drop` producer, but *where* a
       block generates (Y levels, biomes) is `GenerationInfo`'s section, not an obtain step, and
       worldgen is not among the four mcmeta data groups the pipeline reads. Phase 6c owns it.
-- [ ] Sprite-coverage regression check in `pipeline.validate.regression`: fail a build whose atlas
-      covers meaningfully fewer icon keys than the previous one.
-      Deferred, because the committed `data/dist` baseline predates the atlas and carries nothing
-      yet for a coverage comparison to run against.
 - [ ] Decide what to do about the three oversized sprites the wiki serves as full images rather
       than as cropped icons.
       Measured on the 26.2 build: `InvSprite:Sculk` and `InvSprite:Sculk Shrieker` are 300x300 and
       `InvSprite:Zombie Horse Spawn Egg` is 160x160, against 16x16 for 928 frames and 32x32 for
       924 more.
-      Those three frames take roughly 760 of the atlas's 2,812 pixel rows, so 3 icons out of 1,901
-      cost about a quarter of the image.
-      The packer is right to record the real size, because the file is what the `spritefile` bucket
-      named and Decision 3 forbids guessing a filename.
-      The open question is whether the fix belongs in the packer as a maximum frame size that
-      downscales, or in `/data/curated` as a per-sprite override, and that choice needs the Phase 6
-      renderer to exist first so the cost of a wrong icon size is visible.
+      Decision 15 records why a packer-level maximum frame size is rejected.
+      What remains open moves to Phase 6: curated per-sprite overrides naming verified `File:`
+      titles for these three, once a rendered icon exists to confirm a replacement actually reads
+      correctly at icon size.
       Seven more frames are 1x1: `Cave Air`, `Void Air`, and the five marker and display entities.
       Those are correct and need nothing, because the thing they draw really is invisible.
 
@@ -83,6 +76,12 @@ reasoning survives even after the choice is made.
   - [ ] `armor` — shown beside the HP badge, for the mobs that have it
   - [ ] `behavior` and `mobtype` — shown as the passive / hostile / neutral signal
   - [ ] `speed` and `knockbackresistance` — parsed and stored, not rendered
+- [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
+      `InvSprite:Sculk Shrieker`, `InvSprite:Zombie Horse Spawn Egg`), naming a verified `File:`
+      title in `/data/curated` per Decision 3.
+      It waits on this phase's renderer existing, because confirming a replacement actually reads
+      correctly at icon size needs eyes on a rendered icon.
+      See Decision 15 for why the fix is a curated override and not a packer-level resize.
 
 ## Phase 6b — Obtaining, scraped from the wiki
 
@@ -322,6 +321,38 @@ New collections the added data makes nearly free:
     supports `package = false` for a project that is run from the repository root and never
     published to an index. `pip-tools` would need a separate virtualenv step and gives no
     equivalent lock across dependency groups.
+
+15. **No maximum frame size in the sprite packer.**
+    Measured by re-packing the committed frames through the real `pack_atlas` twice, once as-is and
+    once with every frame over 32px resampled nearest-neighbour to 32x32.
+    As-is packs to 512x2812 at 644925 bytes.
+    Capped at 32px it packs to 512x2228 at 626338 bytes.
+    So a 32px cap removes 584 canvas rows, 20.8% of the canvas height, and saves 18587 bytes, 2.9%
+    of the PNG.
+    The two figures diverge so far because the rows a cap reclaims are transparent, and deflate
+    compresses a run of zero bytes to almost nothing.
+    Nearest-neighbour is the optimistic end of that saving; a smoother resampling filter compresses
+    worse, not better.
+
+    The cap is rejected for three reasons.
+    First, it buys 2.9% of the download, measured, which is not enough to justify the second and
+    third reasons below.
+    Second, it would put a resampling filter choice inside the one module that writes a committed
+    binary, which is exactly the Pillow-version-drift hazard `pipeline.emit.atlas.encode_png`'s own
+    docstring already refuses to accept for PNG row filters, and the same reasoning applies with
+    more force to resampling.
+    Third, it would not even fix the icon: the two sculk frames are full block renders in
+    perspective, not inventory icons, so no resampling makes them read correctly beside a flat
+    16x16 item sprite, which makes this a data fault, not a packing one.
+
+    What remains open is a curated per-sprite override naming a verified `File:` title for
+    `InvSprite:Sculk`, `InvSprite:Sculk Shrieker`, and `InvSprite:Zombie Horse Spawn Egg`, tracked
+    under Phase 6 because it needs eyes on a rendered icon to confirm a replacement actually reads
+    correctly at icon size.
+    A curated override is compatible with this decision, because a human recording a checked
+    filename is not the pipeline guessing one.
+    The seven 1x1 frames (`Cave Air`, `Void Air`, and the five marker and display entities) are
+    correct and need nothing, because the thing they draw really is invisible.
 
 ## Still open
 

@@ -9,14 +9,24 @@ both numbers share, so the comparison never has to reconcile two different repre
 
 A snapshot carries no entity, no id, no name -- only the aggregates `pipeline.validate.regression`'s
 table actually needs: a total, a per-kind breakdown, how many entities carry each required and
-optional field, how many sections of each type exist, and the obtain graph's producer count. This
-is a deliberate narrowing, not laziness. The regression half exists to answer one question -- "did
-this build lose data it should not have" -- and a model that also carried, say, every entity's
-`id` would invite a caller to build a diff of *which* entities changed, which is a different and
-much larger feature than the one `TODO.md`'s Phase 3 bullet asks for. Keeping this model to counts
-keeps it cheap to build from a committed `data/dist` (a scan, not a full parse into `Entity`
-models) and cheap to compare (integer and float arithmetic, no set operations over thousands of
-ids).
+optional field, how many sections of each type exist, the obtain graph's producer count, and the
+sprite atlas's icon count. This is a deliberate narrowing, not laziness. The regression half exists
+to answer one question -- "did this build lose data it should not have" -- and a model that also
+carried, say, every entity's `id` would invite a caller to build a diff of *which* entities changed,
+which is a different and much larger feature than the one `TODO.md`'s Phase 3 bullet asks for.
+Keeping this model to counts keeps it cheap to build from a committed `data/dist` (a scan, not a
+full parse into `Entity` models) and cheap to compare (integer and float arithmetic, no set
+operations over thousands of ids).
+
+`atlas_icon_count` arrives here as a plain `int`, never as a `pipeline.emit.atlas.Atlas`, and that
+narrowing is forced rather than stylistic. `pipeline.emit.write` already imports `pipeline.validate`
+(for `GateCallback`) and `pipeline.validate.conformance` (for `GateDocuments`), so this module
+importing `pipeline.emit.atlas` back would close an import cycle: `pipeline.emit.write` imports
+`pipeline.validate`, which would import `pipeline.validate.snapshot`, which would import
+`pipeline.emit.atlas` -- and the first of those three arrows already makes the cycle a fact, not a
+risk. And the count is all this model ever needed anyway -- the same narrowing that already stores
+`obtain_producer_count` as a bare `int` rather than holding the `ProducerIndex` itself, for the
+identical reason: a snapshot answers "how many", never "which one" or "packed how".
 
 ## Two constructors, because the two sides come from two different places
 
@@ -119,10 +129,14 @@ class BuildSnapshot(BaseModel, frozen=True):
     optional_field_coverage: Mapping[str, int]
     section_type_counts: Mapping[str, int]
     obtain_producer_count: int
+    atlas_icon_count: int = 0
 
     @classmethod
     def from_merge_result(
-        cls, result: MergeResult, producer_index: ProducerIndex = _EMPTY_PRODUCER_INDEX
+        cls,
+        result: MergeResult,
+        producer_index: ProducerIndex = _EMPTY_PRODUCER_INDEX,
+        atlas_icon_count: int = 0,
     ) -> "BuildSnapshot":
         """Return the snapshot of a build that has been merged but not yet emitted.
 
@@ -131,7 +145,9 @@ class BuildSnapshot(BaseModel, frozen=True):
         own `EmitReport.obtain_producer_count` computes it: the number of producers across every
         item id `producer_index.by_output` names, not the number of distinct items. `producer_
         index` defaults to an index over nothing, matching `emit_build`'s own default, for a
-        caller that does not care about the obtain graph.
+        caller that does not care about the obtain graph. `atlas_icon_count` defaults to zero the
+        same way, for a caller (most of this module's own tests included) that has no atlas at
+        all to report on.
         """
         required_field_coverage, optional_field_coverage, section_type_counts = _empty_counts()
         by_kind: dict[str, int] = {}
@@ -155,6 +171,7 @@ class BuildSnapshot(BaseModel, frozen=True):
             optional_field_coverage=optional_field_coverage,
             section_type_counts=section_type_counts,
             obtain_producer_count=sum(len(group) for group in producer_index.by_output.values()),
+            atlas_icon_count=atlas_icon_count,
         )
 
     @classmethod
@@ -162,11 +179,17 @@ class BuildSnapshot(BaseModel, frozen=True):
         """Return the snapshot of a committed `data/dist`, or `None` when there is no baseline.
 
         Reads every `*.json` file under `dist/entities/` -- the same files `pipeline.emit.write`'s
-        stale-file sweep scopes itself to -- and `dist/obtain.json`. Returns `None` for any of the
-        three shapes the module docstring's closing section names as "no baseline": an absent
-        `entities/` directory, one with no shard files in it, or shards that between them hold no
-        entities at all. See `pipeline.validate.regression.check_regression`'s own docstring for
-        why every one of those three passes the gate rather than failing it.
+        stale-file sweep scopes itself to -- `dist/obtain.json`, and `dist/sprites.json`. Returns
+        `None` for any of the three shapes the module docstring's closing section names as "no
+        baseline": an absent `entities/` directory, one with no shard files in it, or shards that
+        between them hold no entities at all. See `pipeline.validate.regression.check_regression`'s
+        own docstring for why every one of those three passes the gate rather than failing it. An
+        absent `sprites.json`, or one whose `sprites` is not an object, never triggers that `None`
+        path on its own -- it only zeroes `atlas_icon_count`, the same tolerant read `obtain.json`
+        already gets just above it, because a build predating the atlas is still a real baseline for
+        every other count this snapshot carries. Neither read defends against a file that is not
+        valid JSON at all: that is a corrupted `data/dist`, not an older one, and it should surface
+        as the decode error it is rather than as a silently zeroed count.
         """
         entities_dir = dist / "entities"
         if not entities_dir.is_dir():
@@ -214,6 +237,16 @@ class BuildSnapshot(BaseModel, frozen=True):
                     len(group) for group in producers.values() if isinstance(group, list)
                 )
 
+        atlas_icon_count = 0
+        sprites_path = dist / "sprites.json"
+        if sprites_path.is_file():
+            sprites_payload: Any = json.loads(sprites_path.read_text(encoding="utf-8"))
+            sprites = (
+                sprites_payload.get("sprites") if isinstance(sprites_payload, dict) else None
+            )
+            if isinstance(sprites, dict):
+                atlas_icon_count = len(sprites)
+
         return cls(
             total=total,
             by_kind=by_kind,
@@ -221,4 +254,5 @@ class BuildSnapshot(BaseModel, frozen=True):
             optional_field_coverage=optional_field_coverage,
             section_type_counts=section_type_counts,
             obtain_producer_count=obtain_producer_count,
+            atlas_icon_count=atlas_icon_count,
         )

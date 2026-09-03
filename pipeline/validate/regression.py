@@ -3,13 +3,13 @@ ran.
 
 `TODO.md`'s Phase 3 bullet asks for a check that "fails the build if entity count drops more than
 5% or a required field disappears across versions." This module is that check, widened from the
-two examples the bullet names into the seven-row table the module docstring of `pipeline.validate`
+two examples the bullet names into the eight-row table the module docstring of `pipeline.validate`
 records in full, and narrowed from "fails the build" to "reports what it found" --
 `check_regression` never raises; `pipeline.validate.ValidationGate` decides whether
 `RegressionReport.blocking_failures` is enough to refuse a build, because that decision also has to
 weigh `--allow-regression`, which this module knows nothing about beyond the one flag it is handed.
 
-## Seven checks, each one an integer or a float, never a fuzzy read
+## Eight checks, each one an integer or a float, never a fuzzy read
 
 Every threshold below is written as an integer comparison, not a float ratio compared against
 another float. `100 * (baseline - new) > percent * baseline` and `baseline - new >= 3` are both
@@ -61,6 +61,33 @@ or shards that hold no entities between them. All three describe a clean checkou
 first time, not a version that lost data relative to a version that came before it -- there is no
 "before" to have regressed from, so failing here would only make the repository impossible to
 build from nothing.
+
+## Sprite atlas coverage counts icon keys, not packed frames
+
+`BuildSnapshot.atlas_icon_count` is `len(sprites.json's "sprites" map)` -- the number of icon KEYS
+`sprites.json` resolves, not `pipeline.emit.atlas.Atlas.frame_count`, the number of distinct
+packed frames. The two differ today (1823 frames against 1901 keys), and the gap is not a fault:
+several icon keys can share one packed frame, the `Sculk Block` alias `pipeline.emit.atlas`'s own
+module docstring names is a live example, and how many keys happen to share a frame is a packing
+detail of which wiki `File:` pages collide, not a fact about how much icon coverage a build shipped.
+A key is what `Entity.icon` actually resolves against at render time, so it is the only number a
+"did this build stop being able to draw an icon for something it used to draw" check can be about.
+Tracking `frame_count` instead would fail this check the moment two icon keys started, or stopped,
+sharing one `File:` page -- a packing-table change with no missing icon behind it at all -- while
+missing the actual regression this check exists to catch: a key that resolved to a frame in the
+baseline and resolves to nothing now.
+
+## A pre-atlas baseline can never fail this row
+
+`_dropped_more_than_percent` already answers `False` for a non-positive `baseline_count` -- see its
+own docstring -- so a baseline of `0`, the `atlas_icon_count` every `data/dist` predating this
+module's own atlas reads back as, can never register as a drop no matter what `new.atlas_icon_count`
+turns out to be. `obtain_producer_count` already relies on this identical graceful path, for the
+identical reason: both counts describe build outputs that did not always exist, and a gate that
+failed the first build to introduce one would make that build impossible to land at all. This is
+what makes this check safe to add on a tree whose committed `data/dist` was written before the
+atlas existed, with no special-casing beyond the one already built into the helper both checks
+share.
 """
 
 from pydantic import BaseModel, field_serializer
@@ -76,6 +103,7 @@ _TOTAL_DROP_PERCENT = 5
 _KIND_DROP_PERCENT = 5
 _KIND_MINIMUM_LOST_MEMBERS = 3
 _OBTAIN_DROP_PERCENT = 5
+_ATLAS_DROP_PERCENT = 5  # sprite atlas icon coverage's own floor, held to the same 5% as the rest
 _OPTIONAL_COVERAGE_DROP_POINTS = 5.0
 
 
@@ -255,6 +283,16 @@ def check_regression(
         f"must not drop more than {_OBTAIN_DROP_PERCENT}% below the baseline",
         not _dropped_more_than_percent(
             baseline.obtain_producer_count, new.obtain_producer_count, percent=_OBTAIN_DROP_PERCENT
+        ),
+    )
+
+    add(
+        "sprite atlas icon coverage",
+        baseline.atlas_icon_count,
+        new.atlas_icon_count,
+        f"must not drop more than {_ATLAS_DROP_PERCENT}% below the baseline",
+        not _dropped_more_than_percent(
+            baseline.atlas_icon_count, new.atlas_icon_count, percent=_ATLAS_DROP_PERCENT
         ),
     )
 

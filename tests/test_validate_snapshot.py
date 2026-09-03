@@ -1,11 +1,11 @@
 """`BuildSnapshot`'s two constructors: from a fresh `MergeResult`, and from a committed `data/dist`.
 
 The real baseline numbers asserted below (2120 entities, 15 shards, the per-kind breakdown, the
-section-type counts, the 4002-producer obtain graph) were measured against the committed
-`data/dist` on 2026-09-02, the same measurement `pipeline.validate`'s own module docstring and this
-task's brief both cite. A future build of a newer Minecraft version will change these numbers, and
-that is expected -- these assertions exist to catch `BuildSnapshot.from_dist` reading the tree
-wrong, not to pin `data/dist` itself in place.
+section-type counts, the 4002-producer obtain graph, the 1901-key sprite atlas) were measured
+against the committed `data/dist` on 2026-09-02, the same measurement `pipeline.validate`'s own
+module docstring and this task's brief both cite. A future build of a newer Minecraft version will
+change these numbers, and that is expected -- these assertions exist to catch `BuildSnapshot.
+from_dist` reading the tree wrong, not to pin `data/dist` itself in place.
 """
 
 from pathlib import Path
@@ -131,6 +131,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "SpawnInfo": 53,
     }
     assert snapshot.obtain_producer_count == 4002
+    assert snapshot.atlas_icon_count == 1901
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:
@@ -163,6 +164,55 @@ def test_from_dist_ignores_a_missing_obtain_json(tmp_path: Path) -> None:
     assert snapshot is not None
     assert snapshot.total == 1
     assert snapshot.obtain_producer_count == 0
+
+
+def test_from_dist_reads_zero_atlas_icons_when_sprites_json_is_absent(tmp_path: Path) -> None:
+    """A `data/dist` with entity shards but no `sprites.json` at all -- a build that predates the
+    atlas -- must read back as zero rather than raising, the same tolerant path `obtain.json`'s own
+    absence already takes.
+    """
+    entities_dir = tmp_path / "entities"
+    entities_dir.mkdir()
+    (entities_dir / "item-0.json").write_text(
+        '{"schemaVersion":1,"entities":[{"id":"minecraft:apple","kind":"item","name":"Apple",'
+        '"aliases":[],"sourceTiers":{},"sections":[]}]}',
+        encoding="utf-8",
+    )
+    snapshot = BuildSnapshot.from_dist(tmp_path)
+    assert snapshot is not None
+    assert snapshot.atlas_icon_count == 0
+
+
+def test_from_dist_reads_zero_atlas_icons_when_sprites_is_not_a_dict(tmp_path: Path) -> None:
+    """A `sprites.json` whose `sprites` value is not a dict is an unexpected shape, not a baseline
+    to raise over -- matches `from_dist`'s own tolerant reads of `obtain.json`'s `producers`.
+    """
+    entities_dir = tmp_path / "entities"
+    entities_dir.mkdir()
+    (entities_dir / "item-0.json").write_text(
+        '{"schemaVersion":1,"entities":[{"id":"minecraft:apple","kind":"item","name":"Apple",'
+        '"aliases":[],"sourceTiers":{},"sections":[]}]}',
+        encoding="utf-8",
+    )
+    (tmp_path / "sprites.json").write_text(
+        '{"schemaVersion":1,"image":"sprites.png","width":512,"height":16,"sprites":[]}',
+        encoding="utf-8",
+    )
+    snapshot = BuildSnapshot.from_dist(tmp_path)
+    assert snapshot is not None
+    assert snapshot.atlas_icon_count == 0
+
+
+def test_from_merge_result_defaults_atlas_icon_count_to_zero() -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    snapshot = BuildSnapshot.from_merge_result(result)
+    assert snapshot.atlas_icon_count == 0
+
+
+def test_from_merge_result_carries_the_given_atlas_icon_count() -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    snapshot = BuildSnapshot.from_merge_result(result, atlas_icon_count=1901)
+    assert snapshot.atlas_icon_count == 1901
 
 
 def test_optional_and_required_field_constants_are_disjoint() -> None:
