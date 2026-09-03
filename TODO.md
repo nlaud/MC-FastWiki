@@ -27,14 +27,6 @@ reasoning survives even after the choice is made.
       Seven more frames are 1x1: `Cave Air`, `Void Air`, and the five marker and display entities.
       Those are correct and need nothing, because the thing they draw really is invisible.
 
-## Phase 4 — Search
-
-- [ ] Choose the matcher — recommend `@leeoniya/uFuzzy` (tiny, fast, built for short prefix queries)
-- [ ] Load `index.json` at boot; measure and record the gzipped size
-- [ ] Ranking: exact match, then prefix, then alias hit, then fuzzy — with a popularity/kind tiebreak
-      so `villager` surfaces the mob above every villager-adjacent item
-- [ ] Benchmark: keystroke to updated list under 16 ms on the full index
-
 ## Phase 5 — Shell UI
 
 - [ ] Blank canvas, search bar pinned to the bottom, layered above all windows
@@ -353,6 +345,31 @@ New collections the added data makes nearly free:
     filename is not the pipeline guessing one.
     The seven 1x1 frames (`Cave Air`, `Void Air`, and the five marker and display entities) are
     correct and need nothing, because the thing they draw really is invisible.
+
+16. **Alias strength is recovered from the entity id, not from alias position.**
+    `generate_aliases` tags every alias `FULL_PHRASE` > `CURATED` > `CROSS_LINK` > `SEGMENT`, but
+    `EntityDraft._aliases` is a `dict[str, SourceTier]` and drops the strength tag at the merge
+    boundary, so only the sorted order survives into `index.json`.
+
+    Reading position as strength was tried first and is wrong. `generate_aliases` sorts
+    strongest-first but **alphabetically inside one strength band**, so a position encodes
+    spelling rather than strength: `diamond` sits at alias index 2 for `diamond_axe`, after
+    `axe`, and at index 1 for `diamond_hoe`, before `hoe`. Comparing those indexes across
+    entities made Diamond Ore, a block, outrank Diamond Axe for the query `diamond`. That
+    reaches every entity whose registry path has more than one segment, so it is not an edge
+    case.
+
+    What the matcher does instead: an alias is a `FULL_PHRASE` alias exactly when it equals the
+    registry path after the namespace, spelled with underscores or with spaces. That is what
+    `_phrase_aliases` emits, so the strongest band is recovered exactly, from data the index
+    already carries, and nothing depends on an ordering the pipeline is free to change.
+
+    `CURATED`, `CROSS_LINK`, and `SEGMENT` remain indistinguishable, as do the two
+    potion-specific `FULL_PHRASE` aliases that are not derived from the path; kind priority
+    resolves the potion case. If a fault ever needs those finer bands, the verified alternative
+    is a parallel `w` array of strength digits in `index.json` and the entity models, measured at
+    +28 kB raw and +2.0 kB gzipped, and rejected here only because it changes the entity contract
+    and grows every shard.
 
 ## Still open
 
