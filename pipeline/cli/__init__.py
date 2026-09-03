@@ -21,12 +21,12 @@ applies to a build failure at the command line exactly as it applies to a
 
 * **0** -- the build finished and wrote `data/dist`.
 * **1** -- a build stage raised one of `FetchError`, `ExtractError`,
-  `EnrichError`, `NormalizeError`, `EmitError`, or this package's own
-  `CliError`. `main` prints `str(error)` to stderr, with no traceback, and
-  returns 1. Every one of those six classes already writes a message meant
-  for a person to read -- that is the whole point of the exception hierarchy
-  CLAUDE.md's tiers describe -- so `main` adds nothing to it and hides
-  nothing from it.
+  `EnrichError`, `NormalizeError`, `EmitError`, `ValidationError`, or this
+  package's own `CliError`. `main` prints `str(error)` to stderr, with no
+  traceback, and returns 1. Every one of those seven classes already writes a
+  message meant for a person to read -- that is the whole point of the
+  exception hierarchy CLAUDE.md's tiers describe -- so `main` adds nothing to
+  it and hides nothing from it.
 * **2** -- a usage error: an unknown flag, a missing subcommand, a value
   `argparse` itself cannot parse. `argparse.ArgumentParser.parse_args` raises
   `SystemExit(2)` for these on its own, and `--help`/`-h` raises `SystemExit
@@ -145,6 +145,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress progress lines on stderr.",
     )
+    build_parser.add_argument(
+        "--allow-regression",
+        dest="allow_regression",
+        action="store_true",
+        help="Downgrade a validation gate regression-check failure to a warning, still recorded "
+        "in full in data/reports/validation.json. Never downgrades a schema conformance "
+        "failure -- a malformed document always fails the build.",
+    )
     return parser
 
 
@@ -168,11 +176,20 @@ def main(argv: Sequence[str]) -> int:
         shard_size=args.shard_size,
         offline=args.offline,
         quiet=args.quiet,
+        allow_regression=args.allow_regression,
     )
 
     try:
         run_build(options)
-    except (FetchError, ExtractError, EnrichError, NormalizeError, EmitError, CliError) as error:
+    except (
+        FetchError,
+        ExtractError,
+        EnrichError,
+        NormalizeError,
+        EmitError,
+        ValidationError,
+        CliError,
+    ) as error:
         print(str(error), file=sys.stderr)
         return 1
     return 0
@@ -193,3 +210,4 @@ from pipeline.enrich import EnrichError  # noqa: E402
 from pipeline.extract import ExtractError  # noqa: E402
 from pipeline.fetch import FetchError  # noqa: E402
 from pipeline.normalize import NormalizeError  # noqa: E402
+from pipeline.validate import ValidationError  # noqa: E402

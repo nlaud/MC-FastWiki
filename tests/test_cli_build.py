@@ -44,6 +44,7 @@ from pipeline.fetch.extracts import build_extracts_url
 from pipeline.fetch.mcmeta import GITHUB_REF_URL, MCMETA_ARCHIVE_URL, MCMETA_REPOSITORY
 from pipeline.fetch.version_manifest import VERSION_MANIFEST_URL
 from pipeline.fetch.wikitext import build_wikitext_url
+from pipeline.validate import ValidationError
 
 VERSION = "26.2"
 SUMMARY_SHA = "a" * 40
@@ -398,6 +399,13 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     )
     assert {e["id"] for e in advancement_shard["entities"]} == {"minecraft:story/root"}
 
+    # Stage 7.5 ran: a clean `tmp_path` has no committed `data/dist` of its own to compare
+    # against, so this is the "no baseline" case -- it must pass, not fail, and the report
+    # must say so rather than silently looking like every check trivially passed.
+    assert outcome.validation_report.regression.has_baseline is False
+    assert outcome.validation_report.regression.checks == ()
+    assert outcome.validation_report.conformance.failures == ()
+
 
 def test_reports_land_in_the_reports_directory(tmp_path: Path) -> None:
     fixtures = _build_fixtures()
@@ -414,6 +422,7 @@ def test_reports_land_in_the_reports_directory(tmp_path: Path) -> None:
         "emit-report.json",
         "pages-without-infobox.json",
         "obtain-report.json",
+        "validation.json",
     }
     assert {path.name for path in reports_dir.iterdir()} == expected
     assert {path.name for path in outcome.report_paths} == expected
@@ -537,3 +546,129 @@ def test_offline_completes_a_whole_build_against_a_cache_one_online_build_primed
     assert written
     for relative in written:
         assert (online_dist / relative).read_bytes() == (offline_dist / relative).read_bytes()
+
+
+# --- Stage 7.5, the validation gate's regression half, wired through --allow-regression ------
+
+
+def _seed_inflated_baseline(dist: Path, *, item_count: int) -> None:
+    """Write a `data/dist` shaped like a previous build with far more items than the small
+    fixture build in this module ever produces, so a build over that fixture regresses hard
+    enough to trip the total-count and per-kind checks in one step.
+    """
+    entities_dir = dist / "entities"
+    entities_dir.mkdir(parents=True)
+    entities = [
+        {
+            "id": f"minecraft:baseline-item-{i}",
+            "kind": "item",
+            "name": f"Baseline Item {i}",
+            "aliases": [],
+            "sourceTiers": {},
+            "sections": [],
+        }
+        for i in range(item_count)
+    ]
+    (entities_dir / "item-0.json").write_text(
+        json.dumps({"schemaVersion": 1, "entities": entities}), encoding="utf-8"
+    )
+
+
+def test_a_regression_against_a_seeded_baseline_raises_and_writes_nothing(tmp_path: Path) -> None:
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+    options = _base_options(tmp_path)
+    _seed_inflated_baseline(options.dist, item_count=100)
+    before = (options.dist / "entities" / "item-0.json").read_bytes()
+
+    with pytest.raises(ValidationError):
+        run_build(options, transport=transport, cache=cache, now=BUILT_AT)
+
+    # The gate refused before emit_build wrote anything -- the seeded baseline must be
+    # completely untouched, not partially overwritten by the refused build.
+    assert (options.dist / "entities" / "item-0.json").read_bytes() == before
+    assert not (options.dist / "entities" / "mob-0.json").exists()
+
+
+def test_allow_regression_completes_the_build_and_still_records_every_downgraded_failure(
+    tmp_path: Path,
+) -> None:
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+    options = _base_options(tmp_path).model_copy(update={"allow_regression": True})
+    _seed_inflated_baseline(options.dist, item_count=100)
+
+    outcome = run_build(options, transport=transport, cache=cache, now=BUILT_AT)
+
+    assert outcome.entity_count == 3
+    blocking = outcome.validation_report.regression.blocking_failures
+    assert blocking == ()
+
+    downgraded = [
+        check for check in outcome.validation_report.regression.checks if check.downgraded
+    ]
+    assert downgraded
+    assert any(check.name == "total entity count" for check in downgraded)
+
+    # The downgraded findings are still written to validation.json in full, not only held on
+    # the in-memory outcome.
+    validation_document = json.loads(
+        (options.reports / "validation.json").read_text(encoding="utf-8")
+    )
+    written_downgraded = [
+        check
+        for check in validation_document["regression"]["checks"]
+        if check["downgraded"]
+    ]
+    assert written_downgraded
+    assert {check["name"] for check in written_downgraded} == {check.name for check in downgraded}
+
+    # And the build actually completed: the new, much smaller build is what is on disk now.
+    item_shard = json.loads((options.dist / "entities" / "item-0.json").read_text(encoding="utf-8"))
+    assert {e["id"] for e in item_shard["entities"]} == {"minecraft:creeper_spawn_egg"}
+
+
+def test_the_progress_line_names_downgraded_checks_rather_than_reading_as_clean(
+    tmp_path: Path,
+) -> None:
+    """A build run with `--allow-regression` has zero blocking failures by construction.
+
+    Reporting only that number would print a line that reads as completely clean for the one build
+    that most needs a second look, and the reader would have to open `validation.json` to learn
+    that anything failed at all.
+    """
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+    options = _base_options(tmp_path).model_copy(
+        update={"allow_regression": True, "quiet": False}
+    )
+    _seed_inflated_baseline(options.dist, item_count=100)
+
+    stream = io.StringIO()
+    run_build(options, transport=transport, cache=cache, now=BUILT_AT, stream=stream)
+
+    validate_line = next(
+        line for line in stream.getvalue().splitlines() if line.startswith("validate:")
+    )
+    assert "0 blocking regression failures" in validate_line
+    assert "downgraded by --allow-regression" in validate_line
+
+
+def test_the_progress_line_stays_quiet_about_downgrades_when_there_are_none(
+    tmp_path: Path,
+) -> None:
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+    options = _base_options(tmp_path).model_copy(update={"quiet": False})
+
+    stream = io.StringIO()
+    run_build(options, transport=transport, cache=cache, now=BUILT_AT, stream=stream)
+
+    validate_line = next(
+        line for line in stream.getvalue().splitlines() if line.startswith("validate:")
+    )
+    assert "downgraded" not in validate_line

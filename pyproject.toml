@@ -5,6 +5,11 @@ description = "Build-time data pipeline for MC-FastWiki. It writes JSON into /da
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.11",
+    # Validates every document `pipeline.emit.write.emit_build` is about to
+    # write against its JSON Schema in `/pipeline/schema`, before any byte
+    # reaches disk. A runtime dependency, not a dev one -- `pipeline.validate`
+    # runs inside `run_build`, not only inside the test process.
+    "jsonschema>=4.26",
 ]
 
 [dependency-groups]
@@ -12,6 +17,10 @@ dev = [
     "mypy>=1.18",
     "pytest>=9.1",
     "ruff>=0.14",
+    # Type stubs for `jsonschema`, a runtime dependency above. mypy strict
+    # mode refuses an untyped import outright, and `jsonschema` itself ships
+    # no `py.typed` marker.
+    "types-jsonschema>=4.26",
 ]
 
 # The pipeline is imported from the repository root, never installed, and it

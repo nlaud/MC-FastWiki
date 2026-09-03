@@ -31,10 +31,19 @@ docstring) that a later atlas packer can resolve without this package
 changing at all -- adding the atlas is one more argument to `emit_build`, not
 a rewrite of it. There is also no `python -m pipeline` entry point yet; nothing
 calls `emit_build` outside a test until that CLI exists, which is its own open
-`TODO.md` bullet. Nor does this package run the Phase 3 validation gate
-`TODO.md` describes separately -- that is a threshold on how much of a
-`MergeReport` is acceptable, which belongs beside the report it reads, not
-beside the stage that writes files from whatever report it was handed.
+`TODO.md` bullet. Nor does this package decide the Phase 3 validation gate's
+policy `TODO.md` describes separately -- the threshold on how much of a build
+is acceptable belongs beside the report it reads (`pipeline.validate`), not
+beside the stage that writes files from whatever report it was handed. What
+this package does own, as of a later task, is the one call site: `pipeline.
+emit.write.emit_build` takes an optional gate callback and calls it with the
+documents this module already assembled, after they exist in memory and
+before any of them reaches disk, so a gate that refuses a build can still
+refuse it before `data/dist` changes at all. That call is plumbing, not a
+policy decision -- a `None` gate, every caller before that task, changes
+nothing about what this module does; the one caller that passes a real gate
+is the one deciding whether to fail a build, and this module is only deciding
+when, in its own sequence, to ask.
 
 `EmitError` is this package's shape-level fault, matching `NormalizeError`,
 `EnrichError`, and `ExtractError` of the stages before it: reserved for a
