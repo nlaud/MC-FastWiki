@@ -9,6 +9,9 @@ answer, so the test fails if a future change lets a `SEGMENT` alias swamp a
 `FULL_PHRASE` one.
 """
 
+import json
+from pathlib import Path
+
 import pytest
 
 from pipeline.normalize.aliases import (
@@ -261,14 +264,10 @@ _CANDIDATES = (
     _candidate("minecraft:weakness", EntityKind.EFFECT, "Weakness", ["weak"]),
 )
 
-ACCEPTANCE_TABLE = (
-    ("golden apple", "minecraft:golden_apple"),
-    ("golden_apple", "minecraft:golden_apple"),
-    ("gapple", "minecraft:golden_apple"),
-    ("blaze rod", "minecraft:blaze_rod"),
-    ("pearl", "minecraft:ender_pearl"),
-    ("efficiency 5", "minecraft:efficiency"),
-    ("weak", "minecraft:weakness"),
+_FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "search_acceptance.json"
+ACCEPTANCE_TABLE = tuple(
+    (entry["query"], entry["expected"])
+    for entry in json.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
 )
 
 

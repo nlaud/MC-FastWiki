@@ -1,0 +1,30 @@
+[
+  {
+    "query": "golden apple",
+    "expected": "minecraft:golden_apple"
+  },
+  {
+    "query": "golden_apple",
+    "expected": "minecraft:golden_apple"
+  },
+  {
+    "query": "gapple",
+    "expected": "minecraft:golden_apple"
+  },
+  {
+    "query": "blaze rod",
+    "expected": "minecraft:blaze_rod"
+  },
+  {
+    "query": "pearl",
+    "expected": "minecraft:ender_pearl"
+  },
+  {
+    "query": "efficiency 5",
+    "expected": "minecraft:efficiency"
+  },
+  {
+    "query": "weak",
+    "expected": "minecraft:weakness"
+  }
+]
