@@ -10,6 +10,14 @@ dependencies = [
     # reaches disk. A runtime dependency, not a dev one -- `pipeline.validate`
     # runs inside `run_build`, not only inside the test process.
     "jsonschema>=4.26",
+    # Decodes sprite bytes for `pipeline.emit.atlas`, for decoding only -- see that module's
+    # docstring for why the PNG *writer* the atlas ships is hand-rolled rather than Pillow's.
+    # The wiki serves palette, greyscale, RGBA, and possibly interlaced PNGs, plus at least one
+    # real animated GIF (`File:Sculk JE1 BE1.gif`, documented in `pipeline.fetch.sprites` as a
+    # deliberate icon and not a mistake), and hand-rolling a decoder for that whole matrix of
+    # PNG color types and GIF frames would be a large amount of subtle code for no benefit over
+    # a library every other Python project already trusts for this exact job.
+    "pillow>=11",
 ]
 
 [dependency-groups]

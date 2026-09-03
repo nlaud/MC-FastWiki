@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.emit import EmitError
+from pipeline.emit.atlas import Atlas, DecodedSprite, pack_atlas
 from pipeline.emit.manifest import BuildInfo
 from pipeline.emit.write import emit_build
 from pipeline.enrich.advancement import Reconciliation
@@ -34,6 +35,12 @@ def _entity(entity_id: str, kind: EntityKind = EntityKind.ITEM) -> Entity:
         source_tiers={},
         sections=(),
     )
+
+
+def _atlas() -> Atlas:
+    """Return a small, real `Atlas` built through `pack_atlas`, not a hand-assembled stand-in."""
+    sprite = DecodedSprite(width=2, height=2, rgba=bytes((1, 2, 3, 4)) * 4)
+    return pack_atlas({"File:Apple.png": sprite}, {"InvSprite:Apple": "File:Apple.png"})
 
 
 def _merge_result(entities: tuple[Entity, ...]) -> MergeResult:
@@ -275,3 +282,101 @@ def test_the_gate_receiving_the_same_dicts_that_get_encoded_keeps_writes_determi
 
     on_disk = json.loads((tmp_path / "entities" / "item-0.json").read_text(encoding="utf-8"))
     assert seen[0].shards["item-0"] == on_disk
+
+
+# --- The `atlas` keyword ---------------------------------------------------------------
+
+
+def test_atlas_none_is_the_default_and_writes_neither_sprite_file(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    report = emit_build(result, BUILD, dist=tmp_path)
+
+    assert not (tmp_path / "sprites.png").exists()
+    assert not (tmp_path / "sprites.json").exists()
+    assert report.atlas_frame_count == 0
+    assert report.atlas_png_bytes == 0
+    assert report.atlas_map_bytes == 0
+    assert report.atlas_map_gzipped_bytes == 0
+
+
+def test_a_real_atlas_writes_both_sprite_files(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    atlas = _atlas()
+
+    report = emit_build(result, BUILD, dist=tmp_path, atlas=atlas)
+
+    assert (tmp_path / "sprites.png").read_bytes() == atlas.png
+    written_map = json.loads((tmp_path / "sprites.json").read_text(encoding="utf-8"))
+    assert written_map == atlas.coordinates.model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+    assert report.atlas_frame_count == 1
+    assert report.atlas_png_bytes == len(atlas.png)
+    assert report.atlas_map_bytes > 0
+    assert 0 < report.atlas_map_gzipped_bytes <= report.atlas_map_bytes
+
+
+def test_sprites_json_ends_with_exactly_one_lf_newline_and_no_cr(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    emit_build(result, BUILD, dist=tmp_path, atlas=_atlas())
+
+    data = (tmp_path / "sprites.json").read_bytes()
+    assert b"\r" not in data
+    assert data.endswith(b"\n")
+    assert not data.endswith(b"\n\n")
+
+
+def test_the_gate_sees_the_atlas_map_document_when_one_is_given(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    atlas = _atlas()
+    seen: list[GateDocuments] = []
+
+    def gate(documents: GateDocuments) -> None:
+        seen.append(documents)
+
+    emit_build(result, BUILD, dist=tmp_path, gate=gate, atlas=atlas)
+
+    assert seen[0].atlas == atlas.coordinates.model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+
+
+def test_the_gate_sees_no_atlas_document_when_none_is_given(tmp_path: Path) -> None:
+    result = _merge_result((_entity("minecraft:apple"),))
+    seen: list[GateDocuments] = []
+
+    def gate(documents: GateDocuments) -> None:
+        seen.append(documents)
+
+    emit_build(result, BUILD, dist=tmp_path, gate=gate)
+
+    assert seen[0].atlas is None
+
+
+def test_a_build_whose_gate_fails_writes_neither_sprite_file(tmp_path: Path) -> None:
+    """All-or-nothing extends to the atlas exactly as it does to every other document."""
+    result = _merge_result((_entity("minecraft:apple"),))
+    dist = tmp_path / "dist"
+
+    def refusing_gate(documents: GateDocuments) -> None:
+        raise ValidationError("no thank you")
+
+    with pytest.raises(ValidationError, match="no thank you"):
+        emit_build(result, BUILD, dist=dist, gate=refusing_gate, atlas=_atlas())
+
+    assert not dist.exists()
+
+
+def test_an_atlas_less_rebuild_leaves_a_previous_builds_sprite_files_alone(tmp_path: Path) -> None:
+    """Rule 2's stale-file sweep is scoped to `data/dist/entities/`, on purpose: an `atlas=None`
+    build must not delete sprite files an earlier, atlas-writing build left behind.
+    """
+    result = _merge_result((_entity("minecraft:apple"),))
+    emit_build(result, BUILD, dist=tmp_path, atlas=_atlas())
+    png_before = (tmp_path / "sprites.png").read_bytes()
+    map_before = (tmp_path / "sprites.json").read_bytes()
+
+    emit_build(result, BUILD, dist=tmp_path)
+
+    assert (tmp_path / "sprites.png").read_bytes() == png_before
+    assert (tmp_path / "sprites.json").read_bytes() == map_before

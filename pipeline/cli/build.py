@@ -133,6 +133,8 @@ from typing import TextIO
 from pydantic import BaseModel
 
 from pipeline.cli import CliError
+from pipeline.emit import EmitError
+from pipeline.emit.atlas import DecodedSprite, collect_sprite_files, decode_sprite, pack_atlas
 from pipeline.emit.manifest import BuildInfo
 from pipeline.emit.shard import DEFAULT_SHARD_SIZE
 from pipeline.emit.write import DEFAULT_DIST_PATH, EmitReport, emit_build
@@ -154,7 +156,9 @@ from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
 from pipeline.fetch.extracts import fetch_page_extracts
+from pipeline.fetch.imageinfo import fetch_file_images
 from pipeline.fetch.mcmeta import fetch_data_files, fetch_summary_payload, resolve_mcmeta_tag
+from pipeline.fetch.sprites import download_sprites
 from pipeline.fetch.version_manifest import fetch_version_manifest
 from pipeline.fetch.wikitext import fetch_page_wikitext
 from pipeline.normalize.curated import load_curated
@@ -637,6 +641,49 @@ def run_build(
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
+    # --- 7b. sprite atlas -------------------------------------------------------------
+    #
+    # Sits after normalize because it needs `result.entities` -- specifically, the icon key
+    # `pipeline.normalize.merge` already resolved onto each one -- and before validate/emit
+    # because stage 7.5's conformance half needs the finished `Atlas` to check `sprites.json`
+    # against `atlas.schema.json` before anything reaches disk, and stage 8 needs it to write
+    # `sprites.png` and `sprites.json` at all. See `pipeline.emit.atlas`'s own module docstring
+    # for the packer itself; this stage is wiring, the same role every other stage here plays.
+    selection = collect_sprite_files(result.entities, sprite_index)
+    image_report = fetch_file_images(
+        selection.file_titles, revision=version, cache=store, transport=network_transport
+    )
+    download_report = download_sprites(
+        image_report.images, cache=store, transport=network_transport
+    )
+    decoded_sprites: dict[str, DecodedSprite] = {}
+    decode_failures: list[str] = []
+    for title, payload in download_report.images.items():
+        try:
+            decoded_sprites[title] = decode_sprite(payload, title=title)
+        except EmitError as error:
+            # A per-file decode fault, collected rather than raised: `pipeline.fetch.sprites`'s
+            # own module docstring already argues that one bad file must not abort a run over
+            # roughly 1,900 of them, and a body that downloads intact but fails to decode is the
+            # same shape of gap, one step later in the pipe.
+            decode_failures.append(str(error))
+    resolved_icons = {
+        icon: title for icon, title in selection.icon_to_file.items() if title in decoded_sprites
+    }
+    atlas = pack_atlas(decoded_sprites, resolved_icons)
+    sprite_failures = (
+        len(selection.unresolved_icons)
+        + len(image_report.missing)
+        + len(download_report.failed)
+        + len(decode_failures)
+    )
+    report(
+        f"sprite atlas: {len(selection.icon_to_file) + len(selection.unresolved_icons)} icon "
+        f"keys requested, {len(selection.file_titles)} files resolved, "
+        f"{len(download_report.images)} sprites downloaded, {atlas.frame_count} frames packed "
+        f"into {atlas.coordinates.width}x{atlas.coordinates.height}, {sprite_failures} failures"
+    )
+
     # --- 7.5 validate -------------------------------------------------------------------
     #
     # `validate_build` reads `options.dist`'s baseline snapshot now, before emit gets any
@@ -658,6 +705,7 @@ def run_build(
         shard_size=options.shard_size,
         producer_index=producer_index,
         gate=gate,
+        atlas=atlas,
     )
     validation_report = gate.report
     if validation_report is None:
