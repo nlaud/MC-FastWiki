@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from pipeline.cli import CliError
 from pipeline.cli.build import BuildOptions, run_build
@@ -41,6 +42,7 @@ from pipeline.fetch import FetchError, Transport
 from pipeline.fetch.bucket import PAGE_SIZE, BucketQuery
 from pipeline.fetch.cache import ContentCache
 from pipeline.fetch.extracts import build_extracts_url
+from pipeline.fetch.imageinfo import build_imageinfo_url
 from pipeline.fetch.mcmeta import GITHUB_REF_URL, MCMETA_ARCHIVE_URL, MCMETA_REPOSITORY
 from pipeline.fetch.version_manifest import VERSION_MANIFEST_URL
 from pipeline.fetch.wikitext import build_wikitext_url
@@ -53,6 +55,21 @@ SUMMARY_TAG = f"{VERSION}-summary"
 DATA_TAG = f"{VERSION}-data"
 
 BUILT_AT = datetime(2026, 9, 1, tzinfo=UTC)
+
+# The Creeper sprite the sprite-atlas stage downloads and decodes. `sha1` only has to be a
+# well-formed 40-character digest -- it is a cache key, never verified against the bytes, per
+# `pipeline.fetch.sprites`'s own Cloudflare Polish section -- so a fixed digest is as good as a
+# real one here.
+CREEPER_SPRITE_SHA1 = "c" * 40
+CREEPER_SPRITE_URL = "https://minecraft.wiki/images/Creeper.png?d47d8"
+
+
+def _creeper_sprite_png() -> bytes:
+    """Return a small, real PNG, encoded by Pillow -- the sprite-atlas stage decodes this."""
+    image = Image.new("RGBA", (2, 2), (0, 200, 0, 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _tar_gz(members: Mapping[str, bytes], *, root: str) -> bytes:
@@ -284,6 +301,35 @@ def _build_fixtures() -> dict[str, bytes]:
     }
     fixtures[_bucket_url("spritefile", SPRITE_COLUMNS)] = _bucket_answer([sprite_row])
 
+    # The sprite-atlas stage: `Creeper`'s icon key is `EntitySprite:creeper`, which resolves to
+    # `File:Creeper.png` through the bucket row above, so a build needs that file's imageinfo and
+    # its bytes.
+    imageinfo_url = build_imageinfo_url(["File:Creeper.png"])
+    fixtures[imageinfo_url] = json.dumps(
+        {
+            "batchcomplete": True,
+            "query": {
+                "pages": [
+                    {
+                        "ns": 6,
+                        "title": "File:Creeper.png",
+                        "imageinfo": [
+                            {
+                                "url": CREEPER_SPRITE_URL,
+                                "sha1": CREEPER_SPRITE_SHA1,
+                                "size": 250,
+                                "width": 2,
+                                "height": 2,
+                                "mime": "image/png",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    ).encode("utf-8")
+    fixtures[CREEPER_SPRITE_URL] = _creeper_sprite_png()
+
     fixtures[_bucket_url("droptable", DROPTABLE_COLUMNS)] = _bucket_answer([])
     fixtures[_bucket_url("spawn_table", SPAWN_TABLE_COLUMNS)] = _bucket_answer([])
     fixtures[_bucket_url("trade", TRADE_COLUMNS)] = _bucket_answer([])
@@ -382,6 +428,11 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     assert (dist / "manifest.json").is_file()
     assert (dist / "index.json").is_file()
     assert (dist / "obtain.json").is_file()
+    assert (dist / "sprites.png").is_file()
+    sprites_map = json.loads((dist / "sprites.json").read_text(encoding="utf-8"))
+    assert sprites_map["sprites"]["EntitySprite:creeper"] == {"x": 0, "y": 0, "w": 2, "h": 2}
+    assert outcome.emit_report.atlas_frame_count == 1
+    assert outcome.emit_report.atlas_png_bytes > 0
 
     mob_shard = json.loads((dist / "entities" / "mob-0.json").read_text(encoding="utf-8"))
     ids = {entity["id"] for entity in mob_shard["entities"]}
@@ -672,3 +723,26 @@ def test_the_progress_line_stays_quiet_about_downgrades_when_there_are_none(
         line for line in stream.getvalue().splitlines() if line.startswith("validate:")
     )
     assert "downgraded" not in validate_line
+
+
+# --- Stage 7b, the sprite atlas -----------------------------------------------------------
+
+
+def test_the_sprite_atlas_progress_line_names_every_count(tmp_path: Path) -> None:
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+    options = _base_options(tmp_path).model_copy(update={"quiet": False})
+
+    stream = io.StringIO()
+    run_build(options, transport=transport, cache=cache, now=BUILT_AT, stream=stream)
+
+    atlas_line = next(
+        line for line in stream.getvalue().splitlines() if line.startswith("sprite atlas:")
+    )
+    assert "1 icon keys requested" in atlas_line
+    assert "1 files resolved" in atlas_line
+    assert "1 sprites downloaded" in atlas_line
+    assert "1 frames packed" in atlas_line
+    assert "2x2" in atlas_line
+    assert "0 failures" in atlas_line

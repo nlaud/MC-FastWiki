@@ -11,16 +11,23 @@ freshly against the instance, disagrees. `jsonschema.Draft202012Validator` is wh
 it validates *instances*, not declarations, against the same five files `pipeline/schema` already
 holds as the single contract between the pipeline and the web app.
 
-## Five document kinds, one call each, at the exact shape they will be written in
+## Six document kinds, one call each, at the exact shape they will be written in
 
-`GateDocuments` carries the shard payloads, the index, the manifest, and the obtain graph, each
-already `model_dump(mode="json", by_alias=True, exclude_none=True)`-ed -- the identical call
-`pipeline.emit.write._shard_payload` and its three siblings make. Validating anything else --
-the Python `Entity` model directly, or a dump with different flags -- would check a document that
-never reaches disk: `by_alias=True` is what turns `wiki_url` into `wikiUrl`, and `exclude_none=True`
-is what drops an unset `icon` instead of writing a `null` the schema's closed object never declares
-a type for. A validator run over the wrong dump would pass documents this pipeline never ships and
-could fail ones it does, in either direction, silently.
+`GateDocuments` carries the shard payloads, the index, the manifest, the obtain graph, and the
+sprite atlas's coordinate map, each already `model_dump(mode="json", by_alias=True,
+exclude_none=True)`-ed -- the identical call `pipeline.emit.write._shard_payload` and its siblings
+make. Validating anything else -- the Python `Entity` model directly, or a dump with different
+flags -- would check a document that never reaches disk: `by_alias=True` is what turns `wiki_url`
+into `wikiUrl`, and `exclude_none=True` is what drops an unset `icon` instead of writing a `null`
+the schema's closed object never declares a type for. A validator run over the wrong dump would
+pass documents this pipeline never ships and could fail ones it does, in either direction, silently.
+
+`atlas` is the one field of the six that is genuinely optional rather than merely absent from a
+small test fixture: `pipeline.emit.write.emit_build`'s own `atlas` keyword defaults to `None`, and
+a `None` atlas means no `sprites.png` and no `sprites.json` are being written at all, so there is
+nothing here to check against `atlas.schema.json` and this module records no failure over its
+absence -- see `validate_conformance`'s own docstring for exactly how that is expressed in
+`checked`.
 
 Individual `Entity` documents are not carried on `GateDocuments` as a list of their own. They live
 inside `GateDocuments.shards`, one shard's `"entities"` array at a time, because that is where
@@ -30,13 +37,13 @@ is one iteration over data already in memory, not a second serialisation pass.
 ## One compiled validator per schema, built once, reused across every instance
 
 `Draft202012Validator(schema)` compiles the schema into a form that can check many instances
-without redoing that compilation each time. `validate_conformance` builds exactly five of them --
+without redoing that compilation each time. `validate_conformance` builds exactly six of them --
 one per file in `pipeline/schema` -- at the top of one call, and reuses each across every instance
 of its kind: 2120 entity dicts against the one entity validator, 15 shard dicts against the one
-shard validator, and one instance each against the index, obtain, and manifest validators.
-Building a fresh `Draft202012Validator` per instance would recompile the same schema roughly 2140
-times for one call over the real build, for no benefit -- the schema does not change between one
-entity and the next.
+shard validator, and one instance each against the index, obtain, manifest, and (when present)
+atlas validators. Building a fresh `Draft202012Validator` per instance would recompile the same
+schema roughly 2140 times for one call over the real build, for no benefit -- the schema does not
+change between one entity and the next.
 
 ## A bounded failure list, not the first failure and not every failure
 
@@ -68,12 +75,12 @@ __all__ = [
     "validate_conformance",
 ]
 
-# The five files `pipeline/schema` holds. `pipeline.schema.schema_names` would answer this
-# generically, but this module needs exactly these five, in the order the module docstring's
+# The six files `pipeline/schema` holds. `pipeline.schema.schema_names` would answer this
+# generically, but this module needs exactly these six, in the order the module docstring's
 # document-kind table lists them, and a generic read would still leave this module needing to know
-# which of the five schemas describes a shard's nested entity and which describes the shard itself
+# which of the six schemas describes a shard's nested entity and which describes the shard itself
 # -- knowledge that has to live here regardless.
-_SCHEMA_NAMES = ("entity", "shard", "index", "obtain", "manifest")
+_SCHEMA_NAMES = ("entity", "shard", "index", "obtain", "manifest", "atlas")
 
 DEFAULT_MAX_FAILURES = 20
 
@@ -85,23 +92,28 @@ class GateDocuments(BaseModel, frozen=True):
     exclude_none=True)` shape `emit_build` writes -- see the module docstring for why that
     precision matters. `shards` is keyed by shard name (`"item-0"`, matching `Shard.name`) so a
     `ConformanceFailure.document` can name which file a shard-level fault came from.
+
+    `atlas` defaults to `None`, matching `emit_build`'s own `atlas` keyword: a build with no sprite
+    atlas passes no document here for this module to validate, and that is not a failure -- see the
+    module docstring's closing paragraph.
     """
 
     shards: Mapping[str, Mapping[str, Any]]
     index: Mapping[str, Any]
     obtain: Mapping[str, Any]
     manifest: Mapping[str, Any]
+    atlas: Mapping[str, Any] | None = None
 
 
 class ConformanceFailure(BaseModel, frozen=True):
     """One place an instance did not satisfy its schema.
 
     `document` names which document kind failed -- `"entity"`, `"shard:item-0"`, `"index"`,
-    `"obtain"`, or `"manifest"` -- and `entity_id` is set only for an `"entity"` failure, because
-    that is the one document kind with an id of its own to name; every other kind is already
-    identified by `document` alone. `pointer` is the JSON Pointer (RFC 6901) into the *instance*
-    that failed -- `""` for the whole document, `"/sourceTiers/blurb"` for one field of it -- and
-    `message` is `jsonschema`'s own explanation of what about that location was wrong.
+    `"obtain"`, `"manifest"`, or `"atlas"` -- and `entity_id` is set only for an `"entity"` failure,
+    because that is the one document kind with an id of its own to name; every other kind is
+    already identified by `document` alone. `pointer` is the JSON Pointer (RFC 6901) into the
+    *instance* that failed -- `""` for the whole document, `"/sourceTiers/blurb"` for one field of
+    it -- and `message` is `jsonschema`'s own explanation of what about that location was wrong.
     """
 
     document: str
@@ -114,10 +126,13 @@ class ConformanceReport(BaseModel, frozen=True):
     """What one `validate_conformance` call checked, and every failure it found, up to the cap.
 
     `checked` counts instances per document kind (`{"entity": 2120, "shard": 15, "index": 1,
-    "obtain": 1, "manifest": 1}` on the real build), so a report can say how much was actually
-    validated even when it found nothing wrong. `truncated_count` is how many more failures existed
-    past `max_failures` -- see the module docstring's bounded-list section for why this number is
-    kept rather than the failures themselves being dropped silently.
+    "obtain": 1, "manifest": 1}` on the real build, before an atlas exists to check), so a report
+    can say how much was actually validated even when it found nothing wrong. `"atlas"` only
+    appears in `checked` when `GateDocuments.atlas` was not `None` -- a build with no sprite atlas
+    checked zero atlas documents, and this dict says so by omitting the key entirely rather than
+    reporting a misleading `0`. `truncated_count` is how many more failures existed past
+    `max_failures` -- see the module docstring's bounded-list section for why this number is kept
+    rather than the failures themselves being dropped silently.
     """
 
     checked: Mapping[str, int]
@@ -186,4 +201,10 @@ def validate_conformance(
         "obtain": 1,
         "manifest": 1,
     }
+    # `atlas` is the one document kind that may genuinely be absent -- a `None` `GateDocuments.
+    # atlas` means the build carries no sprite atlas at all, and that is not a failure to record.
+    # See `ConformanceReport`'s own docstring for why the key is omitted rather than set to `0`.
+    if documents.atlas is not None:
+        record("atlas", None, validators["atlas"].iter_errors(documents.atlas))
+        checked["atlas"] = 1
     return ConformanceReport(checked=checked, failures=tuple(failures), truncated_count=truncated)

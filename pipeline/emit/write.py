@@ -100,6 +100,33 @@ in behaviour at all. `pipeline.validate`'s own package docstring owns the reason
 gate checks and why; this module does not repeat it, because this module still does not know what a
 threshold is -- it only knows how to call a callable it was handed, exactly as `pipeline.emit`'s own
 package docstring now states.
+
+## The sprite atlas: one more optional argument, exactly as `pipeline.emit`'s own package docstring
+## said it would be
+
+`emit_build` takes one more keyword this task adds: `atlas: Atlas | None`, defaulting to `None`. A
+`None` atlas changes nothing at all -- no `sprites.png`, no `sprites.json`, and every caller and
+every test that predates this task sees identical behaviour, the same contract the `gate` keyword
+above already set a precedent for. When a caller passes a real `pipeline.emit.atlas.Atlas`, two more
+files join the `files` mapping Rule 4 already builds in full before any of them reaches disk:
+`sprites.png`, written from `atlas.png` exactly as it arrives, and `sprites.json`, the encoded
+`atlas.coordinates` payload.
+
+`sprites.png` is written raw, never through `_encode`. `_encode` exists for Rule 1's JSON
+determinism -- a UTF-8 text payload with exactly one trailing line feed -- and a PNG is binary: it
+already carries its own fixed 8-byte signature and its own internal length-prefixed chunks, so there
+is no trailing newline to add and no line-ending translation to protect against by writing it as
+`bytes` in the first place, which `Atlas.png` already is. `sprites.json` gets the ordinary
+treatment: `atlas.coordinates.model_dump(mode="json", by_alias=True, exclude_none=True)`, encoded by
+`_encode`, and included in the `gate` call the same way every other document already is.
+
+Rule 2's stale-file sweep stays scoped to `data/dist/entities/`, unchanged by this task. An
+`atlas=None` build therefore leaves any `sprites.png`/`sprites.json` an earlier, atlas-writing build
+left on disk completely alone -- it neither rewrites them nor deletes them, because this module has
+no way to tell "this build has no atlas" apart from "this build does not know its dist directory
+already holds sprite files" without reading state this function otherwise never reads. The same
+answer applies here as to the gate: nothing in this module sweeps a file it did not itself decide to
+write.
 """
 
 import gzip
@@ -109,6 +136,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from pipeline.emit import EmitError
+from pipeline.emit.atlas import ATLAS_IMAGE_NAME, Atlas
 from pipeline.emit.manifest import BuildInfo, build_manifest
 from pipeline.emit.obtain import build_obtain_graph
 from pipeline.emit.search_index import build_search_index
@@ -160,6 +188,14 @@ _INDEX_FILE_NAME = "index.json"
 _MANIFEST_FILE_NAME = "manifest.json"
 _OBTAIN_FILE_NAME = "obtain.json"
 
+# The two sprite-atlas file names. `_SPRITES_IMAGE_NAME` is bound to `pipeline.emit.atlas.
+# ATLAS_IMAGE_NAME` rather than repeating the string `"sprites.png"` a second time -- one place
+# owns that fact, per `pipeline.emit.shard`'s own D2 section on why a shard's name is computed
+# once and never recomputed by a caller. `_SPRITES_MAP_NAME` has no equivalent constant to import:
+# no other module names the coordinate map's own file, the same way none names `index.json`'s.
+_SPRITES_IMAGE_NAME = ATLAS_IMAGE_NAME
+_SPRITES_MAP_NAME = "sprites.json"
+
 
 class ShardSummary(BaseModel, frozen=True):
     """How one shard came out of one build, so a report reads without reopening the file."""
@@ -171,7 +207,14 @@ class ShardSummary(BaseModel, frozen=True):
 
 
 class EmitReport(BaseModel, frozen=True):
-    """What one `emit_build` call wrote, and what it swept away."""
+    """What one `emit_build` call wrote, and what it swept away.
+
+    The `atlas_*` fields default to `None`/`0` so a build with no atlas -- every test and every
+    build this repository has run before this task -- constructs a report exactly as it always
+    has. `atlas_frame_count` is `Atlas.frame_count`: the number of distinct `File:` frames packed,
+    which is usually smaller than the number of icon keys the atlas resolves, because more than one
+    entity's icon can point at the same packed frame.
+    """
 
     entity_count: int
     shards: tuple[ShardSummary, ...]
@@ -180,6 +223,10 @@ class EmitReport(BaseModel, frozen=True):
     obtain_producer_count: int
     obtain_bytes: int
     obtain_gzipped_bytes: int
+    atlas_frame_count: int = 0
+    atlas_png_bytes: int = 0
+    atlas_map_bytes: int = 0
+    atlas_map_gzipped_bytes: int = 0
     removed: tuple[str, ...] = ()
 
 
@@ -220,9 +267,10 @@ def emit_build(
     shard_size: int = DEFAULT_SHARD_SIZE,
     producer_index: ProducerIndex = _EMPTY_PRODUCER_INDEX,
     gate: GateCallback | None = None,
+    atlas: Atlas | None = None,
 ) -> EmitReport:
-    """Write `result`, `build`, and `producer_index` into `dist`, and return a report of what
-    was written.
+    """Write `result`, `build`, `producer_index`, and `atlas` into `dist`, and return a report of
+    what was written.
 
     `producer_index` is `pipeline.obtain.producer.ProducerIndex.merge`'s
     output over every `pipeline.obtain` adapter a build ran; it defaults to
@@ -238,6 +286,11 @@ def emit_build(
     them reaches disk -- see the module docstring's validation-gate section.
     A gate that raises leaves `dist` exactly as it was; this function adds no
     guard of its own around whatever the gate raises.
+
+    `atlas` defaults to `None`, in which case this function writes no `sprites.png` and no
+    `sprites.json` and behaves exactly as it always has. When a caller passes a
+    `pipeline.emit.atlas.Atlas`, both files join the write loop below -- see the module
+    docstring's sprite-atlas section for exactly what each one is written from.
 
     Raises `EmitError` for a `result` with no entities, a `dist` that exists
     and is not a directory, or a `shard_size` below 1. All three raise before
@@ -268,6 +321,11 @@ def emit_build(
     index_payload = search_index.model_dump(mode="json", by_alias=True, exclude_none=True)
     manifest_payload = manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
     obtain_payload = obtain_graph.model_dump(mode="json", by_alias=True, exclude_none=True)
+    atlas_map_payload = (
+        atlas.coordinates.model_dump(mode="json", by_alias=True, exclude_none=True)
+        if atlas is not None
+        else None
+    )
 
     if gate is not None:
         gate(
@@ -276,6 +334,7 @@ def emit_build(
                 index=index_payload,
                 manifest=manifest_payload,
                 obtain=obtain_payload,
+                atlas=atlas_map_payload,
             )
         )
 
@@ -295,6 +354,15 @@ def emit_build(
 
     obtain_bytes = _encode(obtain_payload)
     files[dist / _OBTAIN_FILE_NAME] = obtain_bytes
+
+    # The sprite atlas: two more files, only when a caller passed one. `atlas.png` is already
+    # `bytes` and is never run through `_encode` -- see the module docstring's sprite-atlas
+    # section for why a PNG has no trailing newline to add and no JSON determinism rule to keep.
+    atlas_map_bytes = b""
+    if atlas is not None and atlas_map_payload is not None:
+        files[dist / _SPRITES_IMAGE_NAME] = atlas.png
+        atlas_map_bytes = _encode(atlas_map_payload)
+        files[dist / _SPRITES_MAP_NAME] = atlas_map_bytes
 
     # Rule 2: every `*.json` under `entities/` that this build did not just
     # decide to write is stale. Computed before any write, so `removed` in the
@@ -320,6 +388,13 @@ def emit_build(
     for path in stale:
         path.unlink()
 
+    # `mtime=0` for the identical reason `index_gzipped_bytes` below already uses it: a
+    # deterministic figure over a build that writes no atlas at all is `0`, not the gzip header
+    # of an empty payload.
+    atlas_map_gzipped_bytes = (
+        len(gzip.compress(atlas_map_bytes, mtime=0)) if atlas_map_bytes else 0
+    )
+
     return EmitReport(
         entity_count=len(result.entities),
         shards=tuple(
@@ -340,6 +415,10 @@ def emit_build(
         obtain_producer_count=sum(len(group) for group in obtain_graph.producers.values()),
         obtain_bytes=len(obtain_bytes),
         obtain_gzipped_bytes=len(gzip.compress(obtain_bytes, mtime=0)),
+        atlas_frame_count=atlas.frame_count if atlas is not None else 0,
+        atlas_png_bytes=len(atlas.png) if atlas is not None else 0,
+        atlas_map_bytes=len(atlas_map_bytes),
+        atlas_map_gzipped_bytes=atlas_map_gzipped_bytes,
         removed=tuple(path.relative_to(dist).as_posix() for path in stale),
     )
 

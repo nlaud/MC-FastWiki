@@ -31,6 +31,13 @@ _INDEX = {
     "entities": [{"id": "minecraft:apple", "n": "Apple", "k": "item", "a": [], "s": "item-0"}],
 }
 _OBTAIN: dict[str, object] = {"schemaVersion": 1, "producers": {}}
+_ATLAS: dict[str, object] = {
+    "schemaVersion": 1,
+    "image": "sprites.png",
+    "width": 4,
+    "height": 2,
+    "sprites": {"InvSprite:Apple": {"x": 0, "y": 0, "w": 4, "h": 2}},
+}
 
 
 def _apple(**overrides: object) -> dict[str, object]:
@@ -88,6 +95,48 @@ def test_a_well_formed_minimal_build_passes() -> None:
     report = validate_conformance(documents)
     assert report.failures == ()
     assert report.checked == {"entity": 1, "shard": 1, "index": 1, "obtain": 1, "manifest": 1}
+
+
+def test_a_none_atlas_is_not_checked_and_is_not_a_failure() -> None:
+    """`GateDocuments.atlas` defaults to `None`, matching `emit_build`'s own default -- a build
+    with no sprite atlas must not fail conformance, and `checked` must not claim to have
+    validated an atlas document it never saw.
+    """
+    documents = GateDocuments(
+        shards={"item-0": _shard(_apple())}, index=_INDEX, obtain=_OBTAIN, manifest=_MANIFEST
+    )
+    report = validate_conformance(documents)
+    assert report.failures == ()
+    assert "atlas" not in report.checked
+
+
+def test_a_well_formed_atlas_is_validated_and_counted() -> None:
+    documents = GateDocuments(
+        shards={"item-0": _shard(_apple())},
+        index=_INDEX,
+        obtain=_OBTAIN,
+        manifest=_MANIFEST,
+        atlas=_ATLAS,
+    )
+    report = validate_conformance(documents)
+    assert report.failures == ()
+    assert report.checked["atlas"] == 1
+
+
+def test_a_malformed_atlas_fails_naming_the_atlas_document() -> None:
+    broken_atlas = dict(_ATLAS)
+    del broken_atlas["width"]
+    documents = GateDocuments(
+        shards={"item-0": _shard(_apple())},
+        index=_INDEX,
+        obtain=_OBTAIN,
+        manifest=_MANIFEST,
+        atlas=broken_atlas,
+    )
+    report = validate_conformance(documents)
+    atlas_failures = [failure for failure in report.failures if failure.document == "atlas"]
+    assert atlas_failures
+    assert any("width" in failure.message for failure in atlas_failures)
 
 
 def test_an_entity_with_sections_stripped_fails_naming_the_id_and_a_pointer() -> None:

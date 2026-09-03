@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mc-fastwiki.local/schema/atlas.schema.json",
+  "title": "Atlas",
+  "description": "data/dist/sprites.json, the coordinate map into data/dist/sprites.png, the single packed image every entity icon is cropped from. `pipeline.emit.atlas` builds this file from a `pipeline.enrich.sprite.SpriteIndex` lookup over a build's entities -- see that module's own docstring for the shelf-packing algorithm and for why it is deterministic. `sprites` is keyed by the icon key `entity.schema.json`'s own `icon` field already carries (\"InvSprite:Raw Iron\"), not by the wiki `File:` title the pixels came from, so the web app crops a sprite straight out of `image` with no second lookup.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "image", "width", "height", "sprites"],
+  "properties": {
+    "schemaVersion": {
+      "description": "The version of this contract. The web app refuses data that carries another number. Raise it whenever a schema change breaks an older reader.",
+      "type": "integer",
+      "const": 1
+    },
+    "image": {
+      "description": "The file name of the packed atlas image under data/dist/, sibling to this file. Always \"sprites.png\" today.",
+      "type": "string",
+      "minLength": 1
+    },
+    "width": {
+      "description": "The atlas image's width in pixels.",
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "height": {
+      "description": "The atlas image's height in pixels. The exact sum of every packed shelf row's height -- never padded and never rounded to a power of two, because the atlas is read as a plain image and never bound as a GPU texture.",
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "sprites": {
+      "description": "Every icon key this build resolved, mapped to its rectangle within the atlas image. Several icon keys may share one rectangle, when more than one entity's icon names the same wiki File: page.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/iconKey"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/spriteFrame"
+      }
+    }
+  },
+  "$defs": {
+    "iconKey": {
+      "description": "A sprite key: the sprite family the wiki's spritefile bucket uses (InvSprite, EntitySprite, ...), a colon, and the sprite id that bucket row names. Mirrors the shape entity.schema.json's icon field already carries. The id half is not a namespaced identifier the way an entityId is: pipeline.enrich.sprite reads it verbatim from the wiki's own id column, which for the InvSprite family is a display name (\"Raw Iron\"), not a lowercase, hyphenated slug -- so this pattern only fixes the family half's shape and requires the id half to be non-empty.",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*:.+$",
+      "examples": ["InvSprite:Raw Iron", "EffectSprite:absorption"]
+    },
+    "spriteFrame": {
+      "title": "SpriteFrame",
+      "description": "One sprite's rectangle within the atlas image, in pixels, top-left origin.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": {
+          "description": "The left edge of the sprite's rectangle, in pixels from the atlas image's left edge.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "description": "The top edge of the sprite's rectangle, in pixels from the atlas image's top edge.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "w": {
+          "description": "The width of the sprite's rectangle, in pixels.",
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "h": {
+          "description": "The height of the sprite's rectangle, in pixels.",
+          "type": "integer",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

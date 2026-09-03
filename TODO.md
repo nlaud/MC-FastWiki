@@ -15,11 +15,24 @@ reasoning survives even after the choice is made.
       wired source. Mining a block for an item ships as a `block_drop` producer, but *where* a
       block generates (Y levels, biomes) is `GenerationInfo`'s section, not an obtain step, and
       worldgen is not among the four mcmeta data groups the pipeline reads. Phase 6c owns it.
-- [ ] Pack all sprites into a single atlas image plus a JSON coordinate map, and wire that atlas
-      into `pipeline.emit.emit_build` (keeps the site under Cloudflare's 20,000-file cap and avoids
-      ~4,900 requests). The emit stage ships without it: it writes no `sprites.png` and no
-      coordinate map. `Entity.icon` already carries a stable sprite key, so the atlas is one more
-      argument to `emit_build`, not a rewrite of it.
+- [ ] Sprite-coverage regression check in `pipeline.validate.regression`: fail a build whose atlas
+      covers meaningfully fewer icon keys than the previous one.
+      Deferred, because the committed `data/dist` baseline predates the atlas and carries nothing
+      yet for a coverage comparison to run against.
+- [ ] Decide what to do about the three oversized sprites the wiki serves as full images rather
+      than as cropped icons.
+      Measured on the 26.2 build: `InvSprite:Sculk` and `InvSprite:Sculk Shrieker` are 300x300 and
+      `InvSprite:Zombie Horse Spawn Egg` is 160x160, against 16x16 for 928 frames and 32x32 for
+      924 more.
+      Those three frames take roughly 760 of the atlas's 2,812 pixel rows, so 3 icons out of 1,901
+      cost about a quarter of the image.
+      The packer is right to record the real size, because the file is what the `spritefile` bucket
+      named and Decision 3 forbids guessing a filename.
+      The open question is whether the fix belongs in the packer as a maximum frame size that
+      downscales, or in `/data/curated` as a per-sprite override, and that choice needs the Phase 6
+      renderer to exist first so the cost of a wrong icon size is visible.
+      Seven more frames are 1x1: `Cave Air`, `Void Air`, and the five marker and display entities.
+      Those are correct and need nothing, because the thing they draw really is invisible.
 
 ## Phase 4 — Search
 

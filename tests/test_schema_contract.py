@@ -131,7 +131,7 @@ def _pascal_case(name: str) -> str:
 
 def test_the_directory_holds_schema_files() -> None:
     """An empty directory would make every test below pass for the wrong reason."""
-    assert SCHEMA_NAMES == ["entity", "index", "manifest", "obtain", "shard"]
+    assert SCHEMA_NAMES == ["atlas", "entity", "index", "manifest", "obtain", "shard"]
 
 
 @pytest.mark.parametrize("name", SCHEMA_NAMES)
