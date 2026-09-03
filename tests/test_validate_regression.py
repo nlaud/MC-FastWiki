@@ -24,6 +24,7 @@ def _snapshot(
     optional_field_coverage: dict[str, int] | None = None,
     section_type_counts: dict[str, int] | None = None,
     obtain_producer_count: int = 0,
+    atlas_icon_count: int = 0,
 ) -> BuildSnapshot:
     required = required_field_coverage or {
         "id": total,
@@ -40,6 +41,7 @@ def _snapshot(
         optional_field_coverage=optional_field_coverage or {},
         section_type_counts=section_type_counts or {},
         obtain_producer_count=obtain_producer_count,
+        atlas_icon_count=atlas_icon_count,
     )
 
 
@@ -168,6 +170,53 @@ def test_obtain_graph_dropping_more_than_five_percent_fails() -> None:
     check = next(c for c in report.checks if c.name == "obtain graph producer count")
     assert check.passed is False
     assert check in report.blocking_failures
+
+
+def test_atlas_icon_coverage_dropping_more_than_five_percent_fails_naming_the_floor() -> None:
+    baseline = _snapshot(total=10, atlas_icon_count=1901)
+    new = _snapshot(total=10, atlas_icon_count=1000)
+    report = check_regression(new=new, baseline=baseline, allow_regression=False)
+
+    check = next(c for c in report.checks if c.name == "sprite atlas icon coverage")
+    assert check.baseline == 1901
+    assert check.new == 1000
+    assert check.passed is False
+    assert check in report.blocking_failures
+    assert "5%" in check.rule
+
+
+def test_atlas_icon_coverage_dropping_exactly_five_percent_passes() -> None:
+    baseline = _snapshot(total=10, atlas_icon_count=2000)
+    new = _snapshot(total=10, atlas_icon_count=1900)  # exactly a 5% drop
+    report = check_regression(new=new, baseline=baseline, allow_regression=False)
+
+    check = next(c for c in report.checks if c.name == "sprite atlas icon coverage")
+    assert check.passed is True
+    assert report.blocking_failures == ()
+
+
+def test_atlas_icon_coverage_with_a_pre_atlas_baseline_of_zero_never_fails() -> None:
+    """A `data/dist` predating the atlas reads back `atlas_icon_count=0`, and `_dropped_more_than_
+    percent` already answers `False` for a non-positive baseline -- see the module docstring's own
+    section on this. A build introducing the atlas for the first time must not be refused over it.
+    """
+    baseline = _snapshot(total=10, atlas_icon_count=0)
+    new = _snapshot(total=10, atlas_icon_count=1901)
+    report = check_regression(new=new, baseline=baseline, allow_regression=False)
+
+    check = next(c for c in report.checks if c.name == "sprite atlas icon coverage")
+    assert check.passed is True
+
+
+def test_atlas_icon_coverage_allow_regression_downgrades_a_failure_but_still_records_it() -> None:
+    baseline = _snapshot(total=10, atlas_icon_count=1901)
+    new = _snapshot(total=10, atlas_icon_count=1000)
+    report = check_regression(new=new, baseline=baseline, allow_regression=True)
+
+    check = next(c for c in report.checks if c.name == "sprite atlas icon coverage")
+    assert check.passed is False
+    assert check.downgraded is True
+    assert report.blocking_failures == ()
 
 
 def test_growth_never_fails_anything() -> None:

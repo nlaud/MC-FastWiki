@@ -22,10 +22,15 @@ repository has ever run.
 **Regression** (`pipeline.validate.regression`) asks a question conformance cannot: is this build
 suspiciously *smaller* than the one before it, in a way that is shaped perfectly correctly but
 still wrong -- a wiki outage that quietly serves empty tables, a scrape that silently drops a whole
-kind. It needs a memory conformance does not: the previous build's counts, which `pipeline.validate.
+kind, or a sprite fetch that quietly stops resolving icons for entities that used to have one. It
+needs a memory conformance does not: the previous build's counts, which `pipeline.validate.
 snapshot.BuildSnapshot.from_dist` reads from the committed `data/dist` itself, because that
 directory *is* the previous build, per this task's own resolution of "the baseline for 'across
-versions'" that `TODO.md`'s Phase 3 bullet leaves unspecified.
+versions'" that `TODO.md`'s Phase 3 bullet leaves unspecified. Its eight checks -- total entity
+count, per-kind count and disappearance, required- and optional-field coverage, section-type
+disappearance, obtain graph producer count, and sprite atlas icon coverage -- are each a plain
+integer or percentage comparison against that baseline; `pipeline.validate.regression`'s own module
+docstring is where each one's threshold and reasoning actually live.
 
 Neither half can stand in for the other. A build can be perfectly shaped and still have silently
 lost 90% of its mobs -- conformance has nothing to say about that, because every entity it does
@@ -159,11 +164,13 @@ class ValidationGate:
         merge_result: MergeResult,
         producer_index: ProducerIndex,
         allow_regression: bool,
+        atlas_icon_count: int = 0,
     ) -> None:
         self._baseline = baseline
         self._merge_result = merge_result
         self._producer_index = producer_index
         self._allow_regression = allow_regression
+        self._atlas_icon_count = atlas_icon_count
         self.report: ValidationReport | None = None
 
     def __call__(self, documents: GateDocuments) -> None:
@@ -177,7 +184,9 @@ class ValidationGate:
         already knows how to summarise directly, with no JSON round trip in between.
         """
         conformance = validate_conformance(documents)
-        new_snapshot = BuildSnapshot.from_merge_result(self._merge_result, self._producer_index)
+        new_snapshot = BuildSnapshot.from_merge_result(
+            self._merge_result, self._producer_index, atlas_icon_count=self._atlas_icon_count
+        )
         regression = check_regression(
             new=new_snapshot, baseline=self._baseline, allow_regression=self._allow_regression
         )
@@ -224,12 +233,17 @@ def validate_build(
     merge_result: MergeResult,
     producer_index: ProducerIndex,
     allow_regression: bool,
+    atlas_icon_count: int = 0,
 ) -> ValidationGate:
     """Return a `ValidationGate` bound to `merge_result`, ready to pass as `emit_build`'s `gate=`.
 
     Reads `dist`'s baseline snapshot right now, before this function's caller ever calls
     `emit_build` -- see the module docstring's read-write hazard section for why that ordering is
-    this function's job to get right rather than the gate's own `__call__`'s.
+    this function's job to get right rather than the gate's own `__call__`'s. `atlas_icon_count`
+    is the new side of the sprite atlas coverage check -- `pipeline.cli.build.run_build` passes
+    `len(atlas.coordinates.sprites)`, the same `Atlas` stage 7b already packed before this function
+    is ever called, and it defaults to zero for a caller (most of this package's own tests) with no
+    atlas to report on at all.
     """
     baseline = BuildSnapshot.from_dist(dist)
     return ValidationGate(
@@ -237,4 +251,5 @@ def validate_build(
         merge_result=merge_result,
         producer_index=producer_index,
         allow_regression=allow_regression,
+        atlas_icon_count=atlas_icon_count,
     )

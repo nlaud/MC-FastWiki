@@ -694,6 +694,7 @@ def run_build(
         merge_result=result,
         producer_index=producer_index,
         allow_regression=options.allow_regression,
+        atlas_icon_count=len(atlas.coordinates.sprites),
     )
 
     # --- 8. emit ----------------------------------------------------------------------
