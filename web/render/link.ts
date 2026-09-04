@@ -23,6 +23,8 @@ function formatNote(rawNote: string): { inlineText: string; title?: string } {
   const cleaned = rawNote
     .replace(/<[^>]*>/g, "")
     .replace(/\[\[(?:[^|\]]*\|)?([^\]]+)\]\]/g, "$1")
+    // The wiki's emphasis markup, which shows as literal quotes without this.
+    .replace(/'{2,5}/g, "")
     .replace(/\s+/g, " ")
     .trim();
 

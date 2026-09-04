@@ -14,8 +14,15 @@ function formatRatioPercentage(ratio: Ratio): string {
   return `${rounded.toString()}%`;
 }
 
+/**
+ * Strips the wikitext a drop note carries down to the words it says.
+ *
+ * `[[Fire Aspect]]` and `[[wolf|wolves]]` become their labels. The quote runs
+ * are the wiki's emphasis markup, and a note such as "Only when ''not'' on fire"
+ * shows the quotes literally without this.
+ */
 function cleanWikitext(text: string): string {
-  return text.replace(/\[\[(?:[^|\]]*\|)?([^\]]+)\]\]/g, "$1");
+  return text.replace(/\[\[(?:[^|\]]*\|)?([^\]]+)\]\]/g, "$1").replace(/'{2,5}/g, "");
 }
 
 /**

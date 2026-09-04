@@ -201,6 +201,42 @@ describe("Section renderers with real committed build data", () => {
       const ironCells = ironRow.querySelectorAll(".looting-cell");
       expect(ironCells[0]?.textContent).toBe("0.8%");
     });
+    it("renders every condition on a drop, with the wikitext stripped", () => {
+      const dropSection = requireItem(
+        zombie.sections.find((s): s is DropTable => s.type === "DropTable"),
+        "DropTable",
+      );
+
+      const el = requireItem(renderDropTable(dropSection, ctx), "DropTable element");
+      const rows = el.querySelectorAll("tbody tr");
+
+      // A note the wiki splits by edition. The pipeline keeps the Java side, so
+      // the Bedrock wording ("spawned as a zombie horseman") must not appear.
+      const mushroomRow = requireItem(
+        Array.from(rows).find((r) => r.textContent.includes("Red Mushroom")),
+        "Red Mushroom row",
+      );
+      const mushroomNote = requireItem(
+        mushroomRow.querySelector(".drop-note"),
+        "Red Mushroom note",
+      );
+      expect(mushroomNote.textContent).toBe("Only if riding a zombie horse.");
+      expect(el.textContent).not.toContain("zombie horseman");
+
+      // A drop can carry more than one condition, and both are shown.
+      const potatoRow = requireItem(
+        Array.from(rows).find((r) => r.textContent.includes("Potato")),
+        "Potato row",
+      );
+      const potatoNotes = Array.from(potatoRow.querySelectorAll(".drop-note")).map(
+        (n) => n.textContent,
+      );
+      expect(potatoNotes).toHaveLength(2);
+
+      // The wiki's emphasis markup is quote runs, and it must not reach the page.
+      expect(el.textContent).not.toContain("''");
+      expect(potatoNotes[1]).toContain("not on fire");
+    });
   });
 
   describe("SpawnInfo (Zombie)", () => {

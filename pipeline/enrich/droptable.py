@@ -11,8 +11,10 @@ distribution at looting 0 is 1/3 for each of 0, 1, and 2, and the Bedrock one is
 not. Of the 233 rows, 166 have a `java` key and 67 do not: a spider's spider eye,
 a wither skeleton's coal, a pufferfish's bone. Those 67 are Bedrock-only drops,
 and CLAUDE.md is explicit that one of them reaching the screen is a correctness
-bug, not a cosmetic one. So `bedrock` is never read here -- not into an unused
-field, not into a comparison. The key is skipped and the row is reported.
+bug, not a cosmetic one. So no Bedrock value is ever read into a field or into a
+comparison. The key is skipped and the row is reported. `_parse_notes` tests for
+the presence of the `bedrock` key, and only to tell a Bedrock-only note apart
+from a note whose shape this module does not know.
 
 **The numbers are exact fractions, and they are kept exact.** The wiki writes
 every probability as `{"numerator": 2, "denominator": 6}` rather than as a
@@ -36,6 +38,10 @@ player or a tamed wolf lands the kill, and that is in `notes`, keyed by a
 number, with the text as wikitext. Dropping the notes would leave a drop table
 that says a zombie drops iron with no conditions attached, which reads as a
 better drop rate than the game gives.
+
+A note carries either flat `content` or a `java`/`bedrock` split, and both
+shapes are common: 283 notes are flat and 173 are split across 55 drops on the
+26.2 build. `_parse_notes` covers both, and takes the Java side of a split one.
 """
 
 from collections.abc import Mapping, Sequence
@@ -59,6 +65,7 @@ from pipeline.fetch.bucket import fetch_bucket_rows
 from pipeline.fetch.cache import ContentCache
 
 __all__ = [
+    "BEDROCK_KEY",
     "BUCKET",
     "COLUMNS",
     "JAVA_KEY",
@@ -79,9 +86,11 @@ BUCKET = "droptable"
 # grouping key and the attribution URL.
 COLUMNS = ("page_name", "item", "json")
 
-# The key of the edition this project keeps. The sibling `bedrock` key is never
-# read; see the module docstring.
+# The key of the edition this project keeps. Its `bedrock` sibling is never
+# parsed into a value; see the module docstring. The key itself is read in one
+# place, to tell a Bedrock-only note apart from a note whose shape is unknown.
 JAVA_KEY = "java"
+BEDROCK_KEY = "bedrock"
 
 # Looting III is the highest level of the enchantment, so the wiki's per-level
 # keys run 0 to 3. A key outside that range means the wiki changed shape, so it
@@ -241,7 +250,7 @@ def _parse_level(level: str, payload: Any, *, source: str) -> LootingDrop:
 
 
 def _parse_notes(payload: Any, *, source: str) -> tuple[DropNote, ...]:
-    """Return the conditions on a drop, in the wiki's own numbered order.
+    """Return the Java conditions on a drop, in the wiki's own numbered order.
 
     Three things mean "no condition", and the third is the one that catches a
     reader out: the key is absent, the value is an empty object, or the value is
@@ -253,6 +262,23 @@ def _parse_notes(payload: Any, *, source: str) -> tuple[DropNote, ...]:
     The keys are numbers written as strings and they decide the order the wiki
     shows the notes in, so they sort numerically rather than as text -- `10`
     after `9`, which string order would get backwards.
+
+    **A note comes in one of two shapes, and reading only the first loses a
+    third of them.** A condition that both editions share is written flat, as
+    `{"name": ..., "content": ...}`. A condition the editions state differently
+    is split by edition instead, as `{"java": {...}, "bedrock": {...}}`, and
+    then there is no `content` key at the top level at all. Measured on the
+    26.2 build: 283 notes are flat and 173 are split across 55 drops, so the
+    split shape is not a rare case. A zombie's red mushroom carries only a
+    split note, and reading only the flat shape left that drop looking
+    unconditional.
+
+    Java wins and Bedrock is dropped, per non-negotiable 1 of CLAUDE.md. The
+    two sides are not paraphrases of each other: the Java side of that same red
+    mushroom note reads "Only if riding a zombie horse" where Bedrock reads
+    "Only if spawned as a zombie horseman". A split note with no `java` side is
+    a Bedrock-only condition, so Java carries no note there and it is skipped;
+    8 notes are in that position.
     """
     if payload is None:
         return ()
@@ -274,6 +300,23 @@ def _parse_notes(payload: Any, *, source: str) -> tuple[DropNote, ...]:
         note = payload[key]
         if not isinstance(note, Mapping):
             raise EnrichError(f"{source} answered note {key!r} as {note!r}, not an object.")
+
+        if "content" not in note:
+            # The split-by-edition shape. Take Java and drop Bedrock.
+            if JAVA_KEY not in note:
+                if BEDROCK_KEY in note:
+                    continue
+                raise EnrichError(
+                    f"{source} answered note {key!r} with neither {'content'!r} nor "
+                    f"an edition key: {dict(note)!r}"
+                )
+            note = note[JAVA_KEY]
+            if not isinstance(note, Mapping):
+                raise EnrichError(
+                    f"{source} answered the {JAVA_KEY!r} side of note {key!r} as "
+                    f"{note!r}, not an object."
+                )
+
         content = optional_text(note, "content")
         if content is None:
             continue
