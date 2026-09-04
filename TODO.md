@@ -66,10 +66,44 @@ reasoning survives even after the choice is made.
 - [ ] **Effect** — every source of the effect, and what it actually does.
       Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
 - [ ] **Advancement** — the parent link, the in-game description and the XP reward ship. What is
-      left is the requirements text, which waits on the sub-item below.
+      left is the requirements text and the icon, in the two sub-items below.
   - [ ] Strip the wikitext and HTML markup out of `AdvancementInfo.description` in
         `pipeline/enrich/advancement.py`, so a renderer can show the requirements text.
         103 of 126 descriptions carry markup on the 26.2 build.
+  - [ ] **Give an advancement an icon.** All 126 advancements carry `icon: None`, so every
+        advancement window and every advancement suggestion row draws an empty slot. They are the
+        only kind with no icon at all: 43 enchantments and 48 items are also missing one, but
+        those are gaps within a kind rather than a whole kind.
+
+        The data is already fetched and already parsed. `WikiAdvancement.icon` in
+        `pipeline/enrich/advancement.py` reads the bucket's `image` field, and all 148 rows carry
+        one. It names the item the advancement shows in the game, as a display name:
+        `Stone Age` names `Wooden Pickaxe`. Nothing then carries that value into `Entity.icon`,
+        so the merge is the missing half, not the fetch.
+
+        **Resolve the name, do not construct the key.** Building `InvSprite:<display name>` looks
+        like it works and mostly does — 104 of the 114 distinct names hit an atlas key that way —
+        which is what makes it a trap. The 10 that do not fall into three groups:
+
+        - 4 carry a file extension the bucket did not strip: `Enchanted Book.gif`,
+          `End Crystal.gif`, `Nether Star.gif`, `Sculk Sensor.gif`. Each resolves once the
+          `.gif` is dropped.
+        - 3 live in a different sprite family under a slug-cased id, so no `InvSprite:` key
+          exists for them at all: `Wheat` is `ItemSprite:wheat`, `Wind Charge` is
+          `ItemSprite:wind-charge`, and `Eye of Ender` is `EntitySprite:eye-of-ender`.
+        - 3 have no atlas frame under any family: `Raw Cod`, `Ominous Banner`,
+          `Uncraftable Potion`.
+
+        Decision 3 already settled this shape of problem: resolve a sprite through the bucket
+        join, never by spelling a filename. Route the `image` name through the same
+        `resource_location` join the rest of the pipeline uses.
+
+        Two things to check while doing it. `pipeline/emit/atlas.py` packs the frames that
+        entities ask for, so an advancement icon naming an item no entity requested is not in
+        the atlas even after the name resolves, and the request set has to grow. And
+        `minecraft:ender_eye`, the item, carries `icon: None` while `minecraft:eye_of_ender`,
+        the entity, holds `EntitySprite:eye-of-ender` — a join gap worth fixing in the same pass,
+        since it is the reason that one name has nowhere to land.
 - [ ] Render crafting recipes **collapsed** — "Wooden Stairs — any plank type" rather than
       thirteen near-identical rows (see Decision 9)
 - [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
