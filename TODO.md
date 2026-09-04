@@ -27,20 +27,6 @@ reasoning survives even after the choice is made.
       Seven more frames are 1x1: `Cave Air`, `Void Air`, and the five marker and display entities.
       Those are correct and need nothing, because the thing they draw really is invisible.
 
-## Phase 5 — Shell UI
-
-- [ ] Blank canvas, search bar pinned to the bottom, layered above all windows
-- [ ] Autofocus the bar on any click anywhere on the page, and on any printable keypress
-- [ ] Suggestion list above the bar, first item selected by default
-- [ ] Up/Down to move selection, Enter to open, Esc to clear the query
-- [ ] Window manager, maximum 4 windows; **bar hides at 4** and returns when one closes
-- [ ] Grid layout: 1 full-screen, 2 side by side (left | right), 3 as a 2x2 with one empty cell,
-      4 as a full 2x2. Window positions must stay stable as the count grows — opening the fourth
-      window must not move the first three.
-- [ ] Per-window independent scroll, X button top-right, keyboard close shortcut
-- [ ] Window focus model — which window a link click or a new search targets when 4 are open
-- [ ] Full keyboard map documented in-app (a `?` overlay or similar)
-
 ## Phase 6 — Content renderers
 
 - [ ] **Mob** — HP and damage badges beside the name (damage only when hostile), spawn conditions,
