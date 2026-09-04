@@ -1016,3 +1016,128 @@ def test_no_potion_registry_key_means_no_potion_entities() -> None:
         entity_classification=ENTITY_CLASSIFICATION,
     )
     assert not any(entity.id.startswith("minecraft:potion/") for entity in result.entities)
+
+
+# --- Enchanted trade items --------------------------------------------------------
+
+
+def _merge_enchanted_trades() -> MergeResult:
+    """Merge a small fixture whose trades give enchanted items.
+
+    Built private rather than added to the shared fixture, because it needs its
+    own registry and its own join table and would otherwise change the counts
+    every other test in this file reads.
+    """
+    join_table = parse_resource_locations(
+        [
+            rl_row("Diamond Chestplate", "diamond_chestplate", "item"),
+            # Both of these are real registry items whose own display name
+            # starts with "Enchanted", which is what the exact-name-first rule
+            # has to protect.
+            rl_row("Enchanted Book", "enchanted_book", "item"),
+            rl_row("Book", "book", "item"),
+        ]
+    )
+
+    def trade(given: str) -> WikiTrade:
+        return WikiTrade(
+            profession="Armorer",
+            page="Armorer",
+            wiki_url="https://minecraft.wiki/w/Armorer",
+            level="Master",
+            wanted=(TradeItem(item="Emerald", quantity=WikiIntegerRange(minimum=8, maximum=8)),),
+            given=TradeItem(item=given, quantity=WikiIntegerRange(minimum=1, maximum=1)),
+            java_probability=None,
+            max_trades=None,
+            villager_xp=None,
+            price_multiplier=None,
+        )
+
+    return merge_entities(
+        # Every registry the merge precedence names has to be present, so the
+        # others are carried through empty rather than dropped.
+        registries={
+            key: (["diamond_chestplate", "enchanted_book", "book"] if key == "item" else [])
+            for key in REGISTRIES
+        },
+        advancement_ids=(),
+        join_table=join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TradeIndex.build(
+            [
+                trade("Diamond Chestplate"),
+                trade("Enchanted Diamond Chestplate"),
+                trade("Enchanted Book"),
+            ]
+        ),
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+    )
+
+
+def test_an_enchanted_item_trade_attaches_to_the_item_it_enchants() -> None:
+    """An enchantment is data on a stack, so `Enchanted Diamond Chestplate` is no registry entry.
+
+    Without the fallback the row resolved to nothing and fell out as unplaced,
+    which is why Diamond Chestplate, Diamond Pickaxe, Diamond Sword and Fishing
+    Rod each carried no trades at all on the 26.2 build.
+    """
+    result = _merge_enchanted_trades()
+
+    chestplate = result.by_id["minecraft:diamond_chestplate"]
+    table = next(section for section in chestplate.sections if section.type == "TradeTable")
+
+    given = next(
+        trade.given
+        for trade in table.trades
+        if trade.given.name == "Enchanted Diamond Chestplate"
+    )
+    # The name keeps the qualifier, because an Armorer sells an enchanted one
+    # and a page that called it a plain diamond chestplate would be wrong.
+    assert given.name == "Enchanted Diamond Chestplate"
+    assert given.ref is not None
+    assert given.ref.id == "minecraft:diamond_chestplate"
+
+    assert not any(row.table == "trade" for row in result.report.unplaced)
+
+
+def test_a_real_item_named_enchanted_resolves_to_itself_not_to_its_base() -> None:
+    """`Enchanted Book` is its own registry item, so stripping the prefix would be wrong.
+
+    This is the guard on the rule above: the exact name is tried first, and the
+    fallback only ever runs when it finds nothing.
+    """
+    result = _merge_enchanted_trades()
+
+    book = result.by_id["minecraft:enchanted_book"]
+    table = next(section for section in book.sections if section.type == "TradeTable")
+    assert table.trades[0].given.ref is not None
+    assert table.trades[0].given.ref.id == "minecraft:enchanted_book"
+
+    # The plain book must not have picked up the enchanted book's trade.
+    plain = result.by_id["minecraft:book"]
+    assert not any(section.type == "TradeTable" for section in plain.sections)
+
+
+def test_two_display_names_for_one_item_keep_both_trades() -> None:
+    """A Fletcher sells a `Bow` and an `Enchanted Bow`, and both are `minecraft:bow`.
+
+    `EntityDraft.add_section` is keyed by section type, so attaching a second
+    table for the same item replaces the first rather than extending it. The
+    merge groups by resolved target before it attaches, or the plain trade
+    disappears the moment the enchanted one resolves to the same place.
+    """
+    result = _merge_enchanted_trades()
+
+    chestplate = result.by_id["minecraft:diamond_chestplate"]
+    table = next(section for section in chestplate.sections if section.type == "TradeTable")
+
+    assert [trade.given.name for trade in table.trades] == [
+        "Diamond Chestplate",
+        "Enchanted Diamond Chestplate",
+    ]

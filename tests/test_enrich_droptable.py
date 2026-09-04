@@ -176,6 +176,73 @@ def test_notes_are_ordered_by_their_number_not_by_their_text() -> None:
     assert [note.name for note in index.drops[0].notes] == ["ninth", "tenth"]
 
 
+def test_a_note_split_by_edition_keeps_the_java_side() -> None:
+    """A third of the notes carry no top-level `content`, only a `java`/`bedrock` pair.
+
+    Reading the flat shape alone dropped 173 of the 456 notes on the 26.2 build,
+    which left 55 drops looking unconditional. The two sides say different
+    things, so which one is kept is a correctness question and not a preference:
+    a zombie's red mushroom is "riding a zombie horse" in Java and "spawned as a
+    zombie horseman" in Bedrock.
+    """
+    index = parse_drop_tables(
+        [
+            row(
+                "Zombie",
+                "Red Mushroom",
+                java={"0": level()},
+                notes={
+                    "1": {
+                        "java": {
+                            "name": "zombie_horseman",
+                            "content": "Only if riding a [[zombie horse]].",
+                        },
+                        "bedrock": {
+                            "name": "zombie_horseman",
+                            "content": "Only if spawned as a [[zombie horseman]].",
+                        },
+                    }
+                },
+            )
+        ]
+    )
+
+    note = index.drops[0].notes[0]
+    assert note.name == "zombie_horseman"
+    assert note.content == "Only if riding a [[zombie horse]]."
+
+
+def test_a_note_with_only_a_bedrock_side_is_no_condition_in_java() -> None:
+    """8 notes are Bedrock-only, so Java states no condition and none is rendered."""
+    index = parse_drop_tables(
+        [
+            row(
+                "Vindicator",
+                "Emerald",
+                java={"0": level()},
+                notes={"1": {"bedrock": {"name": "raid_only", "content": "Only during a raid."}}},
+            )
+        ]
+    )
+
+    assert index.drops[0].notes == ()
+
+
+def test_a_note_in_neither_shape_is_refused() -> None:
+    """The blob is machine-generated, so an unknown note shape means the template moved."""
+    with pytest.raises(EnrichError, match="neither"):
+        parse_drop_tables(
+            [
+                row(
+                    "Zombie",
+                    "Carrot",
+                    java={"0": level()},
+                    notes={"1": {"name": "orphan"}},
+                )
+            ]
+        )
+
+
 def test_an_empty_notes_list_means_no_condition() -> None:
     """PHP encodes an empty array as `[]`, so the field's JSON type changes with its contents."""
     index = parse_drop_tables([row("Zombie", "Rotten Flesh", java={"0": level()})])

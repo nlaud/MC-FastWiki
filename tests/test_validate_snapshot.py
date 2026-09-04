@@ -125,7 +125,12 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     assert snapshot.optional_field_coverage == {"wikiUrl": 2089, "blurb": 1963, "icon": 1901}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
-        "TradeTable": 157,
+        # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
+        # to `<item>`. 15 trade rows had resolved to nothing, and 12 of the
+        # items they name carried no trade table at all as a result -- Diamond
+        # Chestplate, Diamond Pickaxe, Diamond Sword and Fishing Rod among
+        # them. The other 3 land on items that already had a table.
+        "TradeTable": 169,
         "StatBlock": 93,
         "DropTable": 65,
         "SpawnInfo": 53,

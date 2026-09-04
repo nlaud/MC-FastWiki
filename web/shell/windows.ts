@@ -1,4 +1,6 @@
-import { createIconElement, renderFallback } from "../render/fallback.js";
+import type { RenderContext } from "../render/context.js";
+import { renderEntity } from "../render/entity.js";
+import { createIconElement } from "../render/icon.js";
 import { computeLayout } from "./layout.js";
 import type { WindowState } from "./state.js";
 
@@ -16,6 +18,7 @@ export interface WindowView {
 export function createWindowElement(
   windowState: WindowState,
   callbacks: WindowCallbacks,
+  ctx: RenderContext,
 ): WindowView {
   const el = document.createElement("article");
   el.className = "wiki-window";
@@ -60,7 +63,7 @@ export function createWindowElement(
     callbacks.onFocus(windowState.slot);
   });
 
-  renderFallback(body, windowState.entry);
+  renderEntity(body, windowState.entry, ctx);
 
   return {
     element: el,

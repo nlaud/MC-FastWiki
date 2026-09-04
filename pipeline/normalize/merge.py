@@ -387,6 +387,12 @@ _POTION_PAGE_TITLES: Mapping[str, str] = {
 _LONG_POTION_PREFIX = "long_"
 _STRONG_POTION_PREFIX = "strong_"
 
+# The wiki writes a trade for an enchanted item under a display name the
+# registry does not carry, because an enchantment is data on a stack rather
+# than a separate item. `_wiki_rows` strips this prefix, but only after the
+# full name has failed to resolve; see that function's own docstring.
+ENCHANTED_PREFIX = "Enchanted "
+
 
 def _potion_name(path: str) -> str:
     """Return the display name of the potion at `path`.
@@ -510,9 +516,33 @@ def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[Resourc
     one registry ID and, on some pages, one display name, and reading both
     kinds as candidates is how one gets silently resolved through the
     other's row.
+
+    **`Enchanted <item>` falls back to `<item>`.** An enchantment is data on an
+    item stack, not a separate registry entry, so there is no
+    `minecraft:enchanted_diamond_chestplate` for that name to reach. The wiki
+    still writes the trade as `Enchanted Diamond Chestplate`, because that is
+    what the villager sells. Without the fallback those rows resolved to
+    nothing and fell out as `MergeReport.unplaced`, which is why Diamond
+    Chestplate, Diamond Pickaxe, Diamond Sword and Fishing Rod each carried no
+    trades at all while Iron Chestplate and Diamond Hoe, whose trades are for
+    unenchanted items, carried theirs. 15 trade rows were lost that way.
+
+    The exact name is always tried first and the fallback only runs when it
+    finds nothing, which is what keeps `Enchanted Book` and `Enchanted Golden
+    Apple` pointing at themselves: both are real registry items, both resolve
+    on the first attempt, and neither ever reaches the second.
     """
     wanted = WIKI_KIND.get(registry, ())
-    return tuple(row for row in join_table.by_display_name.get(name, ()) if row.kind in wanted)
+
+    def rows_for(display_name: str) -> tuple[ResourceLocation, ...]:
+        return tuple(
+            row for row in join_table.by_display_name.get(display_name, ()) if row.kind in wanted
+        )
+
+    rows = rows_for(name)
+    if rows or not name.startswith(ENCHANTED_PREFIX):
+        return rows
+    return rows_for(name.removeprefix(ENCHANTED_PREFIX))
 
 
 def _own_row(
@@ -1306,14 +1336,31 @@ def merge_entities(
         drops = tuple(_convert_drop_entry(drop, join_table, drafts) for drop in mob_drops)
         attach(target, DropTable(drops=drops), table="droptable", subject=mob_name)
 
+    # Two display names can resolve to one item, and since `Enchanted <item>`
+    # falls back to `<item>` that is now the ordinary case rather than a freak
+    # one: a Fletcher sells both a `Bow` and an `Enchanted Bow`, and both are
+    # `minecraft:bow`. `EntityDraft.add_section` is keyed by section type, so
+    # attaching twice would replace the first table rather than extend it and
+    # would lose every trade in it. Group by target first, then attach once.
+    trades_by_target: dict[str, list[enrich_trade.WikiTrade]] = {}
+    names_by_target: dict[str, list[str]] = {}
     for item_name, item_trades in trade_index.by_given_item.items():
         target = _resolve_forward(
             item_name, "item", join_table, drafts, table="trade", unplaced=unplaced
         )
         if target is None:
             continue
-        trades = tuple(_convert_trade_entry(trade, join_table, drafts) for trade in item_trades)
-        attach(target, TradeTable(trades=trades), table="trade", subject=item_name)
+        trades_by_target.setdefault(target, []).extend(item_trades)
+        names_by_target.setdefault(target, []).append(item_name)
+
+    for target, target_trades in trades_by_target.items():
+        trades = tuple(_convert_trade_entry(trade, join_table, drafts) for trade in target_trades)
+        attach(
+            target,
+            TradeTable(trades=trades),
+            table="trade",
+            subject=", ".join(names_by_target[target]),
+        )
 
     # --- Curated overrides: the last field-level write before `.build()` ---
 

@@ -445,3 +445,309 @@ canvas,
 .entity-icon {
   image-rendering: pixelated;
 }
+
+/* ==========================================================================
+   Entity Sections & Links
+   ========================================================================== */
+
+.entity-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.entity-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+/* Entity links */
+.entity-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #8ab4f8;
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: -1px -2px;
+  cursor: pointer;
+  line-height: 1.4;
+  vertical-align: middle;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.entity-link:hover {
+  background: rgba(138, 180, 248, 0.12);
+  text-decoration: underline;
+}
+
+.entity-link:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: 1px;
+}
+
+.entity-link .entity-icon {
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.entity-plain {
+  color: #d0d0d0;
+}
+
+.item-quantity {
+  color: #aaa;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.item-note {
+  color: #888;
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+/* StatBlock */
+.stat-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background: #282828;
+  border: 1px solid #383838;
+  color: #e0e0e0;
+  line-height: 1.2;
+}
+
+.stat-behavior.is-hostile {
+  background: rgba(242, 139, 130, 0.15);
+  border-color: rgba(242, 139, 130, 0.35);
+  color: #f28b82;
+}
+
+.stat-behavior.is-passive {
+  background: rgba(129, 201, 149, 0.15);
+  border-color: rgba(129, 201, 149, 0.35);
+  color: #81c995;
+}
+
+.stat-behavior.is-neutral {
+  background: rgba(253, 214, 99, 0.15);
+  border-color: rgba(253, 214, 99, 0.35);
+  color: #fdd663;
+}
+
+.stat-health {
+  background: rgba(234, 67, 53, 0.12);
+  border-color: rgba(234, 67, 53, 0.3);
+  color: #ff8a80;
+}
+
+.stat-armor {
+  background: rgba(138, 180, 248, 0.12);
+  border-color: rgba(138, 180, 248, 0.3);
+  color: #8ab4f8;
+}
+
+.stat-damage {
+  background: rgba(255, 171, 64, 0.12);
+  border-color: rgba(255, 171, 64, 0.3);
+  color: #ffb74d;
+}
+
+.stat-mob-type,
+.stat-size {
+  background: #252525;
+  color: #aaa;
+}
+
+/* Tables (DropTable, TradeTable) */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a1a;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #282828;
+}
+
+.data-table th {
+  background: #222;
+  color: #888;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.looting-cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #ccc;
+}
+
+.drop-note {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* Trade groups */
+.trade-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trade-profession-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trade-profession-title {
+  margin: 4px 0 2px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.trade-arrow-cell {
+  color: #666;
+  text-align: center;
+  user-select: none;
+}
+
+.trade-plus {
+  color: #666;
+}
+
+.trade-chance-cell {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: right;
+}
+
+/* SpawnInfo biomes */
+.spawn-biomes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.spawn-biome-item {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+/* AdvancementInfo */
+.advancement-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.advancement-field-label {
+  color: #888;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.advancement-description {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #d0d0d0;
+}
+
+.advancement-xp-badge {
+  background: rgba(129, 201, 149, 0.15);
+  border-color: rgba(129, 201, 149, 0.35);
+  color: #81c995;
+}
+
+.advancement-children-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Collapsing */
+.is-collapsed-row,
+.is-collapsed-item,
+.is-collapsed-group {
+  display: none !important;
+}
+
+.show-more-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  background: #252525;
+  border: 1px solid #383838;
+  border-radius: 4px;
+  color: #8ab4f8;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.show-more-btn:hover {
+  background: #333;
+  color: #adc8ff;
+  border-color: #555;
+}
+
+.show-more-btn:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: 1px;
+}

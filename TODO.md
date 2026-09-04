@@ -29,8 +29,25 @@ reasoning survives even after the choice is made.
 
 ## Phase 6 — Content renderers
 
-- [ ] **Mob** — HP and damage badges beside the name (damage only when hostile), spawn conditions,
-      loot table with looting tiers, breeding items when breedable
+- [ ] **Mob** — breeding items when breedable. The rest of this item shipped: HP, damage and armour
+      badges, the passive / hostile / neutral signal, the spawn biomes, and the loot table across
+      looting 0 to III.
+  - [ ] **Breeding, end to end.** Nothing writes a `BreedingInfo` section today, so this is a
+        pipeline task before it is a renderer task, and it needs a source decided first.
+        mcmeta does not carry breeding items: they live in the mob's Java code, not in a data
+        pack, so this is Tier B and there is no Tier A fallback to check it against.
+        The wiki states them in two places that do not agree in shape — the `Breeding` section
+        of each mob page as prose, and the `Breeding` row of the mob infobox as a short item
+        list. Prefer the infobox row: `pipeline/enrich/infobox.py` already parses that template
+        for 91 mobs, so the parser exists and only the field is missing.
+        What the section has to carry: the items that start love mode, the cooldown, the growth
+        time for a baby, and the taming items where they differ from the breeding ones, because
+        a wolf is tamed with bones and bred with meat and conflating those is the obvious bug.
+        Every item is an `EntityRef`, never a name, per Decision 13.
+      One deviation, made deliberately: this item asked for damage "only when hostile", and the
+      renderer shows damage whenever the infobox carries it. 26 mobs carry a damage figure without
+      a hostile behaviour, and they include Enderman, Iron Golem, Bee and Cave Spider. Hiding what
+      an iron golem hits for is the wrong answer to a question a match actually asks.
 - [ ] **Item** — obtain tree, crafting and smelting, with the correct tool shown for blocks
   - [ ] Walk `data/dist/obtain.json` into the tree at render time, rather than reading a
         pre-built one out of the entity shard. The pipeline ships the flat producer graph
@@ -42,23 +59,58 @@ reasoning survives even after the choice is made.
         rather than draw them, memoize, cap depth into an expandable node, and collapse a
         repeated subtree to a back-reference. `tests/test_emit_obtain.py` proves the graph is
         sufficient to rebuild the identical tree.
-- [ ] **Block** — harvest tool and tier, drops, natural generation
-- [ ] **Effect** — every source of the effect, and what it actually does
-- [ ] **Advancement** — how to earn it, parent chain, reward
-- [ ] Intro blurb rendered at the top of every entity that has a wiki page
-- [ ] Inline `EntityRef` links open the target in a new window
-- [ ] Visible CC BY-NC-SA attribution and a link back to the source wiki page
+- [ ] **Block** — harvest tool and tier, drops, natural generation.
+      No block section exists in `data/dist` at all. `pipeline/extract/harvest.py` computes
+      harvest requirements, but `pipeline/normalize/merge.py` never turns them into a section,
+      so the block renderer is blocked on a pipeline emit.
+- [ ] **Effect** — every source of the effect, and what it actually does.
+      Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
+- [ ] **Advancement** — the parent link, the in-game description and the XP reward ship. What is
+      left is the requirements text and the icon, in the two sub-items below.
+  - [ ] Strip the wikitext and HTML markup out of `AdvancementInfo.description` in
+        `pipeline/enrich/advancement.py`, so a renderer can show the requirements text.
+        103 of 126 descriptions carry markup on the 26.2 build.
+  - [ ] **Give an advancement an icon.** All 126 advancements carry `icon: None`, so every
+        advancement window and every advancement suggestion row draws an empty slot. They are the
+        only kind with no icon at all: 43 enchantments and 48 items are also missing one, but
+        those are gaps within a kind rather than a whole kind.
+
+        The data is already fetched and already parsed. `WikiAdvancement.icon` in
+        `pipeline/enrich/advancement.py` reads the bucket's `image` field, and all 148 rows carry
+        one. It names the item the advancement shows in the game, as a display name:
+        `Stone Age` names `Wooden Pickaxe`. Nothing then carries that value into `Entity.icon`,
+        so the merge is the missing half, not the fetch.
+
+        **Resolve the name, do not construct the key.** Building `InvSprite:<display name>` looks
+        like it works and mostly does — 104 of the 114 distinct names hit an atlas key that way —
+        which is what makes it a trap. The 10 that do not fall into three groups:
+
+        - 4 carry a file extension the bucket did not strip: `Enchanted Book.gif`,
+          `End Crystal.gif`, `Nether Star.gif`, `Sculk Sensor.gif`. Each resolves once the
+          `.gif` is dropped.
+        - 3 live in a different sprite family under a slug-cased id, so no `InvSprite:` key
+          exists for them at all: `Wheat` is `ItemSprite:wheat`, `Wind Charge` is
+          `ItemSprite:wind-charge`, and `Eye of Ender` is `EntitySprite:eye-of-ender`.
+        - 3 have no atlas frame under any family: `Raw Cod`, `Ominous Banner`,
+          `Uncraftable Potion`.
+
+        Decision 3 already settled this shape of problem: resolve a sprite through the bucket
+        join, never by spelling a filename. Route the `image` name through the same
+        `resource_location` join the rest of the pipeline uses.
+
+        Two things to check while doing it. `pipeline/emit/atlas.py` packs the frames that
+        entities ask for, so an advancement icon naming an item no entity requested is not in
+        the atlas even after the name resolves, and the request set has to grow. And
+        `minecraft:ender_eye`, the item, carries `icon: None` while `minecraft:eye_of_ender`,
+        the entity, holds `EntitySprite:eye-of-ender` — a join gap worth fixing in the same pass,
+        since it is the reason that one name has nowhere to land.
 - [ ] Render crafting recipes **collapsed** — "Wooden Stairs — any plank type" rather than
       thirteen near-identical rows (see Decision 9)
-- [ ] **Infobox fields, per the wikitext infobox parser (Phase 2):**
-  - [ ] `armor` — shown beside the HP badge, for the mobs that have it
-  - [ ] `behavior` and `mobtype` — shown as the passive / hostile / neutral signal
-  - [ ] `speed` and `knockbackresistance` — parsed and stored, not rendered
 - [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
       `InvSprite:Sculk Shrieker`, `InvSprite:Zombie Horse Spawn Egg`), naming a verified `File:`
       title in `/data/curated` per Decision 3.
-      It waits on this phase's renderer existing, because confirming a replacement actually reads
-      correctly at icon size needs eyes on a rendered icon.
+      This is now unblocked: the renderer ships, so an icon can be looked at beside a real 16x16
+      item sprite, which is what confirming a replacement needed.
       See Decision 15 for why the fix is a curated override and not a packer-level resize.
 
 ## Phase 6b — Obtaining, scraped from the wiki
@@ -122,7 +174,15 @@ loot tables (see Decision 11).
 - [ ] Structure → its chests → the items in them
 - [ ] Trade → the item traded; item → the professions that sell it
 - [ ] Enchantment → the items that accept it
-- [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link
+- [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
+      Two real cases already exist in the 26.2 build, found by rendering it: the `Potato` drop on
+      Zombie and the `Music Disc` trade carry no `itemRef`, yet both names resolve in `index.json`.
+      The renderer prints them as plain text, which is correct behaviour for a missing ref, so the
+      fix belongs in the name-to-ID resolution of `pipeline/normalize/merge.py`, not in `/web`.
+      Ten further names carry no ref and have no index entry either — `Boat`, `Wool`,
+      `Pufferfish (item)`, `Arrow of Poison` and similar. Those are wiki display names that name a
+      group rather than one registry entry, so the lint has to tell the two cases apart rather than
+      flagging every ref-less name.
 
 ## Phase 7 — Collections (the special search terms)
 

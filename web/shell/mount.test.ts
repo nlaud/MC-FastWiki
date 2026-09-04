@@ -34,6 +34,27 @@ describe("mount", () => {
         name: "Creeper",
         blurb: "A common hostile mob.",
         wikiUrl: "https://minecraft.wiki/w/Creeper",
+        sections: [
+          {
+            type: "DropTable",
+            drops: [
+              {
+                item: "Iron Ingot",
+                itemRef: { id: "minecraft:iron_ingot", name: "Iron Ingot" },
+                byLootingLevel: [
+                  {
+                    lootingLevel: 0,
+                    minimum: 1,
+                    maximum: 1,
+                    average: { numerator: 1, denominator: 1 },
+                    dropChance: { numerator: 1, denominator: 1 },
+                    quantityText: "1",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       },
     ],
   };
@@ -255,5 +276,37 @@ describe("mount", () => {
 
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     expect(document.activeElement).toBe(input);
+  });
+
+  it("opens a second window when clicking a rendered entity link", async () => {
+    const corpus = buildCorpus(mockIndex);
+    mount(root, corpus);
+
+    const input = root.querySelector<HTMLInputElement>("input.search-input");
+    if (!input) throw new Error("Missing input");
+    input.value = "creeper";
+    input.dispatchEvent(new Event("input"));
+
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+
+    // Flush shard load microtasks
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(root.querySelectorAll(".wiki-window")).toHaveLength(1);
+
+    // Find rendered link for Iron Ingot in Creeper window
+    const link = root.querySelector<HTMLAnchorElement>(".wiki-window .entity-link");
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain("Iron Ingot");
+
+    // Click link to open target entity
+    link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    await Promise.resolve();
+
+    const windows = root.querySelectorAll(".wiki-window");
+    expect(windows).toHaveLength(2);
+    expect(windows[1]?.querySelector(".window-title")?.textContent).toBe("Iron Ingot");
   });
 });

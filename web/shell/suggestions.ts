@@ -1,4 +1,4 @@
-import { createIconElement } from "../render/fallback.js";
+import { createIconElement } from "../render/icon.js";
 import type { IndexEntry } from "../types/index.js";
 
 export interface SuggestionsProps {
