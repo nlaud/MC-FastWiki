@@ -9,69 +9,439 @@
 html,
 body {
   height: 100%;
-}
-
-body {
   margin: 0;
-  background: #1a1a1a;
+  padding: 0;
+  overflow: hidden;
+  background: #141414;
   color: #e0e0e0;
-  font-family: system-ui, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  user-select: auto;
 }
 
 #app {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 100%;
-  padding-top: 48px;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.search-container {
+/* ==========================================================================
+   Windows Grid
+   ========================================================================== */
+
+.windows-container {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.wiki-window {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 480px;
+  background: #1f1f1f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  overflow: hidden;
+  outline: none;
+  min-width: 0;
+  min-height: 0;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.wiki-window:focus,
+.wiki-window.is-focused {
+  border-color: #5c85d6;
+  box-shadow: 0 0 0 2px rgba(92, 133, 214, 0.4);
+}
+
+.window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #282828;
+  border-bottom: 1px solid #333;
+  user-select: none;
+}
+
+.window-header-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.window-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f0f0f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.window-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #999;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.window-close-btn:hover {
+  background: #3a3a3a;
+  color: #fff;
+  border-color: #555;
+}
+
+.window-close-btn:focus-visible {
+  outline: none;
+  border-color: #5c85d6;
+  box-shadow: 0 0 0 2px rgba(92, 133, 214, 0.4);
+}
+
+.window-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Entity Content (Fallback)
+   ========================================================================== */
+
+.entity-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entity-kind-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #333;
+  color: #8ab4f8;
+  border-radius: 4px;
+}
+
+.entity-blurb {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #d0d0d0;
+}
+
+.entity-attribution {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a2a;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.entity-attribution a {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+
+.entity-attribution a:hover {
+  text-decoration: underline;
+}
+
+.entity-attribution a:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: 2px;
+}
+
+.entity-loading {
+  color: #888;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.entity-error {
+  color: #f28b82;
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   Search Bar & Suggestions
+   ========================================================================== */
+
+.search-container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: calc(100% - 32px);
+  max-width: 560px;
+  pointer-events: none;
+}
+
+.search-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.search-suggestions-container {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #1c1c1c;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  padding: 4px;
+  gap: 2px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+}
+
+.suggestion-item.is-selected {
+  background: #2a3b5c;
+  color: #fff;
+}
+
+.suggestion-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.suggestion-name {
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestion-kind {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #888;
+  padding-left: 8px;
+}
+
+.suggestion-item.is-selected .suggestion-kind {
+  color: #adc8ff;
+}
+
+.search-input-wrapper {
+  width: 100%;
 }
 
 .search-input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 16px;
   font-size: 1rem;
-  background: #2b2b2b;
+  background: #1c1c1c;
   color: #fff;
   border: 1px solid #444;
-  border-radius: 4px;
+  border-radius: 8px;
   outline: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .search-input:focus {
-  border-color: #666;
+  border-color: #5c85d6;
+  box-shadow:
+    0 0 0 2px rgba(92, 133, 214, 0.4),
+    0 6px 20px rgba(0, 0, 0, 0.6);
 }
 
-.search-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.search-max-hint {
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  background: rgba(28, 28, 28, 0.95);
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #aaa;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+/* ==========================================================================
+   Help Overlay
+   ========================================================================== */
+
+.help-container {
+  pointer-events: auto;
+}
+
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+}
+
+.help-panel {
+  background: #1c1c1c;
+  border: 1px solid #444;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
 }
 
-.search-result-item {
-  padding: 8px 12px;
-  background: #262626;
-  border-radius: 4px;
+.help-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.95rem;
+  padding: 14px 18px;
+  border-bottom: 1px solid #333;
 }
 
-/* Sprites are pixel art. Never smooth them. */
+.help-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.help-close-btn {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.help-close-btn:hover {
+  color: #fff;
+}
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  overflow-y: auto;
+}
+
+.help-table th,
+.help-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid #282828;
+}
+
+.help-table th {
+  color: #888;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  background: #222;
+}
+
+.help-key {
+  width: 32%;
+}
+
+.help-key kbd {
+  display: inline-block;
+  padding: 3px 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+}
+
+.help-does {
+  width: 38%;
+  color: #e0e0e0;
+}
+
+.help-when {
+  width: 30%;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   Sprites
+   ========================================================================== */
+
+.entity-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.entity-icon.is-empty {
+  visibility: hidden;
+}
+
 img,
 canvas,
-.sprite {
+.sprite,
+.entity-icon {
   image-rendering: pixelated;
 }
