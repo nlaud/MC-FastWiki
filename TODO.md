@@ -29,8 +29,14 @@ reasoning survives even after the choice is made.
 
 ## Phase 6 — Content renderers
 
-- [ ] **Mob** — HP and damage badges beside the name (damage only when hostile), spawn conditions,
-      loot table with looting tiers, breeding items when breedable
+- [ ] **Mob** — breeding items when breedable. The rest of this item shipped: HP, damage and armour
+      badges, the passive / hostile / neutral signal, the spawn biomes, and the loot table across
+      looting 0 to III. Breeding is all that is left, and it needs a `BreedingInfo` payload, which
+      no build stage writes yet.
+      One deviation, made deliberately: this item asked for damage "only when hostile", and the
+      renderer shows damage whenever the infobox carries it. 26 mobs carry a damage figure without
+      a hostile behaviour, and they include Enderman, Iron Golem, Bee and Cave Spider. Hiding what
+      an iron golem hits for is the wrong answer to a question a match actually asks.
 - [ ] **Item** — obtain tree, crafting and smelting, with the correct tool shown for blocks
   - [ ] Walk `data/dist/obtain.json` into the tree at render time, rather than reading a
         pre-built one out of the entity shard. The pipeline ships the flat producer graph
@@ -42,23 +48,24 @@ reasoning survives even after the choice is made.
         rather than draw them, memoize, cap depth into an expandable node, and collapse a
         repeated subtree to a back-reference. `tests/test_emit_obtain.py` proves the graph is
         sufficient to rebuild the identical tree.
-- [ ] **Block** — harvest tool and tier, drops, natural generation
-- [ ] **Effect** — every source of the effect, and what it actually does
-- [ ] **Advancement** — how to earn it, parent chain, reward
-- [ ] Intro blurb rendered at the top of every entity that has a wiki page
-- [ ] Inline `EntityRef` links open the target in a new window
-- [ ] Visible CC BY-NC-SA attribution and a link back to the source wiki page
+- [ ] **Block** — harvest tool and tier, drops, natural generation.
+      No block section exists in `data/dist` at all. `pipeline/extract/harvest.py` computes
+      harvest requirements, but `pipeline/normalize/merge.py` never turns them into a section,
+      so the block renderer is blocked on a pipeline emit.
+- [ ] **Effect** — every source of the effect, and what it actually does.
+      Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
+- [ ] **Advancement** — the parent link, the in-game description and the XP reward ship. What is
+      left is the requirements text, which waits on the sub-item below.
+  - [ ] Strip the wikitext and HTML markup out of `AdvancementInfo.description` in
+        `pipeline/enrich/advancement.py`, so a renderer can show the requirements text.
+        103 of 126 descriptions carry markup on the 26.2 build.
 - [ ] Render crafting recipes **collapsed** — "Wooden Stairs — any plank type" rather than
       thirteen near-identical rows (see Decision 9)
-- [ ] **Infobox fields, per the wikitext infobox parser (Phase 2):**
-  - [ ] `armor` — shown beside the HP badge, for the mobs that have it
-  - [ ] `behavior` and `mobtype` — shown as the passive / hostile / neutral signal
-  - [ ] `speed` and `knockbackresistance` — parsed and stored, not rendered
 - [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
       `InvSprite:Sculk Shrieker`, `InvSprite:Zombie Horse Spawn Egg`), naming a verified `File:`
       title in `/data/curated` per Decision 3.
-      It waits on this phase's renderer existing, because confirming a replacement actually reads
-      correctly at icon size needs eyes on a rendered icon.
+      This is now unblocked: the renderer ships, so an icon can be looked at beside a real 16x16
+      item sprite, which is what confirming a replacement needed.
       See Decision 15 for why the fix is a curated override and not a packer-level resize.
 
 ## Phase 6b — Obtaining, scraped from the wiki
@@ -122,7 +129,15 @@ loot tables (see Decision 11).
 - [ ] Structure → its chests → the items in them
 - [ ] Trade → the item traded; item → the professions that sell it
 - [ ] Enchantment → the items that accept it
-- [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link
+- [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
+      Two real cases already exist in the 26.2 build, found by rendering it: the `Potato` drop on
+      Zombie and the `Music Disc` trade carry no `itemRef`, yet both names resolve in `index.json`.
+      The renderer prints them as plain text, which is correct behaviour for a missing ref, so the
+      fix belongs in the name-to-ID resolution of `pipeline/normalize/merge.py`, not in `/web`.
+      Ten further names carry no ref and have no index entry either — `Boat`, `Wool`,
+      `Pufferfish (item)`, `Arrow of Poison` and similar. Those are wiki display names that name a
+      group rather than one registry entry, so the lint has to tell the two cases apart rather than
+      flagging every ref-less name.
 
 ## Phase 7 — Collections (the special search terms)
 

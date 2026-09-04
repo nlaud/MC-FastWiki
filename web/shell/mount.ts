@@ -1,3 +1,4 @@
+import type { RenderContext } from "../render/context.js";
 import { loadIndex } from "../search/load.js";
 import { type Corpus, buildCorpus, search } from "../search/matcher.js";
 import type { IndexEntry } from "../types/index.js";
@@ -53,11 +54,43 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
         ? Promise.resolve(corpusSource)
         : loadIndex().then(buildCorpus);
 
-  if (activeCorpus === null) {
+  const entryById = new Map<string, IndexEntry>();
+  const entryByName = new Map<string, IndexEntry>();
+
+  const populateIndex = (corpus: Corpus): void => {
+    for (const entry of corpus.entities) {
+      entryById.set(entry.id, entry);
+      if (!entryByName.has(entry.n.toLowerCase())) {
+        entryByName.set(entry.n.toLowerCase(), entry);
+      }
+    }
+  };
+
+  if (activeCorpus !== null) {
+    populateIndex(activeCorpus);
+  } else {
     void corpusPromise.then((corpus) => {
       activeCorpus = corpus;
+      populateIndex(corpus);
     });
   }
+
+  const renderContext: RenderContext = {
+    openRef: (id: string) => {
+      const entry = renderContext.lookup(id);
+      if (entry) {
+        openEntryInWindow(entry);
+      }
+    },
+    lookup: (id: string) => {
+      return (
+        entryById.get(id) ??
+        entryByName.get(id.toLowerCase()) ??
+        entryById.get(`minecraft:${id.toLowerCase().replace(/\s+/g, "_")}`) ??
+        null
+      );
+    },
+  };
 
   const performSearch = (query: string): void => {
     if (!activeCorpus) {
@@ -122,15 +155,19 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
     if (!currentWindowState) {
       return;
     }
-    const view = createWindowElement(currentWindowState, {
-      onClose: (slot) => {
-        closeWindowAtSlot(slot);
+    const view = createWindowElement(
+      currentWindowState,
+      {
+        onClose: (slot) => {
+          closeWindowAtSlot(slot);
+        },
+        onFocus: (slot) => {
+          state = focusWindow(state, slot);
+          syncLayout();
+        },
       },
-      onFocus: (slot) => {
-        state = focusWindow(state, slot);
-        syncLayout();
-      },
-    });
+      renderContext,
+    );
 
     windowsMap.set(focusedSlot, view);
     windowsContainer.append(view.element);
