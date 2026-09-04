@@ -31,8 +31,19 @@ reasoning survives even after the choice is made.
 
 - [ ] **Mob** — breeding items when breedable. The rest of this item shipped: HP, damage and armour
       badges, the passive / hostile / neutral signal, the spawn biomes, and the loot table across
-      looting 0 to III. Breeding is all that is left, and it needs a `BreedingInfo` payload, which
-      no build stage writes yet.
+      looting 0 to III.
+  - [ ] **Breeding, end to end.** Nothing writes a `BreedingInfo` section today, so this is a
+        pipeline task before it is a renderer task, and it needs a source decided first.
+        mcmeta does not carry breeding items: they live in the mob's Java code, not in a data
+        pack, so this is Tier B and there is no Tier A fallback to check it against.
+        The wiki states them in two places that do not agree in shape — the `Breeding` section
+        of each mob page as prose, and the `Breeding` row of the mob infobox as a short item
+        list. Prefer the infobox row: `pipeline/enrich/infobox.py` already parses that template
+        for 91 mobs, so the parser exists and only the field is missing.
+        What the section has to carry: the items that start love mode, the cooldown, the growth
+        time for a baby, and the taming items where they differ from the breeding ones, because
+        a wolf is tamed with bones and bred with meat and conflating those is the obvious bug.
+        Every item is an `EntityRef`, never a name, per Decision 13.
       One deviation, made deliberately: this item asked for damage "only when hostile", and the
       renderer shows damage whenever the infobox carries it. 26 mobs carry a damage figure without
       a hostile behaviour, and they include Enderman, Iron Golem, Bee and Cave Spider. Hiding what
