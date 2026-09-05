@@ -3,10 +3,6 @@ import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
 import { entityLink } from "../link.js";
 
-function cleanHtml(text: string): string {
-  return text.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "");
-}
-
 /**
  * Resolves a wiki link target (e.g. "Parrot", "Sculk Sensor") to an IndexEntry.
  */
@@ -20,23 +16,22 @@ function resolveWikiLink(target: string, ctx: RenderContext) {
 }
 
 /**
- * Parses in-game description text, converting [[Target|Label]] into real entity links
+ * Parses description text, converting [[Target|Label]] into real entity links
  * where the target resolves in the index, and plain text otherwise.
  */
 function renderParsedDescription(rawText: string, ctx: RenderContext): HTMLElement {
   const p = document.createElement("p");
   p.className = "advancement-description";
 
-  const cleaned = cleanHtml(rawText);
   const WIKI_LINK_REGEX = /\[\[(?:([^|\]]+)\|)?([^\]]+)\]\]/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = WIKI_LINK_REGEX.exec(cleaned)) !== null) {
+  while ((match = WIKI_LINK_REGEX.exec(rawText)) !== null) {
     // Text before the match
     if (match.index > lastIndex) {
-      p.append(document.createTextNode(cleaned.slice(lastIndex, match.index)));
+      p.append(document.createTextNode(rawText.slice(lastIndex, match.index)));
     }
 
     const rawLabel = match[2] ?? "";
@@ -80,8 +75,8 @@ function renderParsedDescription(rawText: string, ctx: RenderContext): HTMLEleme
   }
 
   // Trailing text
-  if (lastIndex < cleaned.length) {
-    p.append(document.createTextNode(cleaned.slice(lastIndex)));
+  if (lastIndex < rawText.length) {
+    p.append(document.createTextNode(rawText.slice(lastIndex)));
   }
 
   return p;
@@ -90,8 +85,7 @@ function renderParsedDescription(rawText: string, ctx: RenderContext): HTMLEleme
 /**
  * Renders an AdvancementInfo section:
  * - Title, parent chain as links, children as links, XP reward
- * - Renders gameDescription only, parsing [[Target|Label]] into real entity links
- * - Does not render description (per Decision 1)
+ * - Renders gameDescription and requirements description, parsing [[Target|Label]] into real entity links
  */
 export function renderAdvancementInfo(
   section: AdvancementInfo,
@@ -116,9 +110,14 @@ export function renderAdvancementInfo(
     container.append(parentRow);
   }
 
-  // Description (gameDescription only)
+  // Description (gameDescription in-game flavour line)
   if (section.gameDescription) {
     container.append(renderParsedDescription(section.gameDescription, ctx));
+  }
+
+  // Requirements description (wiki description with requirements and entity links)
+  if (section.description && section.description !== section.gameDescription) {
+    container.append(renderParsedDescription(section.description, ctx));
   }
 
   // XP / Reward

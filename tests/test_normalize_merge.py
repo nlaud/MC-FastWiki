@@ -610,6 +610,35 @@ def test_a_missing_icon_is_reported_for_a_registry_that_is_not_exempt() -> None:
     assert any(m.id == "minecraft:emerald" for m in report.missing_icons)
 
 
+def test_an_advancement_missing_an_icon_is_reported_in_missing_icons() -> None:
+    report = run_merge().report
+    assert any(m.id == "minecraft:story/root" for m in report.missing_icons)
+    assert any(m.id == "minecraft:adventure/nothing_here" for m in report.missing_icons)
+
+
+def test_an_advancement_with_resolved_icon_sets_tier_b() -> None:
+    join_table = parse_resource_locations([rl_row("Grass Block", "grass_block", "block")])
+    sprite_index = parse_sprite_files([sprite_row("BlockSprite", "grass-block")])
+    result = merge_entities(
+        registries=REGISTRIES,
+        advancement_ids=("story/root",),
+        join_table=join_table,
+        sprite_index=sprite_index,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+    )
+    story_root = result.by_id["minecraft:story/root"]
+    assert story_root.icon == "BlockSprite:grass-block"
+    assert story_root.source_tiers["icon"] is SourceTier.B
+    assert not any(m.id == "minecraft:story/root" for m in result.report.missing_icons)
+
+
 def test_an_enchantment_with_no_icon_is_never_reported() -> None:
     report = run_merge().report
     assert not any(m.id == "minecraft:efficiency" for m in report.missing_icons)

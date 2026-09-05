@@ -69,6 +69,7 @@ threshold on that report belongs, once the `Entity` model it gates on exists.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -92,6 +93,7 @@ __all__ = [
     "RegistryCounts",
     "hyphenated_sprite_id",
     "reconcile",
+    "resolve_display_name_icon",
     "resolve_icon",
     "write_report",
 ]
@@ -340,7 +342,13 @@ def resolve_icon(
         display_names = {entry.display_name for entry in candidates}
         if len(display_names) == 1:
             display_name = candidates[0].display_name
-            if display_name in join_table.ambiguous_names():
+            name_candidates = join_table.candidates(display_name)
+            ids_for_name = {
+                entry.registry_id
+                for entry in name_candidates
+                if entry.kind in rule.join_kinds
+            }
+            if len(ids_for_name) > 1:
                 ambiguous_display_name = display_name
             else:
                 for family in rule.display_name_families:
@@ -373,6 +381,88 @@ def resolve_icon(
         sprite=None,
         routes_tried=tuple(routes_tried),
         ambiguous_display_name=ambiguous_display_name,
+    )
+
+
+def resolve_display_name_icon(
+    display_name: str,
+    join_table: JoinTable,
+    sprite_index: SpriteIndex,
+    *,
+    rules: Mapping[str, IconRule] = ICON_RULES,
+) -> IconResolution:
+    """Return the icon `display_name` resolves to through `join_table` and `rules`.
+
+    Strips a trailing `.gif` or `.png` extension, resolves the display name to
+    candidate registry IDs through `join_table`, and runs `resolve_icon` across
+    the matching rules.
+
+    Item and block candidates are preferred first (as advancements and recipes
+    name items or blocks) before considering other kinds. If multiple distinct
+    registry IDs remain within that candidate group, the name is ambiguous and
+    the route declines rather than guessing.
+
+    Every route considered is recorded in `routes_tried`, matching `resolve_icon`.
+    """
+    clean_name = re.sub(r"\.(?:gif|png)\Z", "", display_name, flags=re.IGNORECASE).strip()
+    routes_tried: list[tuple[str, str]] = []
+
+    candidates = join_table.candidates(clean_name)
+    if not candidates:
+        routes_tried.append(("display_name", clean_name))
+        return IconResolution(
+            registry_id="",
+            sprite=None,
+            routes_tried=tuple(routes_tried),
+        )
+
+    # Prefer item and block candidates first, matching advancement icon semantics
+    item_candidates = tuple(c for c in candidates if c.kind in ("item", "block"))
+    target_candidates = item_candidates if item_candidates else candidates
+
+    distinct_ids = list(dict.fromkeys(c.registry_id for c in target_candidates))
+    if len(distinct_ids) > 1:
+        routes_tried.append(("ambiguous", clean_name))
+        return IconResolution(
+            registry_id="",
+            sprite=None,
+            routes_tried=tuple(routes_tried),
+            ambiguous_display_name=clean_name,
+        )
+
+    registry_id = distinct_ids[0]
+    candidate_kind = target_candidates[0].kind
+
+    registries_to_try: list[str]
+    if candidate_kind == "item":
+        registries_to_try = ["item", "block"]
+    elif candidate_kind == "block":
+        registries_to_try = ["block", "item"]
+    elif candidate_kind == "entity":
+        registries_to_try = ["entity_type"]
+    elif candidate_kind == "biome":
+        registries_to_try = ["worldgen/biome"]
+    elif candidate_kind == "effect":
+        registries_to_try = ["mob_effect"]
+    else:
+        registries_to_try = ["item", "block", "entity_type"]
+
+    last_resolution: IconResolution | None = None
+    for reg in registries_to_try:
+        rule = rules.get(reg)
+        if rule is None or not rule.has_icons:
+            continue
+        resolution = resolve_icon(registry_id, rule, join_table, sprite_index)
+        if resolution.sprite is not None:
+            return resolution
+        routes_tried.extend(resolution.routes_tried)
+        last_resolution = resolution
+
+    return IconResolution(
+        registry_id=registry_id,
+        sprite=None,
+        routes_tried=tuple(routes_tried),
+        ambiguous_display_name=last_resolution.ambiguous_display_name if last_resolution else None,
     )
 
 
@@ -449,14 +539,25 @@ def reconcile(
                 continue
             resolution = resolve_icon(registry_id, rule, join_table, sprite_index)
             if resolution.ambiguous_display_name is not None:
+                name_candidates = join_table.candidates(resolution.ambiguous_display_name)
+                candidate_ids = tuple(
+                    sorted(
+                        {
+                            entry.registry_id
+                            for entry in name_candidates
+                            if entry.kind in rule.join_kinds
+                        }
+                    )
+                )
                 ambiguous_icons.append(
                     AmbiguousIcon(
                         registry=registry_name,
                         registry_id=registry_id,
                         display_name=resolution.ambiguous_display_name,
-                        candidate_registry_ids=join_table.ambiguous_names()[
-                            resolution.ambiguous_display_name
-                        ],
+                        candidate_registry_ids=candidate_ids
+                        or join_table.ambiguous_names().get(
+                            resolution.ambiguous_display_name, ()
+                        ),
                     )
                 )
             elif resolution.sprite is None:

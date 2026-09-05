@@ -240,6 +240,40 @@ _REF_SELF_CLOSING = re.compile(r"<ref\b[^>]*/>", re.IGNORECASE)
 _REF_OPEN = re.compile(r"<ref\b[^>]*>", re.IGNORECASE)
 _REF_CLOSE = re.compile(r"</ref\s*>", re.IGNORECASE)
 _FILE_LINK = re.compile(r"\[\[\s*[Ff]ile\s*:.*?\]\]", re.DOTALL)
+# A `[[Category:...]]` tag is filing metadata, not text. It reaches this module
+# because the `advancement` bucket serves rendered wikitext, where an `Upcoming`
+# marker template expands into one.
+_CATEGORY_LINK = re.compile(r"\[\[\s*[Cc]ategory\s*:.*?\]\]", re.IGNORECASE | re.DOTALL)
+# A `<sup>` on this wiki is an editorial footnote, not content: the
+# `Inline-Template` spans marking a value as `[until: Third Drop 2026]` or
+# `[upcoming]` are written that way. Its *content* has to go with it, which
+# `_GENERIC_TAG` alone does not do -- stripping only the tags leaves
+# `55[until: Third Drop 2026]/56upcoming]` on screen, stray brackets and all.
+# The same reasoning `_REF_BLOCK` already applies to a citation.
+_SUP_BLOCK = re.compile(r"<sup\b[^>]*>.*?</sup>", re.IGNORECASE | re.DOTALL)
+# Zero-width characters those footnote templates leave around a number. They
+# survive `_WHITESPACE`, which matches only real whitespace, and then render as
+# an invisible gap mid-word.
+_ZERO_WIDTH = re.compile("[\u200b\u200c\u200d\ufeff]")
+# A wikitext list marker at the start of a display line: `* `, `# `, `** `.
+# Matched before whitespace is collapsed, the only point line starts are still
+# visible.
+_LIST_MARKER = re.compile(r"^[ \t]*[*#]+[ \t]*", re.MULTILINE)
+# A block-level boundary in the rendered HTML the bucket serves, used only to
+# keep a sentence from running into the list before it.
+_BLOCK_BOUNDARY = re.compile(r"</(?:div|p|li|ul|ol|td|tr|table)\s*>", re.IGNORECASE)
+# The two placeholders `flatten_lists` leaves behind, resolved by
+# `_resolve_flatten_marks` once whitespace has been collapsed. Control
+# characters, because no wiki page contains one, so neither mark can collide
+# with real content.
+_BLOCK_MARK = "\u0000"
+_ITEM_MARK = "\u0001"
+# A separator this module introduced that ended up with nothing after it -- a
+# list whose last item was empty, or a block boundary at the end of the field.
+# A `.` is deliberately not in this class: the only trailing period reaching
+# here is one the wiki wrote to end its own sentence, because a block mark with
+# nothing after it resolves to a space rather than to `". "`.
+_TRAILING_SEPARATOR = re.compile(r"[\s,]+$")
 _SMALL_TAG = re.compile(r"</?small>", re.IGNORECASE)
 _GENERIC_TAG = re.compile(r"<[^>]+>")
 _PIPED_LINK = re.compile(r"\[\[([^\]|]*)\|([^\]]*)\]\]")
@@ -444,21 +478,39 @@ def split_lines(text: str) -> tuple[str, ...]:
     return tuple(lines)
 
 
-def strip_markup(text: str) -> str:
+def strip_markup(text: str, *, keep_links: bool = False, flatten_lists: bool = False) -> str:
     """Return `text` with wiki and HTML markup removed, as plain display text.
 
     Removes HTML comments and `<ref>...</ref>` blocks entirely (Cat's `speed`
     field hides two of its three numbers in a comment; Wolf's `behavior` field
     holds a `<ref>` citation -- both must be gone before anything reads the
-    text as a value). Removes `[[File:...]]` embeds outright, since an image is
-    not text. Removes the `<small>` and `</small>` tags but keeps their
+    text as a value). Removes a `<sup>...</sup>` footnote with its content, for
+    the same reason: `55<sup>[until: Third Drop 2026]</sup>` is an editorial
+    note about a value rather than the value, and stripping only the tags would
+    leave the stray brackets on screen. Removes `[[File:...]]` embeds outright,
+    since an image is not text, and `[[Category:...]]` tags, which are filing
+    metadata. Removes the zero-width characters the footnote templates leave
+    behind. Removes the `<small>` and `</small>` tags but keeps their
     content, because `<small>(baby only)</small>` is a note a caller wants, not
-    markup to discard. Resolves `[[Page|label]]` to `label` and a bare
-    `[[Page]]` to `Page`. Strips any other HTML tag and the `'''`/`''` wiki
+    markup to discard. Strips any other HTML tag and the `'''`/`''` wiki
     markers. Unescapes HTML entities through `clean_text` rather than a second
     unescaper -- see `pipeline.enrich` for why one unescaper is the rule.
     Collapses whitespace last, so every removal above can leave a gap without
     leaving double spaces in the result.
+
+    `keep_links=False`, the default, resolves `[[Page|label]]` to `label` and a
+    bare `[[Page]]` to `Page`. `keep_links=True` leaves both intact, for a
+    caller whose renderer turns them into live entity links rather than text --
+    `pipeline.enrich.advancement` is the one today, and Decision 13 of
+    `TODO.md` is why it wants them.
+
+    `flatten_lists=True` additionally turns a wikitext list into running prose:
+    each `* ` marker becomes `", "` and each block-level HTML boundary becomes
+    a sentence break, both resolved by `_resolve_flatten_marks` after the
+    whitespace collapse. It is off by default because an infobox field's own
+    lines carry meaning -- `split_lines` and `classify_heading` both read them
+    -- and only a field that is already a paragraph, such as an advancement
+    description, wants them flattened.
 
     Templates are left alone. A `{{ItemLink|Bow}}` or `{{EntityLink|Monster}}`
     is not markup to this function; `find_template` and `split_template` read
@@ -468,14 +520,78 @@ def strip_markup(text: str) -> str:
     cleaned = _COMMENT.sub("", text)
     cleaned = _REF_BLOCK.sub("", cleaned)
     cleaned = _REF_SELF_CLOSING.sub("", cleaned)
+    cleaned = _SUP_BLOCK.sub("", cleaned)
     cleaned = _FILE_LINK.sub("", cleaned)
+    cleaned = _CATEGORY_LINK.sub("", cleaned)
     cleaned = _SMALL_TAG.sub("", cleaned)
-    cleaned = _PIPED_LINK.sub(lambda match: match.group(2), cleaned)
-    cleaned = _BARE_LINK.sub(lambda match: match.group(1), cleaned)
+    if flatten_lists:
+        cleaned = _BLOCK_BOUNDARY.sub(_BLOCK_MARK, cleaned)
+        cleaned = _LIST_MARKER.sub(_ITEM_MARK, cleaned)
+    if not keep_links:
+        cleaned = _PIPED_LINK.sub(lambda match: match.group(2), cleaned)
+        cleaned = _BARE_LINK.sub(lambda match: match.group(1), cleaned)
     cleaned = _GENERIC_TAG.sub("", cleaned)
     cleaned = cleaned.replace("'''", "").replace("''", "")
+    cleaned = _ZERO_WIDTH.sub("", cleaned)
     cleaned = clean_text(cleaned)
-    return _WHITESPACE.sub(" ", cleaned).strip()
+    cleaned = _WHITESPACE.sub(" ", cleaned).strip()
+    if flatten_lists:
+        cleaned = _resolve_flatten_marks(cleaned)
+    return cleaned
+
+
+def _resolve_flatten_marks(text: str) -> str:
+    """Return `text` with the two `flatten_lists` marks resolved into punctuation.
+
+    Runs after the whitespace collapse, and that ordering is the point: by now
+    every run of spaces around a mark is one space, so what a mark becomes is a
+    local decision rather than a whitespace-sensitive one.
+
+    An item mark becomes `", "` between items and a single space before the
+    first one -- the text introducing a list keeps its own `:`, and neither
+    `biomes: , Badlands` nor `biomes:Badlands` is what anyone wants to read.
+
+    A block mark becomes `". "` only where a sentence actually starts after it,
+    and a space otherwise. That is the one place this function writes a
+    character the wiki did not, and it earns it both ways: without the break
+    `Adventuring Time` glues its last biome to the following sentence as
+    `Wooded Badlands The advancement is only for Overworld biomes`, and with an
+    unconditional break `Mine Stone` gains a fragment, because its list is
+    followed by the mid-sentence continuation `in the inventory`.
+    """
+    tokens = re.split(f"([{_BLOCK_MARK}{_ITEM_MARK}])", text)
+    parts: list[str] = []
+    in_list = False
+    for position, token in enumerate(tokens):
+        if token not in (_BLOCK_MARK, _ITEM_MARK):
+            parts.append(token)
+            continue
+        # A separator binds to the word before it, so drop the space the
+        # whitespace collapse left in between -- otherwise every list item
+        # renders as `Badlands , Bamboo Jungle`.
+        while parts and parts[-1] != parts[-1].rstrip():
+            parts[-1] = parts[-1].rstrip()
+            if not parts[-1]:
+                parts.pop()
+        before = "".join(parts)
+        if token == _ITEM_MARK:
+            parts.append(", " if in_list else " ")
+            in_list = True
+            continue
+        in_list = False
+        after = next(
+            (
+                candidate.lstrip()
+                for candidate in tokens[position + 1 :]
+                if candidate not in (_BLOCK_MARK, _ITEM_MARK) and candidate.strip()
+            ),
+            "",
+        )
+        starts_sentence = bool(after) and after[0].isupper()
+        ends_open = bool(before) and before[-1] not in ".!?:;,"
+        parts.append(". " if starts_sentence and ends_open else " ")
+    joined = _WHITESPACE.sub(" ", "".join(parts))
+    return _TRAILING_SEPARATOR.sub("", joined).strip()
 
 
 def _strip_comments_and_refs(line: str) -> str:

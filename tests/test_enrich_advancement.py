@@ -202,3 +202,19 @@ def test_reconciling_reports_both_directions_of_the_join() -> None:
     assert report.matched == ("story/root",)
     assert report.missing_from_wiki == ("nether/root",)
     assert report.missing_from_tier_a == ("story/mine_stone",)
+
+
+def test_description_strips_html_and_categories_while_preserving_wikilinks() -> None:
+    """HTML tags and category links are stripped, but entity wikilinks are preserved."""
+    raw_desc = (
+        '<div class="collapsible"><div>Kill one of these [[mob]]s:</div>\n'
+        '* [[Blaze|<span class="sprite-text">Blaze</span>]][[Category:Upcoming]]</div>'
+    )
+    tree = parse_advancements([row("adventure/kill_a_mob", "Monster Hunter", description=raw_desc)])
+    desc = tree.by_id["adventure/kill_a_mob"].description
+    assert desc is not None
+    assert "<div" not in desc
+    assert "Category:" not in desc
+    assert "[[mob]]" in desc
+    assert "[[Blaze|Blaze]]" in desc
+

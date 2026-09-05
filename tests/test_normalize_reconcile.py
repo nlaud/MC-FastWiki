@@ -26,6 +26,7 @@ from pipeline.normalize.reconcile import (
     MissingIcon,
     hyphenated_sprite_id,
     reconcile,
+    resolve_display_name_icon,
     resolve_icon,
     write_report,
 )
@@ -379,3 +380,84 @@ def test_a_rule_with_no_families_and_has_icons_true_would_never_resolve() -> Non
     resolution = resolve_icon("minecraft:x", rule, join_table, sprite_index)
     assert resolution.sprite is None
     assert resolution.routes_tried == ()
+
+
+# --- `resolve_display_name_icon` and scoped ambiguity ---------------------------
+
+
+def test_resolve_display_name_icon_strips_file_extension() -> None:
+    """Extensions like .gif and .png in wiki image parameters are stripped."""
+    join_table = parse_resource_locations([rl_row("Wheat", "wheat", "item")])
+    sprite_index = parse_sprite_files([sprite_row("InvSprite", "Wheat")])
+
+    res = resolve_display_name_icon("Wheat.gif", join_table, sprite_index)
+    assert res.sprite is not None
+    assert res.sprite.file_title == "File:InvSprite Wheat.png"
+
+
+def test_resolve_display_name_icon_id_fallback() -> None:
+    """When display_name route finds no sprite, candidate's id route is tried."""
+    join_table = parse_resource_locations([rl_row("Wind Charge", "wind_charge", "item")])
+    sprite_index = parse_sprite_files([sprite_row("ItemSprite", "wind-charge")])
+
+    res = resolve_display_name_icon("Wind Charge", join_table, sprite_index)
+    assert res.sprite is not None
+    assert res.sprite.file_title == "File:ItemSprite wind-charge.png"
+    assert res.matched_route == "id"
+
+
+def test_resolve_icon_scopes_ambiguity_to_rule_join_kinds() -> None:
+    """Item ender_eye resolves because entity eye_of_ender is outside item join kinds."""
+    join_table = parse_resource_locations(
+        [
+            rl_row("Eye of Ender", "ender_eye", "item"),
+            rl_row("Eye of Ender", "eye_of_ender", "entity"),
+        ]
+    )
+    sprite_index = parse_sprite_files([sprite_row("InvSprite", "Eye of Ender")])
+
+    res = resolve_icon("minecraft:ender_eye", ICON_RULES["item"], join_table, sprite_index)
+    assert res.sprite is not None
+    assert res.sprite.file_title == "File:InvSprite Eye of Ender.png"
+
+
+def test_resolve_display_name_icon_scopes_ambiguity_to_item_block_first() -> None:
+    """Display name with item and entity candidates prioritizes item/block without ambiguity."""
+    join_table = parse_resource_locations(
+        [
+            rl_row("Eye of Ender", "ender_eye", "item"),
+            rl_row("Eye of Ender", "eye_of_ender", "entity"),
+        ]
+    )
+    sprite_index = parse_sprite_files([sprite_row("InvSprite", "Eye of Ender")])
+
+    res = resolve_display_name_icon("Eye of Ender", join_table, sprite_index)
+    assert res.sprite is not None
+    assert res.sprite.file_title == "File:InvSprite Eye of Ender.png"
+
+
+def test_resolve_display_name_icon_declines_when_ambiguous_within_join_kinds() -> None:
+    """Two items sharing the same display name cannot be resolved unambiguously."""
+    join_table = parse_resource_locations(
+        [
+            rl_row("Widget", "widget_a", "item"),
+            rl_row("Widget", "widget_b", "item"),
+        ]
+    )
+    sprite_index = parse_sprite_files([sprite_row("InvSprite", "Widget")])
+
+    res = resolve_display_name_icon("Widget", join_table, sprite_index)
+    assert res.sprite is None
+    assert res.routes_tried == (("ambiguous", "Widget"),)
+    assert res.ambiguous_display_name == "Widget"
+
+
+def test_resolve_display_name_icon_missing_candidate_reports_routes_tried() -> None:
+    """A display name with no candidate returns None with tried routes."""
+    join_table = parse_resource_locations([])
+    sprite_index = parse_sprite_files([sprite_row("InvSprite", "something")])
+
+    res = resolve_display_name_icon("Uncraftable Potion", join_table, sprite_index)
+    assert res.sprite is None
+    assert res.routes_tried == (("display_name", "Uncraftable Potion"),)
+

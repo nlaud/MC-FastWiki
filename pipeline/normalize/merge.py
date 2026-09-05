@@ -244,7 +244,7 @@ from pipeline.normalize.entity import (
     TradeEntry,
     TradeTable,
 )
-from pipeline.normalize.reconcile import ICON_RULES, resolve_icon
+from pipeline.normalize.reconcile import ICON_RULES, resolve_display_name_icon, resolve_icon
 from pipeline.obtain.brewing import POTION_ID_TEMPLATE
 
 __all__ = [
@@ -1162,11 +1162,17 @@ def merge_entities(
             if box is not None and _statblock_has_content(box):
                 draft.add_section(_build_stat_block(box), SourceTier.B)
 
-        icon_key, routes, exempt = _resolve_entity_icon(entity_id, regs, join_table, sprite_index)
-        if icon_key is not None:
-            draft.set("icon", icon_key, SourceTier.B)
-        elif not exempt:
-            missing_icons.append(MissingIconEntity(id=entity_id, routes_tried=routes))
+        override = curated.overrides.get(entity_id)
+        if override is not None and override.icon is not None:
+            draft.set("icon", override.icon, SourceTier.C)
+        else:
+            icon_key, routes, exempt = _resolve_entity_icon(
+                entity_id, regs, join_table, sprite_index
+            )
+            if icon_key is not None:
+                draft.set("icon", icon_key, SourceTier.B)
+            elif not exempt:
+                missing_icons.append(MissingIconEntity(id=entity_id, routes_tried=routes))
 
         curated_aliases = curated.aliases.get(entity_id, ())
         for alias, strength in generate_aliases(
@@ -1223,6 +1229,32 @@ def merge_entities(
                     background=wiki_advancement.background,
                 ),
                 SourceTier.B,
+            )
+
+        if override is not None and override.icon is not None:
+            draft.set("icon", override.icon, SourceTier.C)
+        elif wiki_advancement is not None and wiki_advancement.icon is not None:
+            resolution = resolve_display_name_icon(
+                wiki_advancement.icon, join_table, sprite_index
+            )
+            if resolution.sprite is not None:
+                draft.set(
+                    "icon",
+                    f"{resolution.matched_family}:{resolution.sprite.sprite_id}",
+                    SourceTier.B,
+                )
+            else:
+                adv_routes = tuple(
+                    ("advancement", family, sprite_id)
+                    for family, sprite_id in resolution.routes_tried
+                )
+                missing_icons.append(MissingIconEntity(id=entity_id, routes_tried=adv_routes))
+        else:
+            missing_icons.append(
+                MissingIconEntity(
+                    id=entity_id,
+                    routes_tried=(("advancement", "none", "none"),),
+                )
             )
 
         curated_aliases = curated.aliases.get(entity_id, ())
