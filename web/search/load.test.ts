@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearShardCache, loadIndex, loadShard } from "./load.js";
+import { clearObtainCache, clearShardCache, loadIndex, loadObtain, loadShard } from "./load.js";
 
 describe("loadIndex", () => {
   const originalFetch = globalThis.fetch;
@@ -143,6 +143,90 @@ describe("loadShard", () => {
 
     const first = await loadShard("item-0");
     const second = await loadShard("item-0");
+
+    expect(first).toBe(second);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("loadObtain", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    clearObtainCache();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    clearObtainCache();
+  });
+
+  it("loads and returns obtain payload when valid", async () => {
+    const mockObtain = {
+      schemaVersion: 1,
+      producers: {
+        "minecraft:iron_ingot": [
+          {
+            m: "smelting",
+            src: "smelting/iron_ingot",
+            c: 1,
+          },
+        ],
+      },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockObtain),
+    });
+
+    const obtain = await loadObtain();
+    expect(obtain.schemaVersion).toBe(1);
+    expect(obtain.producers["minecraft:iron_ingot"]).toHaveLength(1);
+  });
+
+  it("rejects non-OK responses naming HTTP status", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    });
+
+    await expect(loadObtain()).rejects.toThrow("HTTP 404");
+  });
+
+  it("rejects when schemaVersion is not 1 naming both versions", async () => {
+    const staleObtain = {
+      schemaVersion: 2,
+      producers: {},
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(staleObtain),
+    });
+
+    await expect(loadObtain()).rejects.toThrow(/expected 1.*got 2/i);
+  });
+
+  it("caches loaded obtain graph in memory and avoids second fetch", async () => {
+    const mockObtain = {
+      schemaVersion: 1,
+      producers: {},
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockObtain),
+    });
+    globalThis.fetch = fetchMock;
+
+    const first = await loadObtain();
+    const second = await loadObtain();
 
     expect(first).toBe(second);
     expect(fetchMock).toHaveBeenCalledTimes(1);

@@ -994,3 +994,242 @@ canvas,
   color: #aaa;
   font-size: 0.82rem;
 }
+
+/* ---------------------------------------------------------------------------
+   HarvestInfo section
+   --------------------------------------------------------------------------- */
+.harvest-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.harvest-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.harvest-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.harvest-label {
+  color: #888;
+  min-width: 140px;
+}
+
+.harvest-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.harvest-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.harvest-badge.badge-yes {
+  color: #81c995;
+  background: rgba(129, 201, 149, 0.15);
+  border: 1px solid rgba(129, 201, 149, 0.35);
+}
+
+.harvest-badge.badge-no {
+  color: #f28b82;
+  background: rgba(242, 139, 130, 0.15);
+  border: 1px solid rgba(242, 139, 130, 0.35);
+}
+
+/* ---------------------------------------------------------------------------
+   RecipeTree section (Obtaining)
+   --------------------------------------------------------------------------- */
+.recipe-tree-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tree-method-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tree-method-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #adc8ff;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tree-producer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #181818;
+  border: 1px solid #282828;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.tree-producer-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Per-method colour on the group heading. Every producer row sits under a
+   heading naming its method, so the colour belongs on the heading rather than
+   on a badge repeated once per row. */
+.tree-method-title.method-crafting {
+  color: #8ab4f8;
+}
+
+.tree-method-title.method-smelting {
+  color: #ffb74d;
+}
+
+.tree-method-title.method-brewing {
+  color: #d7aefb;
+}
+
+.tree-method-title.method-mob_loot {
+  color: #f28b82;
+}
+
+.tree-method-title.method-chest_loot {
+  color: #fdd663;
+}
+
+.tree-method-title.method-trade {
+  color: #81c995;
+}
+
+.station-badge,
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  background: #222;
+  color: #aaa;
+  border: 1px solid #333;
+}
+
+/* Names the chest a loot producer comes from. Such a producer consumes
+   nothing, so without this its row is the bare method name repeated once per
+   chest. Reads as the primary text of the row, not as another badge. */
+.tree-source-label {
+  color: #d0d0d0;
+  font-size: 0.85rem;
+}
+
+.tree-inputs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-input-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tree-input-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tree-input-count {
+  color: #aaa;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.tree-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  background: #242424;
+  color: #c58af9;
+  border: 1px solid #382d47;
+}
+
+.tree-members-count {
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.tree-back-reference {
+  color: #888;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.tree-stub {
+  margin-left: 18px;
+  margin-top: 2px;
+}
+
+.tree-expand-stub-btn,
+.tree-more-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+  background: #242424;
+  color: #8ab4f8;
+  border: 1px solid #3a3a3a;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.tree-expand-stub-btn:hover,
+.tree-more-button:hover {
+  background: #333;
+  border-color: #555;
+  color: #adc8ff;
+}
+
+.tree-expand-stub-btn:focus-visible,
+.tree-more-button:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: 1px;
+}
+
+.tree-node .tree-node {
+  margin-left: 16px;
+  border-left: 2px solid #2a2a2a;
+  padding-left: 10px;
+  margin-top: 4px;
+}

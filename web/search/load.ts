@@ -1,5 +1,6 @@
 import type { Atlas } from "../types/atlas.js";
 import type { Index } from "../types/index.js";
+import type { Obtain } from "../types/obtain.js";
 import type { Shard } from "../types/shard.js";
 
 /**
@@ -121,4 +122,48 @@ export async function loadAtlas(url?: string): Promise<Atlas> {
 
 export function clearAtlasCache(): void {
   atlasPromise = null;
+}
+
+let obtainPromise: Promise<Obtain> | null = null;
+
+/**
+ * Loads the obtain graph from /data/obtain.json relative to the app base URL.
+ *
+ * Caches the graph in memory so repeated requests do not perform duplicate fetches.
+ */
+export async function loadObtain(url?: string): Promise<Obtain> {
+  if (!url && obtainPromise) {
+    return obtainPromise;
+  }
+
+  const base = import.meta.env.BASE_URL.endsWith("/")
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`;
+  const targetUrl = url ?? `${base}data/obtain.json`;
+
+  const promise = (async () => {
+    const response = await fetch(targetUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to load obtain graph: HTTP ${response.status.toString()}`);
+    }
+
+    const data = (await response.json()) as Partial<Obtain>;
+    if (data.schemaVersion !== 1) {
+      throw new Error(
+        `Obtain schemaVersion mismatch: expected 1, got ${String(data.schemaVersion)}`,
+      );
+    }
+
+    return data as Obtain;
+  })();
+
+  if (!url) {
+    obtainPromise = promise;
+  }
+
+  return promise;
+}
+
+export function clearObtainCache(): void {
+  obtainPromise = null;
 }

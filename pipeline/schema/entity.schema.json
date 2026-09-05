@@ -286,7 +286,7 @@
       }
     },
     "section": {
-      "description": "One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` carry real, closed fields. The other six are still open payloads; each one's own description names the later phase that fills it in.",
+      "description": "One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` and `harvestInfo` carry real, closed fields. The other five are still open payloads; each one's own description names the later phase that fills it in.",
       "oneOf": [
         {
           "$ref": "#/$defs/statBlock"
@@ -308,6 +308,9 @@
         },
         {
           "$ref": "#/$defs/foodInfo"
+        },
+        {
+          "$ref": "#/$defs/harvestInfo"
         },
         {
           "$ref": "#/$defs/effectSources"
@@ -817,6 +820,45 @@
         },
         "teleportsRandomly": {
           "description": "Whether consuming this teleports the player, as the chorus fruit does.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "harvestTool": {
+      "title": "HarvestTool",
+      "description": "The tool that breaks a block, from the mineable tags.",
+      "type": "string",
+      "enum": ["pickaxe", "axe", "shovel", "hoe"]
+    },
+    "harvestTier": {
+      "title": "HarvestTier",
+      "description": "The material floor of the tool, from the needs_<material>_tool tags.",
+      "type": "string",
+      "enum": ["wooden", "stone", "iron", "diamond"]
+    },
+    "harvestInfo": {
+      "title": "HarvestInfo",
+      "description": "What tool and tier are needed to harvest a block, from the vanilla block tags. tools lists the mineable tools in HarvestTool order. tier is the material floor. dropsWithoutTool indicates whether the block drops itself when broken without the right tool.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tools", "tier", "dropsWithoutTool"],
+      "properties": {
+        "type": {
+          "const": "HarvestInfo"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/harvestTool"
+          },
+          "default": []
+        },
+        "tier": {
+          "$ref": "#/$defs/harvestTier"
+        },
+        "dropsWithoutTool": {
+          "description": "Whether the block drops itself when broken without the required tool.",
           "type": "boolean",
           "default": false
         }

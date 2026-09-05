@@ -7,16 +7,22 @@ import type {
   DropTable,
   Entity,
   FoodInfo,
+  HarvestInfo,
+  RecipeTree,
   SpawnInfo,
   StatBlock,
   TradeTable,
 } from "../types/entity.js";
 import type { Index, IndexEntry } from "../types/index.js";
+import type { Obtain } from "../types/obtain.js";
 import type { RenderContext } from "./context.js";
+import { buildObtainTree } from "./obtain-tree.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
 import { renderFoodInfo } from "./sections/food-info.js";
+import { renderHarvestInfo } from "./sections/harvest-info.js";
+import { renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
 import { renderTradeTable } from "./sections/trade-table.js";
@@ -37,6 +43,8 @@ describe("Section renderers with real committed build data", () => {
 
   /** Every item entity of the committed build, across all item shards. */
   let itemsById: Map<string, Entity>;
+  let blocksById: Map<string, Entity>;
+  let obtainGraph: Obtain;
 
   beforeAll(() => {
     // Load real dist data
@@ -86,6 +94,18 @@ describe("Section renderers with real committed build data", () => {
         itemsById.set(entity.id, entity);
       }
     }
+
+    const block0Raw = fs.readFileSync(
+      path.resolve(process.cwd(), "data/dist/entities/block-0.json"),
+      "utf8",
+    );
+    blocksById = new Map<string, Entity>();
+    for (const entity of (JSON.parse(block0Raw) as { entities: Entity[] }).entities) {
+      blocksById.set(entity.id, entity);
+    }
+
+    const obtainRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/obtain.json"), "utf8");
+    obtainGraph = JSON.parse(obtainRaw) as Obtain;
 
     const indexRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/index.json"), "utf8");
     const index = JSON.parse(indexRaw) as Index;
@@ -670,6 +690,231 @@ describe("Section renderers with real committed build data", () => {
       };
 
       expect(renderFoodInfo(empty, ctx)).toBeNull();
+    });
+  });
+
+  describe("renderHarvestInfo", () => {
+    it("renders tool, tier, and dropsWithoutTool correctly for chiseled_bookshelf", () => {
+      const bookshelf = requireItem(
+        blocksById.get("minecraft:chiseled_bookshelf"),
+        "Chiseled Bookshelf",
+      );
+      const harvestSection = requireItem(
+        bookshelf.sections.find((s): s is HarvestInfo => s.type === "HarvestInfo"),
+        "HarvestInfo",
+      );
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      expect(el.querySelector(".section-title")?.textContent).toBe("Harvest");
+      expect(el.textContent).toContain("Axe");
+      expect(el.textContent).toContain("Wooden (any)");
+      expect(el.querySelector(".badge-yes")?.textContent).toBe("Yes");
+    });
+
+    it("renders dropsWithoutTool as No for pickaxe blocks", () => {
+      const anvil = requireItem(blocksById.get("minecraft:chipped_anvil"), "Chipped Anvil");
+      const harvestSection = requireItem(
+        anvil.sections.find((s): s is HarvestInfo => s.type === "HarvestInfo"),
+        "HarvestInfo",
+      );
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      expect(el.textContent).toContain("Pickaxe");
+      expect(el.querySelector(".badge-no")?.textContent).toBe("No");
+    });
+
+    it("renders minimum tier above wooden without the (any) suffix", () => {
+      const copper = requireItem(blocksById.get("minecraft:chiseled_copper"), "Chiseled Copper");
+      const harvestSection = requireItem(
+        copper.sections.find((s): s is HarvestInfo => s.type === "HarvestInfo"),
+        "HarvestInfo",
+      );
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      expect(el.textContent).toContain("Stone");
+      expect(el.textContent).not.toContain("Stone (any)");
+    });
+  });
+
+  describe("renderRecipeTree", () => {
+    it("renders Obtaining heading and groups producers by method", () => {
+      const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
+      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      expect(el.querySelector(".section-title")?.textContent).toBe("Obtaining");
+      const methodTitles = Array.from(el.querySelectorAll(".tree-method-title")).map(
+        (t) => t.textContent,
+      );
+      expect(methodTitles).toContain("Crafting");
+      expect(methodTitles).toContain("Smelting");
+    });
+
+    it("orders method groups by usefulness, not by the graph's alphabetical sort", () => {
+      const tree = buildObtainTree("minecraft:emerald", obtainGraph);
+      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      // Only the root node's own groups: a nested node orders its own.
+      const rootNode = requireItem(el.querySelector(".tree-node"), "root tree node");
+      const titles = Array.from(rootNode.children)
+        .filter((child) => child.classList.contains("tree-method-group"))
+        .map((group) => group.querySelector(".tree-method-title")?.textContent);
+
+      // The graph sorts chest_loot above crafting alphabetically, which led an
+      // item you simply craft with a list of chests it might be lying in.
+      expect(titles.indexOf("Crafting")).toBeLessThan(titles.indexOf("Chest Loot"));
+      expect(titles.indexOf("Smelting")).toBeLessThan(titles.indexOf("Trading"));
+      expect(titles[0]).toBe("Crafting");
+    });
+
+    it("names the chest a loot producer comes from, keeping the directory that qualifies it", () => {
+      const tree = buildObtainTree("minecraft:emerald", obtainGraph);
+      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      const labels = Array.from(el.querySelectorAll(".tree-source-label")).map(
+        (e) => e.textContent,
+      );
+      expect(labels.length).toBeGreaterThan(0);
+
+      // A bare basename would read "intersection", which names nothing.
+      const nested = labels.filter((l) => l.startsWith("trial chambers"));
+      expect(nested.length).toBeGreaterThan(0);
+
+      // And the directory is not repeated: "village armorer", never
+      // "village village armorer".
+      expect(labels.some((l) => /^(\w+) \1\b/.test(l))).toBe(false);
+    });
+
+    it("shows up to 3 producers per group with remainder behind toggle button", () => {
+      const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
+      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      // Iron ingot has many chest_loot producers (> 3)
+      const moreBtn = el.querySelector<HTMLButtonElement>(".tree-more-button");
+      expect(moreBtn).not.toBeNull();
+      expect(moreBtn?.textContent).toMatch(/Show \d+ more/i);
+
+      // The overflow rows do not exist until the reader asks for them: building
+      // them eagerly and hiding them costs the whole subtree of every hidden
+      // producer for rows nobody has opened.
+      const overflow = el.querySelector<HTMLElement>(".tree-group-overflow");
+      expect(overflow?.hidden).toBe(true);
+      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBe(0);
+
+      moreBtn?.click();
+      expect(overflow?.hidden).toBe(false);
+      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBeGreaterThan(0);
+      expect(moreBtn?.textContent).toMatch(/Show fewer/i);
+
+      // Collapsing keeps the rows already built, rather than rebuilding on
+      // every toggle.
+      const builtRows = overflow?.querySelectorAll(".tree-producer-row").length;
+      moreBtn?.click();
+      expect(overflow?.hidden).toBe(true);
+      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBe(builtRows);
+    });
+
+    it("renders stub with expand button and clicking expands the subtree", async () => {
+      const tree = buildObtainTree("minecraft:chiseled_resin_bricks", obtainGraph, {
+        maxDepth: 1,
+      });
+      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      const expandBtn = el.querySelector<HTMLButtonElement>(".tree-expand-stub-btn");
+      expect(expandBtn).not.toBeNull();
+      expect(expandBtn?.textContent).toBe("Expand...");
+
+      expandBtn?.click();
+      // Wait for async stub expansion
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(el.querySelector(".tree-node")).not.toBeNull();
+    });
+
+    it("renders back-reference as text reference and not a second subtree", () => {
+      const backRefNode = {
+        item: "minecraft:iron_ingot",
+        producers: [
+          {
+            method: "crafting" as const,
+            station: null,
+            note: null,
+            source_id: "test",
+            inputs: [
+              {
+                label: "minecraft:iron_nugget",
+                item: "minecraft:iron_nugget",
+                tag: null,
+                count: 1,
+                members: [],
+                node: {
+                  item: "minecraft:iron_nugget",
+                  producers: [],
+                  expandable: false,
+                  back_reference: "root.producers.0.inputs.0",
+                },
+              },
+            ],
+          },
+        ],
+        expandable: false,
+        back_reference: null,
+      };
+      const section = { type: "RecipeTree", root: backRefNode } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      // The node path is an addressing detail of the walk, so it rides on
+      // `title` rather than being printed at a player.
+      const backRefEl = el.querySelector<HTMLElement>(".tree-back-reference");
+      expect(backRefEl).not.toBeNull();
+      expect(backRefEl?.textContent).toBe("(shown above)");
+      expect(backRefEl?.title).toBe("root.producers.0.inputs.0");
+      expect(backRefEl?.textContent).not.toContain("producers.0");
+    });
+
+    it("prints plain text instead of link when item is absent from search index", () => {
+      const unindexedNode = {
+        item: "minecraft:test_item",
+        producers: [
+          {
+            method: "crafting" as const,
+            station: null,
+            note: null,
+            source_id: "test",
+            inputs: [
+              {
+                label: "minecraft:unknown_material",
+                item: "minecraft:unknown_material",
+                tag: null,
+                count: 1,
+                members: [],
+                node: null,
+              },
+            ],
+          },
+        ],
+        expandable: false,
+        back_reference: null,
+      };
+      const section = { type: "RecipeTree", root: unindexedNode } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      expect(el.querySelector("a.entity-link[data-id='minecraft:unknown_material']")).toBeNull();
+      expect(el.querySelector(".entity-plain")?.textContent).toBe("unknown material");
+    });
+
+    it("returns null when root has no producers", () => {
+      const emptyTree = {
+        item: "minecraft:bedrock",
+        producers: [],
+        expandable: false,
+        back_reference: null,
+      };
+      const section = { type: "RecipeTree", root: emptyTree } as unknown as RecipeTree;
+      expect(renderRecipeTree(section, ctx)).toBeNull();
     });
   });
 });

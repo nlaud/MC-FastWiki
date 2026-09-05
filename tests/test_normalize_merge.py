@@ -36,10 +36,11 @@ from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
 from pipeline.extract.entity_class import EntityClass, EntityClassification
+from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.fetch.extracts import ExtractReport, PageExtract
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
-from pipeline.normalize.entity import BreedingInfo, EntityKind, SourceTier
+from pipeline.normalize.entity import BreedingInfo, EntityKind, HarvestInfo, SourceTier
 from pipeline.normalize.merge import MergeResult, merge_entities, write_report
 
 # --- Fixture builders -------------------------------------------------------
@@ -1254,4 +1255,112 @@ def test_wolf_breeding_and_taming_items_never_conflated() -> None:
     assert [item.name for item in breeding_info.taming_items] == ["Bone"]
     assert breeding_info.taming_items[0].ref is not None
     assert breeding_info.taming_items[0].ref.id == "minecraft:bone"
+
+
+def test_harvest_info_attached_to_block() -> None:
+    test_registries = {
+        "entity_type": ["creeper"],
+        "block": ["obsidian", "oak_log", "stone"],
+        "item": [],
+        "mob_effect": [],
+        "worldgen/biome": [],
+        "enchantment": [],
+    }
+    test_join_table = parse_resource_locations(
+        [
+            rl_row("Creeper", "creeper", "entity"),
+            rl_row("Obsidian", "obsidian", "block"),
+            rl_row("Oak Log", "oak_log", "block"),
+            rl_row("Stone", "stone", "block"),
+        ]
+    )
+    harvest_index = {
+        "minecraft:obsidian": BlockHarvest(
+            block="minecraft:obsidian",
+            tools=(HarvestTool.PICKAXE,),
+            tier=HarvestTier.DIAMOND,
+        ),
+        "minecraft:oak_log": BlockHarvest(
+            block="minecraft:oak_log",
+            tools=(HarvestTool.AXE,),
+            tier=HarvestTier.WOODEN,
+        ),
+        "minecraft:stone": BlockHarvest(
+            block="minecraft:stone",
+            tools=(HarvestTool.PICKAXE,),
+            tier=HarvestTier.WOODEN,
+        ),
+    }
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=(),
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        harvest_index=harvest_index,
+    )
+    obsidian = result.by_id["minecraft:obsidian"]
+    h_obsidian = next(s for s in obsidian.sections if isinstance(s, HarvestInfo))
+    assert obsidian.sections[0] == h_obsidian
+    assert h_obsidian.tools == (HarvestTool.PICKAXE,)
+    assert h_obsidian.tier == HarvestTier.DIAMOND
+    assert h_obsidian.drops_without_tool is False
+
+    oak_log = result.by_id["minecraft:oak_log"]
+    h_oak = next(s for s in oak_log.sections if isinstance(s, HarvestInfo))
+    assert oak_log.sections[0] == h_oak
+    assert h_oak.tools == (HarvestTool.AXE,)
+    assert h_oak.tier == HarvestTier.WOODEN
+    assert h_oak.drops_without_tool is True
+
+    stone = result.by_id["minecraft:stone"]
+    h_stone = next(s for s in stone.sections if isinstance(s, HarvestInfo))
+    assert stone.sections[0] == h_stone
+    assert h_stone.tools == (HarvestTool.PICKAXE,)
+    assert h_stone.tier == HarvestTier.WOODEN
+    assert h_stone.drops_without_tool is False
+
+
+def test_harvest_info_unplaced_row_recorded() -> None:
+    test_registries = {
+        "entity_type": ["creeper"],
+        "block": [],
+        "item": [],
+        "mob_effect": [],
+        "worldgen/biome": [],
+        "enchantment": [],
+    }
+    test_join_table = parse_resource_locations([rl_row("Creeper", "creeper", "entity")])
+    harvest_index = {
+        "minecraft:ghost_block": BlockHarvest(
+            block="minecraft:ghost_block",
+            tools=(HarvestTool.PICKAXE,),
+            tier=HarvestTier.STONE,
+        ),
+    }
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=(),
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        harvest_index=harvest_index,
+    )
+    unplaced = [r for r in result.report.unplaced if r.table == "harvest"]
+    assert len(unplaced) == 1
+    assert unplaced[0].subject == "minecraft:ghost_block"
 
