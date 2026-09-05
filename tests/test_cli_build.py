@@ -370,6 +370,34 @@ def _build_fixtures() -> dict[str, bytes]:
         }
     ).encode("utf-8")
 
+    breeding_table = (
+        '{| class="wikitable sortable" data-description="Breeding foods"\n'
+        "|-\n"
+        "! Mob\n"
+        "! Items\n"
+        "! Other\n"
+        "|-\n"
+        "| {{EntityLink|Creeper}}\n"
+        "| {{ItemLink|Stick}}\n"
+        "| None\n"
+        "|}"
+    )
+    fixtures[build_wikitext_url(["Breeding"])] = json.dumps(
+        {
+            "batchcomplete": True,
+            "query": {
+                "pages": [
+                    {
+                        "pageid": 3,
+                        "ns": 0,
+                        "title": "Breeding",
+                        "revisions": [{"slots": {"main": {"content": breeding_table}}}],
+                    }
+                ]
+            },
+        }
+    ).encode("utf-8")
+
     infobox_text = "{{Infobox entity\n| health = {{hp|20}}\n}}"
     fixtures[build_wikitext_url(["Creeper"])] = json.dumps(
         {

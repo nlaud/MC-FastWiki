@@ -15,6 +15,9 @@ describe("mount", () => {
       { id: "minecraft:diamond", n: "Diamond", k: "item", a: [], s: "item-0" },
       { id: "minecraft:creeper", n: "Creeper", k: "mob", a: [], s: "mob-0" },
       { id: "minecraft:iron_ingot", n: "Iron Ingot", k: "item", a: [], s: "item-0" },
+      { id: "minecraft:emerald", n: "Emerald", k: "item", a: [], s: "item-0" },
+      { id: "minecraft:coal", n: "Coal", k: "item", a: [], s: "item-0" },
+      { id: "minecraft:stick", n: "Stick", k: "item", a: [], s: "item-0" },
     ],
   };
 
@@ -83,12 +86,31 @@ describe("mount", () => {
         blurb: "A versatile metal.",
         wikiUrl: "https://minecraft.wiki/w/Iron_Ingot",
       },
+      {
+        id: "minecraft:emerald",
+        kind: "item",
+        name: "Emerald",
+        blurb: "A green gem.",
+      },
+      {
+        id: "minecraft:coal",
+        kind: "item",
+        name: "Coal",
+        blurb: "A fuel mineral.",
+      },
+      {
+        id: "minecraft:stick",
+        kind: "item",
+        name: "Stick",
+        blurb: "A wooden stick.",
+      },
     ],
   };
 
   beforeEach(() => {
     vi.restoreAllMocks();
     document.body.replaceChildren();
+    HTMLElement.prototype.scrollBy = vi.fn();
     root = document.createElement("div");
     root.id = "app";
     document.body.append(root);
@@ -200,7 +222,7 @@ describe("mount", () => {
     expect(badge?.textContent).toBe("mob");
   });
 
-  it("hides search bar and shows hint at 4 windows, and restores bar on Alt+W", async () => {
+  it("hides search bar and shows hint at 8 windows, and restores bar on Alt+W", async () => {
     const corpus = buildCorpus(mockIndex);
     mount(root, corpus);
 
@@ -219,19 +241,50 @@ describe("mount", () => {
     await openItem("villager");
     await openItem("diamond");
     await openItem("creeper");
+    await openItem("iron");
+    await openItem("golden");
+    await openItem("emerald");
+    await openItem("coal");
     expect(hint.style.display).toBe("none");
 
-    await openItem("iron");
-    expect(root.querySelectorAll(".wiki-window")).toHaveLength(4);
+    await openItem("stick");
+    expect(root.querySelectorAll(".wiki-window")).toHaveLength(8);
     expect(hint.style.display).toBe("block");
     expect(input.parentElement?.style.display).toBe("none");
 
     // Close focused window with Alt+W
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "w", altKey: true }));
-    expect(root.querySelectorAll(".wiki-window")).toHaveLength(3);
+    expect(root.querySelectorAll(".wiki-window")).toHaveLength(7);
     expect(hint.style.display).toBe("none");
     expect(input.parentElement?.style.display).toBe("block");
     expect(document.activeElement).toBe(input);
+  });
+
+  it("scrolls focused window by clientHeight on Shift+ArrowDown", async () => {
+    const corpus = buildCorpus(mockIndex);
+    mount(root, corpus);
+
+    const input = root.querySelector<HTMLInputElement>("input.search-input");
+    if (!input) throw new Error("Missing input");
+    input.value = "creeper";
+    input.dispatchEvent(new Event("input"));
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await Promise.resolve();
+
+    const windowBody = root.querySelector<HTMLElement>(".window-body");
+    if (!windowBody) throw new Error("Missing window body");
+
+    const scrollByMock = vi.fn();
+    windowBody.scrollBy = scrollByMock;
+    Object.defineProperty(windowBody, "clientHeight", { value: 600, configurable: true });
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", shiftKey: true }));
+
+    expect(scrollByMock).toHaveBeenCalledWith({
+      top: 600,
+      behavior: "smooth",
+    });
   });
 
   it("toggles help overlay with F1 and dismisses it with Esc", () => {

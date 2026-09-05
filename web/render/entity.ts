@@ -31,16 +31,6 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
       const entity = rawEntity as unknown as Entity;
       container.replaceChildren();
 
-      const meta = document.createElement("div");
-      meta.className = "entity-meta";
-
-      const badge = document.createElement("span");
-      badge.className = "entity-kind-badge";
-      badge.textContent = entity.kind;
-      meta.append(badge);
-
-      container.append(meta);
-
       if (entity.blurb) {
         const blurbEl = document.createElement("p");
         blurbEl.className = "entity-blurb";
@@ -53,7 +43,7 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
         const sectionsContainer = document.createElement("div");
         sectionsContainer.className = "entity-sections";
         for (const section of entity.sections) {
-          const el = renderSection(section, ctx);
+          const el = renderSection(section, ctx, entity);
           if (el) {
             sectionsContainer.append(el);
           }

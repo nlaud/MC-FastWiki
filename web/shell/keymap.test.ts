@@ -20,7 +20,8 @@ describe("keymap", () => {
     expect(keys).toContain("Enter");
     expect(keys).toContain("Esc");
     expect(keys).toContain("Alt+W");
-    expect(keys).toContain("Alt+1 to Alt+4");
+    expect(keys).toContain("Alt+1 to Alt+8");
+    expect(keys).toContain("Shift+Up / Shift+Down");
     expect(keys).toContain("Tab");
     expect(keys).toContain("F1");
   });
@@ -68,9 +69,9 @@ describe("keymap", () => {
     });
   });
 
-  describe("Alt+1 to Alt+4", () => {
+  describe("Alt+1 to Alt+8", () => {
     it("dispatches FOCUS_SLOT when the target slot is occupied", () => {
-      const ctx: KeyContext = { ...defaultContext, occupiedSlots: [0, 2] };
+      const ctx: KeyContext = { ...defaultContext, occupiedSlots: [0, 2, 7] };
 
       expect(dispatchKey({ key: "1", altKey: true }, ctx)).toEqual({
         type: "FOCUS_SLOT",
@@ -80,12 +81,17 @@ describe("keymap", () => {
         type: "FOCUS_SLOT",
         slot: 2,
       });
+      expect(dispatchKey({ key: "8", altKey: true }, ctx)).toEqual({
+        type: "FOCUS_SLOT",
+        slot: 7,
+      });
     });
 
     it("ignores Alt+digit when the slot is not occupied", () => {
       const ctx: KeyContext = { ...defaultContext, occupiedSlots: [0] };
       expect(dispatchKey({ key: "2", altKey: true }, ctx)).toBeNull();
       expect(dispatchKey({ key: "4", altKey: true }, ctx)).toBeNull();
+      expect(dispatchKey({ key: "8", altKey: true }, ctx)).toBeNull();
     });
   });
 
@@ -159,6 +165,35 @@ describe("keymap", () => {
 
       expect(dispatchKey({ key: "ArrowDown" }, ctx)).toBeNull();
       expect(dispatchKey({ key: "ArrowUp" }, ctx)).toBeNull();
+    });
+  });
+
+  describe("Shift+ArrowUp / Shift+ArrowDown", () => {
+    it("dispatches PAGE_SCROLL_WINDOW when windows are open", () => {
+      const ctx: KeyContext = {
+        ...defaultContext,
+        hasSuggestions: true,
+        hasOpenWindows: true,
+      };
+
+      expect(dispatchKey({ key: "ArrowDown", shiftKey: true }, ctx)).toEqual({
+        type: "PAGE_SCROLL_WINDOW",
+        delta: 1,
+      });
+      expect(dispatchKey({ key: "ArrowUp", shiftKey: true }, ctx)).toEqual({
+        type: "PAGE_SCROLL_WINDOW",
+        delta: -1,
+      });
+    });
+
+    it("does nothing when no window is open", () => {
+      const ctx: KeyContext = {
+        ...defaultContext,
+        hasOpenWindows: false,
+      };
+
+      expect(dispatchKey({ key: "ArrowDown", shiftKey: true }, ctx)).toBeNull();
+      expect(dispatchKey({ key: "ArrowUp", shiftKey: true }, ctx)).toBeNull();
     });
   });
 

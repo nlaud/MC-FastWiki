@@ -36,9 +36,14 @@ export const KEYMAP: readonly KeymapEntry[] = [
     when: "A window is open",
   },
   {
-    key: "Alt+1 to Alt+4",
+    key: "Alt+1 to Alt+8",
     does: "Focus the window in that slot",
     when: "That slot is occupied",
+  },
+  {
+    key: "Shift+Up / Shift+Down",
+    does: "Scroll the focused window by a full page",
+    when: "A window is open",
   },
   {
     key: "Tab",
@@ -61,6 +66,7 @@ export type KeyAction =
   | { type: "FOCUS_INPUT"; char?: string }
   | { type: "MOVE_SELECTION"; delta: 1 | -1 }
   | { type: "SCROLL_WINDOW"; delta: 1 | -1 }
+  | { type: "PAGE_SCROLL_WINDOW"; delta: 1 | -1 }
   | { type: "OPEN_SELECTED" }
   | { type: "CLEAR_QUERY" }
   | { type: "CLOSE_FOCUSED_WINDOW" }
@@ -115,7 +121,7 @@ export function dispatchKey(event: MinimalKeyboardEvent, context: KeyContext): K
       return null;
     }
 
-    if (/^[1-4]$/.test(event.key)) {
+    if (/^[1-8]$/.test(event.key)) {
       const slot = parseInt(event.key, 10) - 1;
       if (context.occupiedSlots.includes(slot)) {
         return { type: "FOCUS_SLOT", slot };
@@ -148,6 +154,12 @@ export function dispatchKey(event: MinimalKeyboardEvent, context: KeyContext): K
   // Up and Down arrows
   if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     const delta: 1 | -1 = event.key === "ArrowDown" ? 1 : -1;
+    if (event.shiftKey) {
+      if (context.hasOpenWindows) {
+        return { type: "PAGE_SCROLL_WINDOW", delta };
+      }
+      return null;
+    }
     if (context.hasSuggestions) {
       return { type: "MOVE_SELECTION", delta };
     }

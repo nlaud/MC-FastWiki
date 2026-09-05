@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   AdvancementInfo,
+  BreedingInfo,
   DropTable,
   Entity,
   SpawnInfo,
@@ -12,6 +13,7 @@ import type {
 import type { Index, IndexEntry } from "../types/index.js";
 import type { RenderContext } from "./context.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
+import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
@@ -121,10 +123,18 @@ describe("Section renderers with real committed build data", () => {
       expect(mobTypeBadges).toContain("Undead");
       expect(mobTypeBadges).toContain("Monster");
 
-      // Damage per difficulty
-      expect(text).toContain("Easy: 2.5 dmg");
-      expect(text).toContain("Normal: 3 dmg");
-      expect(text).toContain("Hard: 4.5 dmg");
+      // Damage formatted across difficulties
+      expect(text).toContain("2.5/3/4.5 dmg");
+      expect(text).not.toContain("Easy: 2.5 dmg");
+
+      // Visual icons for hearts, armor, damage, size
+      // 20 HP fills a player bar, and the 40-100 HP leader row fills one too
+      // and marks the overflow with a single "+".
+      expect(el.querySelectorAll(".icon-heart-full")).toHaveLength(20);
+      expect(el.querySelectorAll(".stat-icons-more")).toHaveLength(1);
+      expect(el.querySelectorAll(".icon-armor-full")).toHaveLength(1);
+      expect(el.querySelectorAll(".icon-damage")).toHaveLength(1);
+      expect(el.querySelectorAll(".icon-size")).toHaveLength(2);
 
       // Size
       expect(text).toContain("0.6 × 1.95m (Adult)");
@@ -136,6 +146,67 @@ describe("Section renderers with real committed build data", () => {
       expect(text).not.toContain("0%–5%");
       expect(text.toLowerCase()).not.toContain("speed");
       expect(text.toLowerCase()).not.toContain("knockback");
+    });
+
+    it("caps the heart row at a full player bar instead of drawing one lone heart", () => {
+      const warden: StatBlock = {
+        type: "StatBlock",
+        health: [{ value: { minimum: 500, maximum: 500 }, labels: [] }],
+        armor: [],
+        damage: [],
+        size: [],
+        behavior: [],
+        mobType: [],
+        speed: [],
+        knockbackResistance: [],
+      };
+
+      const el = requireItem(renderStatBlock(warden, ctx), "Warden StatBlock element");
+
+      expect(el.querySelectorAll(".icon-heart-full")).toHaveLength(10);
+      expect(el.querySelectorAll(".icon-heart-half")).toHaveLength(0);
+      expect(el.querySelector(".stat-icons-more")?.textContent).toBe("+");
+      expect(el.textContent).toContain("500 HP");
+    });
+
+    it("draws an exact sub-bar health value without an overflow marker", () => {
+      const chicken: StatBlock = {
+        type: "StatBlock",
+        health: [{ value: { minimum: 4, maximum: 4 }, labels: [] }],
+        armor: [],
+        damage: [],
+        size: [],
+        behavior: [],
+        mobType: [],
+        speed: [],
+        knockbackResistance: [],
+      };
+
+      const el = requireItem(renderStatBlock(chicken, ctx), "Chicken StatBlock element");
+
+      expect(el.querySelectorAll(".icon-heart-full")).toHaveLength(2);
+      expect(el.querySelectorAll(".stat-icons-more")).toHaveLength(0);
+    });
+
+    it("marks an armour range that starts at zero rather than drawing one icon", () => {
+      const player: StatBlock = {
+        type: "StatBlock",
+        health: [],
+        armor: [{ value: { minimum: 0, maximum: 20 }, labels: [] }],
+        damage: [],
+        size: [],
+        behavior: [],
+        mobType: [],
+        speed: [],
+        knockbackResistance: [],
+      };
+
+      const el = requireItem(renderStatBlock(player, ctx), "Player StatBlock element");
+
+      expect(el.querySelectorAll(".icon-armor-full")).toHaveLength(0);
+      expect(el.querySelectorAll(".icon-armor-half")).toHaveLength(0);
+      expect(el.querySelector(".stat-icons-more")?.textContent).toBe("+");
+      expect(el.textContent).toContain("0–20 Armor");
     });
   });
 
@@ -368,6 +439,108 @@ describe("Section renderers with real committed build data", () => {
       );
       const reqLinks = descs[1]?.querySelectorAll(".entity-link");
       expect(reqLinks?.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("BreedingInfo", () => {
+    it("renders untamed mob breeding section with default 20 minutes baby growth", () => {
+      const section: BreedingInfo = {
+        type: "BreedingInfo",
+        items: [{ name: "Wheat", ref: { id: "minecraft:wheat", name: "Wheat" } }],
+        requiresTaming: false,
+        tamingItems: [],
+        cooldownSeconds: 300,
+        babyGrowthSeconds: 1200,
+      };
+
+      const el = requireItem(renderBreedingInfo(section, ctx), "BreedingInfo element");
+
+      expect(el.querySelector(".section-title")?.textContent).toBe("Breeding");
+      expect(el.querySelector(".stat-badge")).toBeNull();
+
+      const timingText = el.querySelector(".breeding-timing")?.textContent ?? "";
+      expect(timingText).toContain("Cooldown: 5 minutes");
+      expect(timingText).toContain("Baby Growth: 20 minutes");
+
+      const foodItems = el.querySelectorAll(".breeding-items .entity-link");
+      expect(foodItems.length).toBe(1);
+      expect(foodItems[0]?.textContent).toContain("Wheat");
+
+      expect(el.querySelector(".taming-group")).toBeNull();
+    });
+
+    it("renders tamed mob with requires taming badge and separated taming items", () => {
+      const section: BreedingInfo = {
+        type: "BreedingInfo",
+        items: [
+          { name: "Raw Beef", ref: { id: "minecraft:beef", name: "Raw Beef" } },
+          { name: "Porkchop", ref: { id: "minecraft:porkchop", name: "Porkchop" } },
+        ],
+        requiresTaming: true,
+        tamingItems: [{ name: "Bone", ref: { id: "minecraft:bone", name: "Bone" } }],
+        cooldownSeconds: 300,
+        babyGrowthSeconds: 1200,
+      };
+
+      const el = requireItem(renderBreedingInfo(section, ctx), "BreedingInfo element");
+
+      const badge = el.querySelector(".stat-badge");
+      expect(badge?.textContent).toBe("Requires Taming");
+
+      const foodItems = Array.from(el.querySelectorAll(".breeding-items .entity-link"));
+      const foodNames = foodItems.map((item) => item.textContent);
+      expect(foodNames.some((n) => n.includes("Porkchop"))).toBe(true);
+      expect(foodNames.some((n) => n.includes("Bone"))).toBe(false);
+
+      const tamingGroup = requireItem(el.querySelector(".taming-group"), "taming group");
+      const tamingItems = Array.from(tamingGroup.querySelectorAll(".entity-link"));
+      const tamingNames = tamingItems.map((item) => item.textContent);
+      expect(tamingNames.some((n) => n.includes("Bone"))).toBe(true);
+      expect(tamingNames.some((n) => n.includes("Porkchop"))).toBe(false);
+    });
+
+    it("renders the section's own baby growth time, not one inferred from the food list", () => {
+      const sniffer: BreedingInfo = {
+        type: "BreedingInfo",
+        items: [{ name: "Torchflower Seeds" }],
+        requiresTaming: false,
+        tamingItems: [],
+        cooldownSeconds: 300,
+        babyGrowthSeconds: 2400,
+      };
+
+      const snifferEl = requireItem(renderBreedingInfo(sniffer, ctx), "Sniffer BreedingInfo");
+      const snifferTiming = snifferEl.querySelector(".breeding-timing")?.textContent ?? "";
+      expect(snifferTiming).toContain("Baby Growth: 40 minutes");
+
+      // A chicken eats Torchflower Seeds too, but grows up in the usual 20 minutes.
+      // Reading the food list instead of the field is what got this wrong before.
+      const chicken: BreedingInfo = {
+        type: "BreedingInfo",
+        items: [{ name: "Wheat Seeds" }, { name: "Torchflower Seeds" }],
+        requiresTaming: false,
+        tamingItems: [],
+        cooldownSeconds: 300,
+        babyGrowthSeconds: 1200,
+      };
+
+      const chickenEl = requireItem(renderBreedingInfo(chicken, ctx), "Chicken BreedingInfo");
+      const chickenTiming = chickenEl.querySelector(".breeding-timing")?.textContent ?? "";
+      expect(chickenTiming).toContain("Baby Growth: 20 minutes");
+      expect(chickenTiming).not.toContain("40 minutes");
+    });
+
+    it("returns null when items is empty", () => {
+      const section: BreedingInfo = {
+        type: "BreedingInfo",
+        items: [],
+        requiresTaming: false,
+        tamingItems: [],
+        cooldownSeconds: 300,
+        babyGrowthSeconds: 1200,
+      };
+
+      expect(renderBreedingInfo(section, ctx)).toBeNull();
     });
   });
 });

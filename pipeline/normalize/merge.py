@@ -205,6 +205,7 @@ from pathlib import Path
 from pydantic import BaseModel, model_validator
 
 from pipeline.enrich import advancement as enrich_advancement
+from pipeline.enrich import breeding as enrich_breeding
 from pipeline.enrich import droptable as enrich_droptable
 from pipeline.enrich import infobox as enrich_infobox
 from pipeline.enrich import spawn_table as enrich_spawn_table
@@ -218,6 +219,8 @@ from pipeline.normalize.aliases import AliasStrength, generate_aliases
 from pipeline.normalize.curated import CuratedData, StaleDocument
 from pipeline.normalize.entity import (
     AdvancementInfo,
+    BreedingInfo,
+    BreedingItem,
     DamageValue,
     DistributionEntry,
     DropEntry,
@@ -478,6 +481,7 @@ class MergeReport(BaseModel, frozen=True):
     missing_blurbs: tuple[MissingBlurb, ...] = ()
     unknown_curated_overrides: tuple[str, ...] = ()
     stale_curated_documents: tuple[StaleDocument, ...] = ()
+    split_ids: tuple[str, ...] = ()
     advancement_reconciliation: enrich_advancement.Reconciliation
     counts: Mapping[str, int] = {}
 
@@ -578,13 +582,27 @@ def _own_row(
     refuses outright, so the merge did not merely lose data -- it could not
     build at all.
     """
-    all_rows = join_table.by_registry_id.get(entity_id, ())
+    all_rows = join_table.by_registry_id.get(
+        f"{NAMESPACE}:{entity_id.removeprefix(f'{NAMESPACE}:entity_type/')}"
+        if entity_id.startswith(f"{NAMESPACE}:entity_type/")
+        else entity_id,
+        (),
+    )
+    path = entity_id.removeprefix(f"{NAMESPACE}:entity_type/").split(":", 1)[-1]
     for registry in registries:
         wanted = WIKI_KIND.get(registry, ())
         rows = tuple(row for row in all_rows if row.kind in wanted)
         names = {row.display_name for row in rows}
         if len(names) == 1:
             return rows[0]
+        path_matches = [
+            row for row in rows if row.display_name.casefold().replace(" ", "_") == path
+        ]
+        if len({row.display_name for row in path_matches}) == 1:
+            return path_matches[0]
+        exact_kind = [row for row in rows if row.kind == registry]
+        if len({row.display_name for row in exact_kind}) == 1:
+            return exact_kind[0]
 
     # Nothing matched on kind. Narrowing is a *disambiguator*, so when there
     # is exactly one display name to choose from there is nothing left for it
@@ -622,7 +640,6 @@ def _own_row(
     # ID's own name and cannot be anything else. `minecraft:weakness` carries
     # rows for `Weakness` and for the joke effect `Sharing`; `minecraft:potion`
     # carries 26, one per brewed potion, of which exactly one is `Potion`.
-    path = entity_id.split(":", 1)[-1]
     for row in all_rows:
         if row.display_name.casefold().replace(" ", "_") == path:
             return row
@@ -662,6 +679,11 @@ def _maybe_ref(
     if len(ids) != 1:
         return None
     target = next(iter(ids))
+    if registry == "entity_type":
+        path = target.split(":", 1)[-1]
+        qualified = f"{NAMESPACE}:entity_type/{path}"
+        if qualified in by_id:
+            target = qualified
     if target not in by_id:
         return None
     return EntityRef(id=target, name=name)
@@ -701,6 +723,11 @@ def _resolve_forward(
         )
         return None
     target = next(iter(ids))
+    if registry == "entity_type":
+        path = target.split(":", 1)[-1]
+        qualified = f"{NAMESPACE}:entity_type/{path}"
+        if qualified in by_id:
+            target = qualified
     if target not in by_id:
         unplaced.append(
             UnplacedRow(
@@ -733,6 +760,11 @@ def _resolve_entity_icon(
     becomes 43 entries of `MergeReport.missing_icons`, matching `reconcile`'s
     own exemption.
     """
+    raw_id = (
+        f"{NAMESPACE}:{entity_id.removeprefix(f'{NAMESPACE}:entity_type/')}"
+        if entity_id.startswith(f"{NAMESPACE}:entity_type/")
+        else entity_id
+    )
     tried_any_iconed_registry = False
     all_routes: list[tuple[str, str, str]] = []
     for registry in registries_of_id:
@@ -740,7 +772,7 @@ def _resolve_entity_icon(
         if rule is None or not rule.has_icons:
             continue
         tried_any_iconed_registry = True
-        resolution = resolve_icon(entity_id, rule, join_table, sprite_index)
+        resolution = resolve_icon(raw_id, rule, join_table, sprite_index)
         if resolution.sprite is not None:
             return f"{resolution.matched_family}:{resolution.sprite.sprite_id}", (), False
         all_routes.extend(
@@ -904,68 +936,57 @@ def _convert_trade_entry(
 # --- Enumeration ----------------------------------------------------------------
 
 
+def _should_split_entity_type(
+    registries: Sequence[str], rows: Sequence[ResourceLocation]
+) -> bool:
+    """Return True when an ID present in entity_type and other registries should split.
+
+    The wiki's own display names are the evidence: split an ID only when
+    the entity_type registry's wiki display names and the other registries'
+    wiki display names are disjoint. Leaves block + item pairs alone (they
+    share identical names), but splits chicken (Chicken vs Raw Chicken) and
+    ender_pearl (Ender Pearl vs Thrown Ender Pearl).
+    """
+    if "entity_type" not in registries or len(registries) < 2:
+        return False
+    wanted_entity = WIKI_KIND["entity_type"]
+    entity_names = {row.display_name for row in rows if row.kind in wanted_entity}
+    other_names = {row.display_name for row in rows if row.kind not in wanted_entity}
+    return bool(entity_names and other_names and entity_names.isdisjoint(other_names))
+
+
 def _registries_of_id(
     registries: Mapping[str, Sequence[str]],
     join_table: JoinTable,
     classification: EntityClassification,
-) -> dict[str, tuple[str, ...]]:
+) -> tuple[dict[str, tuple[str, ...]], tuple[str, ...]]:
     """Return every path of the six precedence registries, mapped to the registries it sits in.
 
     Each value lists the registries in the order the merge should try them, so
     `value[0]` is the entity's chosen registry: it decides the `kind` and it
     is the first registry `_own_row` looks for a wiki row under.
 
-    The starting order is `_REGISTRY_PRECEDENCE`, and two adjustments run on
+    The starting order is `_REGISTRY_PRECEDENCE`, and three adjustments run on
     top of it, in this order, for an ID that sits in more than one registry:
 
-    **First, the registry whose wiki row calls the ID by its own name wins.**
+    **First, an ID sitting in `entity_type` and other registries whose wiki
+    display names are disjoint is split into two entities.**
+    The precedence winner keeps the bare ID (e.g. `minecraft:chicken` for the
+    item) and `entity_type` gains a qualified path (e.g.
+    `minecraft:entity_type/chicken` for the mob).
+
+    **Second, the registry whose wiki row calls the ID by its own name wins.**
     Precedence alone is a guess about which of two meanings a player wants,
     and the wiki has already answered the question by choosing what to call
     each row.
 
-    `minecraft:ender_pearl` is the case that forced this. It is an
-    `entity_type` and an `item`, and the wiki writes two rows: `Ender Pearl`
-    for the item and `Thrown Ender Pearl` for the projectile. Straight
-    precedence put `entity_type` first, so the merge named the entity
-    `Thrown Ender Pearl` -- a player typing "ender pearl" would get an exact
-    match on nothing and the page they wanted would rank below whatever did
-    match. Comparing each row's display name against the registry path fixes
-    it without a hand-written list: `ender_pearl` matches `Ender Pearl`, so
-    `item` wins.
-
-    The same rule leaves `minecraft:chicken` alone, which is the check that
-    matters. Its rows are `Chicken` for the mob and `Raw Chicken` for the
-    food; `chicken` matches the mob's row, `entity_type` keeps its
-    precedence, and the mob still owns the page. Measured against the live
-    26.2 registries on 2026-08-31 this adjustment fires for 14 IDs and every
-    one is a fix: the nine boats and the bamboo raft become items rather than
-    mobs, `egg` stops being `Thrown Egg`, `tnt` stops being `Primed TNT`, and
-    `wheat` stops being `Wheat Crops`. The boats and the raft are also fixed
-    by the second adjustment below on their own merits -- neither has a spawn
-    egg or an entity loot table -- so for those ten this one is no longer the
-    only thing holding the answer up, but it still fires first and still
-    gives the same answer.
-
-    **Second, an `entity_type` ID that classifies as `EntityClass.NEITHER`
+    **Third, an `entity_type` ID that classifies as `EntityClass.NEITHER`
     is demoted to the bottom of its own list.** This runs after the name
     adjustment and unconditionally overrides whatever it decided, which is
     what makes the demotion a real settlement rather than one more input to a
     tie-break: `pipeline.extract.entity_class.classify_entity_types` already
     proved this ID has no spawn egg and no entity loot table, so nothing the
-    wiki calls it changes what it is. `minecraft:arrow` and `minecraft:
-    snowball` are the case that used to fall through every other rule: both
-    registries' wiki rows carry the identical name, so the name adjustment
-    above cannot distinguish them and precedence alone used to decide --
-    silently picking `mob` for an arrow, correct in the sense that the name
-    was right either way, but wrong about what was choosing it, since nothing
-    about "arrow" is a mob. The demotion is what actually settles it now:
-    `arrow` and `snowball` are both `NEITHER`-classified, so `entity_type`
-    drops to the bottom of their lists regardless of the name tie, and
-    `item` wins on its own registry membership rather than on a coin flip
-    dressed up as precedence. See `EntityClassification` and the module
-    docstring's classification section for the full rule and its measured
-    counts, and `EntityKind`'s own docstring for what `EntityKind.ENTITY`
-    holds when the demotion leaves an ID with nowhere else to land.
+    wiki calls it changes what it is.
 
     Raises `NormalizeError` when a registry `_REGISTRY_PRECEDENCE` names is
     missing from `registries`, or when an ID sits in `entity_type` and
@@ -987,13 +1008,8 @@ def _registries_of_id(
             per_id.setdefault(path, []).append(registry)
 
     ordered: dict[str, tuple[str, ...]] = {}
+    split_ids: list[str] = []
     for path, regs in per_id.items():
-        if len(regs) > 1:
-            rows = join_table.by_registry_id.get(f"{NAMESPACE}:{path}", ())
-            named = _registry_the_wiki_names_the_id_under(path, regs, rows)
-            if named is not None:
-                regs = [named] + [registry for registry in regs if registry != named]
-
         if "entity_type" in regs:
             entity_class = classification.by_path.get(path)
             if entity_class is None:
@@ -1002,13 +1018,30 @@ def _registries_of_id(
                     f"this merge was given names nothing for it. The classifier and the "
                     f"registries payload have gone out of sync."
                 )
-            if entity_class is EntityClass.NEITHER and len(regs) > 1:
-                regs = [registry for registry in regs if registry != "entity_type"] + [
-                    "entity_type"
-                ]
+
+        if len(regs) > 1:
+            rows = join_table.by_registry_id.get(f"{NAMESPACE}:{path}", ())
+            if _should_split_entity_type(regs, rows):
+                split_ids.append(f"{NAMESPACE}:{path}")
+                non_entity_regs = [r for r in regs if r != "entity_type"]
+                named = _registry_the_wiki_names_the_id_under(path, non_entity_regs, rows)
+                if named is not None:
+                    non_entity_regs = [named] + [r for r in non_entity_regs if r != named]
+                ordered[path] = tuple(non_entity_regs)
+                ordered[f"entity_type/{path}"] = ("entity_type",)
+                continue
+
+            named = _registry_the_wiki_names_the_id_under(path, regs, rows)
+            if named is not None:
+                regs = [named] + [registry for registry in regs if registry != named]
+
+        if "entity_type" in regs and entity_class is EntityClass.NEITHER and len(regs) > 1:
+            regs = [registry for registry in regs if registry != "entity_type"] + [
+                "entity_type"
+            ]
 
         ordered[path] = tuple(regs)
-    return ordered
+    return ordered, tuple(sorted(split_ids))
 
 
 def _registry_the_wiki_names_the_id_under(
@@ -1047,6 +1080,7 @@ def merge_entities(
     extract_report: ExtractReport,
     curated: CuratedData,
     entity_classification: EntityClassification,
+    breeding_index: enrich_breeding.BreedingIndex | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1099,7 +1133,7 @@ def merge_entities(
             "types to classify."
         )
 
-    per_id = _registries_of_id(registries, join_table, entity_classification)
+    per_id, split_ids = _registries_of_id(registries, join_table, entity_classification)
 
     multi_registry: list[MultiRegistryId] = []
     undecided_entity_types: list[UndecidedEntityType] = []
@@ -1114,8 +1148,11 @@ def merge_entities(
 
     for path, regs in per_id.items():
         entity_id = f"{NAMESPACE}:{path}"
+        raw_path = path.removeprefix("entity_type/")
         chosen_registry = regs[0]
-        entity_class = entity_classification.by_path.get(path) if "entity_type" in regs else None
+        entity_class = (
+            entity_classification.by_path.get(raw_path) if "entity_type" in regs else None
+        )
         if chosen_registry == "entity_type":
             if entity_class is None:
                 # `_registries_of_id` already raised for this shape, so this
@@ -1140,10 +1177,10 @@ def merge_entities(
             multi_registry.append(MultiRegistryId(id=entity_id, registries=regs, kind=kind))
         if entity_class is EntityClass.LOOT_TABLE_ONLY:
             undecided_entity_types.append(UndecidedEntityType(id=entity_id, kind=kind))
-        if entity_class is not None:
+        if entity_class is not None and chosen_registry == "entity_type":
             entity_type_kind_counts[kind] = entity_type_kind_counts.get(kind, 0) + 1
 
-        fallback_name = _fallback_name(path)
+        fallback_name = _fallback_name(raw_path)
         draft = EntityDraft(id=entity_id, kind=kind, name=fallback_name, tier=SourceTier.A)
 
         row = _own_row(entity_id, regs, join_table)
@@ -1394,6 +1431,44 @@ def merge_entities(
             subject=", ".join(names_by_target[target]),
         )
 
+    if breeding_index is not None:
+        for mob_name, mob_breeding in breeding_index.by_mob.items():
+            target = _resolve_forward(
+                mob_name, "entity_type", join_table, drafts, table="breeding", unplaced=unplaced
+            )
+            if target is None:
+                continue
+
+            breeding_items = tuple(
+                BreedingItem(
+                    name=item_name,
+                    ref=_maybe_ref(item_name, "item", join_table, drafts),
+                )
+                for item_name in mob_breeding.items
+            )
+
+            taming_names = curated.taming.get(target, ())
+            taming_items = tuple(
+                BreedingItem(
+                    name=t_name,
+                    ref=_maybe_ref(t_name, "item", join_table, drafts),
+                )
+                for t_name in taming_names
+            )
+
+            attach(
+                target,
+                BreedingInfo(
+                    items=breeding_items,
+                    requires_taming=mob_breeding.requires_taming,
+                    taming_items=taming_items,
+                    cooldown_seconds=mob_breeding.cooldown_seconds,
+                    baby_growth_seconds=mob_breeding.baby_growth_seconds,
+                ),
+                table="breeding",
+                subject=mob_name,
+            )
+
     # --- Curated overrides: the last field-level write before `.build()` ---
 
     unknown_overrides: list[str] = []
@@ -1428,6 +1503,7 @@ def merge_entities(
     # `player` to `entity` -- so the counts written here, keyed by the kind
     # each ID actually ended up with, land at 91/42/1/24 once that build's
     # curated overrides are the ones in this repository.
+    counts["split_ids"] = len(split_ids)
     for kind, count in entity_type_kind_counts.items():
         counts[f"entity_type_kind.{kind.value}"] = count
 
@@ -1439,6 +1515,7 @@ def merge_entities(
         missing_blurbs=tuple(missing_blurbs),
         unknown_curated_overrides=tuple(sorted(unknown_overrides)),
         stale_curated_documents=curated.stale,
+        split_ids=split_ids,
         advancement_reconciliation=advancement_tree.reconcile(advancement_ids),
         counts=counts,
     )

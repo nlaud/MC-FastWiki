@@ -6,6 +6,7 @@ import { createHelpOverlay } from "./help.js";
 import { dispatchKey } from "./keymap.js";
 import { createSearchBar, updateSearchBarVisibility } from "./searchbar.js";
 import {
+  MAX_WINDOWS,
   clearQuery,
   closeHelp,
   closeWindow,
@@ -198,7 +199,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
   };
 
   const closeWindowAtSlot = (slot: number): void => {
-    const wasFour = state.windows.length === 4;
+    const wasMax = state.windows.length === MAX_WINDOWS;
     state = closeWindow(state, slot);
 
     const view = windowsMap.get(slot);
@@ -209,8 +210,8 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
 
     syncLayout();
 
-    // If closed from 4 to 3 windows, restore focus to search bar
-    if (wasFour && isBarVisible(state)) {
+    // If closed from MAX_WINDOWS to MAX_WINDOWS - 1, restore focus to search bar
+    if (wasMax && isBarVisible(state)) {
       searchBar.input.focus();
     }
   };
@@ -307,10 +308,33 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
         if (focusedSlot !== null) {
           const view = windowsMap.get(focusedSlot);
           if (view) {
-            view.bodyElement.scrollBy({
-              top: action.delta * 40,
-              behavior: "smooth",
-            });
+            if (typeof view.bodyElement.scrollBy === "function") {
+              view.bodyElement.scrollBy({
+                top: action.delta * 40,
+                behavior: "smooth",
+              });
+            } else {
+              view.bodyElement.scrollTop += action.delta * 40;
+            }
+          }
+        }
+        break;
+      }
+      case "PAGE_SCROLL_WINDOW": {
+        e.preventDefault();
+        const focusedSlot = getFocusedSlot(state);
+        if (focusedSlot !== null) {
+          const view = windowsMap.get(focusedSlot);
+          if (view) {
+            const pageAmount = view.bodyElement.clientHeight || 400;
+            if (typeof view.bodyElement.scrollBy === "function") {
+              view.bodyElement.scrollBy({
+                top: action.delta * pageAmount,
+                behavior: "smooth",
+              });
+            } else {
+              view.bodyElement.scrollTop += action.delta * pageAmount;
+            }
           }
         }
         break;

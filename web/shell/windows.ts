@@ -40,7 +40,11 @@ export function createWindowElement(
   title.className = "window-title";
   title.textContent = windowState.entry.n;
 
-  headerLeft.append(icon, title);
+  const badge = document.createElement("span");
+  badge.className = `entity-kind-badge ${windowState.entry.k}`;
+  badge.textContent = windowState.entry.k;
+
+  headerLeft.append(icon, title, badge);
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
@@ -86,8 +90,12 @@ export function syncWindowsLayout(
   for (const [slot, view] of windows.entries()) {
     const cell = layout.slots[slot];
     if (cell) {
-      view.element.style.gridColumn = cell.col.toString();
-      view.element.style.gridRow = cell.row.toString();
+      const colSpan = cell.colSpan ?? 1;
+      const rowSpan = cell.rowSpan ?? 1;
+      view.element.style.gridColumn =
+        colSpan > 1 ? `${cell.col.toString()} / span ${colSpan.toString()}` : cell.col.toString();
+      view.element.style.gridRow =
+        rowSpan > 1 ? `${cell.row.toString()} / span ${rowSpan.toString()}` : cell.row.toString();
     }
     if (slot === focusedSlot) {
       view.element.classList.add("is-focused");

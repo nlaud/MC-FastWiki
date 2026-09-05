@@ -1,3 +1,5 @@
+import { MAX_WINDOWS } from "./state.js";
+
 export interface SearchBarCallbacks {
   onInput: (value: string) => void;
   onClear?: () => void;
@@ -40,7 +42,7 @@ export function createSearchBar(callbacks: SearchBarCallbacks): SearchBarElement
 
   const hint = document.createElement("div");
   hint.className = "search-max-hint";
-  hint.textContent = "Maximum 4 windows open. Press Alt+W to close active window, or F1 for help.";
+  hint.textContent = `Maximum ${MAX_WINDOWS.toString()} windows open. Press Alt+W to close active window, or F1 for help.`;
   hint.style.display = "none";
 
   container.append(suggestionsContainer, barWrapper, hint);
@@ -55,7 +57,7 @@ export function createSearchBar(callbacks: SearchBarCallbacks): SearchBarElement
 }
 
 export function updateSearchBarVisibility(elements: SearchBarElements, windowCount: number): void {
-  if (windowCount >= 4) {
+  if (windowCount >= MAX_WINDOWS) {
     elements.wrapper.style.display = "none";
     elements.suggestionsContainer.style.display = "none";
     elements.hint.style.display = "block";

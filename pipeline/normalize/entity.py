@@ -117,6 +117,7 @@ __all__ = [
     "ENTITY_ID_PATTERN",
     "AdvancementInfo",
     "BreedingInfo",
+    "BreedingItem",
     "ChestLoot",
     "DamageValue",
     "DistributionEntry",
@@ -651,13 +652,27 @@ class ObtainList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     type: Literal["ObtainList"] = "ObtainList"
 
 
-class BreedingInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
-    """The items that breed a mob, and the result.
+class BreedingItem(BaseModel, frozen=True, populate_by_name=True):
+    """One breeding or taming item, following the name/ref pattern."""
 
-    The payload of this section arrives in Phase 6.
+    name: str = Field(min_length=1)
+    ref: EntityRef | None = None
+
+
+class BreedingInfo(BaseModel, frozen=True, populate_by_name=True):
+    """The items that breed a mob, its taming requirements, and its timings.
+
+    Mirrors `pipeline.enrich.breeding.BreedingIndex`. The two timings are
+    carried as seconds rather than as display strings so the renderer formats
+    them and never has to infer them from the food list.
     """
 
     type: Literal["BreedingInfo"] = "BreedingInfo"
+    items: tuple[BreedingItem, ...] = ()
+    requires_taming: bool = Field(default=False, alias="requiresTaming")
+    taming_items: tuple[BreedingItem, ...] = Field(default=(), alias="tamingItems")
+    cooldown_seconds: int = Field(default=300, ge=0, alias="cooldownSeconds")
+    baby_growth_seconds: int = Field(default=1200, ge=0, alias="babyGrowthSeconds")
 
 
 class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):

@@ -292,14 +292,34 @@ export interface ObtainList {
   [k: string]: unknown;
 }
 /**
- * The items that breed a mob, and the result. The payload of this section arrives in Phase 6.
+ * The items that breed a mob, its taming requirements, and its timings in seconds.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "breedingInfo".
  */
 export interface BreedingInfo {
   type: "BreedingInfo";
-  [k: string]: unknown;
+  items: BreedingItem[];
+  requiresTaming: boolean;
+  tamingItems: BreedingItem[];
+  /**
+   * Seconds before a bred pair can be fed again.
+   */
+  cooldownSeconds: number;
+  /**
+   * Seconds for a baby of this mob to grow up, unaccelerated.
+   */
+  babyGrowthSeconds: number;
+}
+/**
+ * One breeding or taming item, following the name/ref pattern. When ref is absent or unresolvable, the renderer prints name as plain text.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "breedingItem".
+ */
+export interface BreedingItem {
+  name: string;
+  ref?: EntityRef;
 }
 /**
  * Every source of a status effect. The payload of this section arrives in Phase 6.

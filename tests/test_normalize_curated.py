@@ -340,3 +340,15 @@ def test_the_committed_aliases_file_holds_a_conservative_number_of_entries() -> 
     curated = load_curated(CURATED_DIR, release_order=RELEASE_ORDER, target_version=TARGET_VERSION)
     total_aliases = sum(len(values) for values in curated.aliases.values())
     assert 12 <= total_aliases <= 20
+
+
+def test_the_committed_taming_file_loads() -> None:
+    curated = load_curated(CURATED_DIR, release_order=RELEASE_ORDER, target_version=TARGET_VERSION)
+    assert curated.taming
+    assert "minecraft:wolf" in curated.taming
+    assert curated.taming["minecraft:wolf"] == ("Bone",)
+    assert curated.taming["minecraft:cat"] == ("Raw Cod", "Raw Salmon")
+    assert curated.taming["minecraft:horse"] == ()
+    for entity_id in curated.taming:
+        assert ENTITY_ID_PATTERN.fullmatch(entity_id), entity_id
+

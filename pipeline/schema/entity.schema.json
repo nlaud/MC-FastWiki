@@ -647,15 +647,68 @@
         }
       }
     },
+    "breedingItem": {
+      "title": "BreedingItem",
+      "description": "One breeding or taming item, following the name/ref pattern. When ref is absent or unresolvable, the renderer prints name as plain text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        }
+      }
+    },
     "breedingInfo": {
       "title": "BreedingInfo",
-      "description": "The items that breed a mob, and the result. The payload of this section arrives in Phase 6.",
+      "description": "The items that breed a mob, its taming requirements, and its timings in seconds.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "items",
+        "requiresTaming",
+        "tamingItems",
+        "cooldownSeconds",
+        "babyGrowthSeconds"
+      ],
       "properties": {
         "type": {
           "const": "BreedingInfo"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/breedingItem"
+          },
+          "default": []
+        },
+        "requiresTaming": {
+          "type": "boolean",
+          "default": false
+        },
+        "tamingItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/breedingItem"
+          },
+          "default": []
+        },
+        "cooldownSeconds": {
+          "description": "Seconds before a bred pair can be fed again.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 300
+        },
+        "babyGrowthSeconds": {
+          "description": "Seconds for a baby of this mob to grow up, unaccelerated.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 1200
         }
       }
     },

@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.enrich import IntegerRange as WikiIntegerRange
+from pipeline.enrich import breeding as enrich_breeding
 from pipeline.enrich.advancement import AdvancementTree, WikiAdvancement
 from pipeline.enrich.droptable import DropIndex, LootingDrop, MobDrop
 from pipeline.enrich.droptable import Ratio as DropRatio
@@ -38,7 +39,7 @@ from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.fetch.extracts import ExtractReport, PageExtract
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
-from pipeline.normalize.entity import EntityKind, SourceTier
+from pipeline.normalize.entity import BreedingInfo, EntityKind, SourceTier
 from pipeline.normalize.merge import MergeResult, merge_entities, write_report
 
 # --- Fixture builders -------------------------------------------------------
@@ -84,7 +85,7 @@ REGISTRIES: dict[str, list[str]] = {
         "undecided_default",
         "undecided_overridden",
     ],
-    "block": ["tnt"],
+    "block": ["tnt", "wheat"],
     "item": [
         "gunpowder",
         "emerald",
@@ -97,6 +98,7 @@ REGISTRIES: dict[str, list[str]] = {
         "widget_b",
         "mystery_thing",
         "arrow",
+        "wheat",
     ],
     "mob_effect": [],
     "worldgen/biome": ["jungle"],
@@ -154,6 +156,8 @@ JOIN_TABLE = parse_resource_locations(
         # `entity_type` has precedence; the name match must beat it.
         rl_row("Ender Pearl", "ender_pearl", "item"),
         rl_row("Thrown Ender Pearl", "ender_pearl", "entity"),
+        rl_row("Wheat Crops", "wheat", "block"),
+        rl_row("Wheat", "wheat", "item"),
         # Two names for one ID, neither of which normalises to `jigsaw` and
         # neither of which is shared with another ID. Every tie-break in
         # `_own_row` declines this on purpose, so the entity has no page.
@@ -388,13 +392,32 @@ def run_merge() -> MergeResult:
 
 def test_an_id_in_two_registries_becomes_one_entity_with_the_precedence_kind() -> None:
     result = run_merge()
-    chicken = result.by_id["minecraft:chicken"]
-    assert chicken.kind is EntityKind.MOB
-    assert chicken.name == "Chicken"  # the entity-kind row, not the item row
+    boat = result.by_id["minecraft:acacia_boat"]
+    assert boat.kind is EntityKind.ITEM
+    assert boat.name == "Acacia Boat"
 
-    entry = next(m for m in result.report.multi_registry if m.id == "minecraft:chicken")
-    assert entry.registries == ("entity_type", "item")
-    assert entry.kind is EntityKind.MOB
+    entry = next(m for m in result.report.multi_registry if m.id == "minecraft:acacia_boat")
+    assert entry.registries == ("item", "entity_type")
+    assert entry.kind is EntityKind.ITEM
+
+
+def test_clashing_entity_type_id_splits_into_item_and_mob() -> None:
+    result = run_merge()
+    item = result.by_id["minecraft:chicken"]
+    assert item.kind is EntityKind.ITEM
+    assert item.name == "Raw Chicken"
+
+    mob = result.by_id["minecraft:entity_type/chicken"]
+    assert mob.kind is EntityKind.MOB
+    assert mob.name == "Chicken"
+    assert "minecraft:chicken" in result.report.split_ids
+
+
+def test_wheat_displays_as_wheat_not_wheat_crops() -> None:
+    result = run_merge()
+    wheat = result.by_id["minecraft:wheat"]
+    assert wheat.kind is EntityKind.ITEM
+    assert wheat.name == "Wheat"
 
 
 def test_a_tier_a_id_with_no_wiki_row_gets_the_fallback_name_and_still_validates() -> None:
@@ -511,7 +534,7 @@ def test_clause_one_fires_before_the_demotion_so_a_mob_with_an_item_form_stays_a
     `_own_row`'s own docstring records as a real past failure.
     """
     result = run_merge()
-    chicken = result.by_id["minecraft:chicken"]
+    chicken = result.by_id["minecraft:entity_type/chicken"]
     assert chicken.kind is EntityKind.MOB
     assert chicken.name == "Chicken"
 
@@ -897,21 +920,17 @@ def test_a_multi_registry_id_resolves_through_a_lower_precedence_registrys_row()
 
 
 def test_narrowing_by_kind_still_holds_when_several_registries_are_tried() -> None:
-    """Trying more registries must not reopen the ambiguity that narrowing closes.
-
-    `IconRule.join_kinds` exists because `minecraft:chicken` is the raw
-    chicken *item* and the chicken *mob*, and resolving one through the
-    other's row is the wrong-answer failure this project ranks below a
-    missing one. Walking `entity_type` and then `item` asks for each kind
-    separately and takes the first hit, so the mob still wins its own row --
-    but a future edit that dropped the narrowing to "just take any row" would
-    pass the test above and fail this one.
-    """
+    """Trying more registries must not reopen the ambiguity that narrowing closes."""
     result = run_merge()
-    chicken = result.by_id["minecraft:chicken"]
-    assert chicken.kind is EntityKind.MOB
-    assert chicken.name == "Chicken"
-    assert chicken.name != "Raw Chicken"
+    mob = result.by_id["minecraft:entity_type/chicken"]
+    assert mob.kind is EntityKind.MOB
+    assert mob.name == "Chicken"
+    assert mob.name != "Raw Chicken"
+
+    item = result.by_id["minecraft:chicken"]
+    assert item.kind is EntityKind.ITEM
+    assert item.name == "Raw Chicken"
+    assert item.name != "Chicken"
 
 
 def test_the_registry_whose_wiki_row_names_the_id_wins_over_precedence() -> None:
@@ -935,19 +954,22 @@ def test_the_registry_whose_wiki_row_names_the_id_wins_over_precedence() -> None
     assert pearl.name == "Ender Pearl"
 
 
-def test_a_name_match_never_displaces_a_registry_that_precedence_already_prefers() -> None:
-    """The counterpart check, and the one that keeps the rule safe.
+def test_both_meanings_of_a_clashing_id_are_given_separate_entities() -> None:
+    """Disjoint display names mean separate entities for the item and the mob.
 
-    `minecraft:chicken` is also an `entity_type` and an `item`, and the wiki
-    writes `Chicken` for the mob and `Raw Chicken` for the food. Here the
-    higher-precedence registry is the one whose row names the ID, so nothing
-    moves and the mob keeps the page. A rule that preferred `item` in general
-    would have renamed the chicken mob to `Raw Chicken`.
+    `minecraft:chicken` is an item and an entity_type, and the wiki writes
+    `Chicken` for the mob and `Raw Chicken` for the food. Rather than tossing
+    one meaning away, the merge gives the bare ID to the item and qualifies
+    the entity_type as `minecraft:entity_type/chicken`.
     """
     result = run_merge()
-    chicken = result.by_id["minecraft:chicken"]
-    assert chicken.kind is EntityKind.MOB
-    assert chicken.name == "Chicken"
+    item = result.by_id["minecraft:chicken"]
+    assert item.kind is EntityKind.ITEM
+    assert item.name == "Raw Chicken"
+
+    mob = result.by_id["minecraft:entity_type/chicken"]
+    assert mob.kind is EntityKind.MOB
+    assert mob.name == "Chicken"
 
 
 def test_a_section_is_never_attached_to_an_entity_with_no_attribution_link() -> None:
@@ -1170,3 +1192,66 @@ def test_two_display_names_for_one_item_keep_both_trades() -> None:
         "Diamond Chestplate",
         "Enchanted Diamond Chestplate",
     ]
+
+
+def test_wolf_breeding_and_taming_items_never_conflated() -> None:
+    """Wolf is bred with meat and tamed with bones: those must never share a field."""
+    wolf_registries = {
+        "entity_type": ["wolf"],
+        "block": [],
+        "item": ["bone", "porkchop"],
+        "mob_effect": [],
+        "worldgen/biome": [],
+        "enchantment": [],
+    }
+    wolf_join_table = parse_resource_locations(
+        [
+            rl_row("Wolf", "wolf", kind="entity"),
+            rl_row("Bone", "bone", kind="item"),
+            rl_row("Porkchop", "porkchop", kind="item"),
+        ]
+    )
+    wolf_classification = EntityClassification(
+        by_path={"wolf": EntityClass.SPAWN_EGG}
+    )
+    breeding_index = enrich_breeding.BreedingIndex(
+        by_mob={
+            "Wolf": enrich_breeding.MobBreeding(
+                mob="Wolf",
+                items=("Porkchop",),
+                requires_taming=True,
+            )
+        }
+    )
+    curated = CuratedData(
+        aliases={},
+        overrides={},
+        taming={"minecraft:wolf": ("Bone",)},
+    )
+    result = merge_entities(
+        registries=wolf_registries,
+        advancement_ids=(),
+        join_table=wolf_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=curated,
+        entity_classification=wolf_classification,
+        breeding_index=breeding_index,
+    )
+
+    wolf = result.by_id["minecraft:wolf"]
+    breeding_info = next(s for s in wolf.sections if isinstance(s, BreedingInfo))
+    assert breeding_info.requires_taming is True
+    assert [item.name for item in breeding_info.items] == ["Porkchop"]
+    assert breeding_info.items[0].ref is not None
+    assert breeding_info.items[0].ref.id == "minecraft:porkchop"
+    assert "Bone" not in [item.name for item in breeding_info.items]
+    assert [item.name for item in breeding_info.taming_items] == ["Bone"]
+    assert breeding_info.taming_items[0].ref is not None
+    assert breeding_info.taming_items[0].ref.id == "minecraft:bone"
+

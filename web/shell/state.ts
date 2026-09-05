@@ -58,8 +58,10 @@ export function clearQuery(state: ShellState): ShellState {
   };
 }
 
+export const MAX_WINDOWS = 8;
+
 export function getLowestFreeSlot(occupiedSlots: number[]): number | null {
-  for (let slot = 0; slot < 4; slot++) {
+  for (let slot = 0; slot < MAX_WINDOWS; slot++) {
     if (!occupiedSlots.includes(slot)) {
       return slot;
     }
@@ -70,7 +72,7 @@ export function getLowestFreeSlot(occupiedSlots: number[]): number | null {
 export function openWindow(state: ShellState, entry: IndexEntry): ShellState {
   const occupied = state.windows.map((w) => w.slot);
 
-  if (occupied.length < 4) {
+  if (occupied.length < MAX_WINDOWS) {
     const slot = getLowestFreeSlot(occupied);
     if (slot === null) {
       return state;
@@ -86,7 +88,7 @@ export function openWindow(state: ShellState, entry: IndexEntry): ShellState {
     };
   }
 
-  // 4 windows are open: evict the least-recently-focused slot (back of focusOrder).
+  // MAX_WINDOWS are open: evict the least-recently-focused slot (back of focusOrder).
   const evictedSlot = state.focusOrder[state.focusOrder.length - 1];
   if (evictedSlot === undefined) {
     return state;
@@ -160,7 +162,7 @@ export function closeHelp(state: ShellState): ShellState {
 }
 
 export function isBarVisible(state: ShellState): boolean {
-  return state.windows.length < 4;
+  return state.windows.length < MAX_WINDOWS;
 }
 
 export function getFocusedSlot(state: ShellState): number | null {

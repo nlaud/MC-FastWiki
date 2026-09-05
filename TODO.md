@@ -8,47 +8,10 @@ the verified data-source details.
 reasoning survives even after the choice is made.
 
 ---
-
-## Phase 3 — Normalization and emit
-
-- [ ] **Natural generation as worldgen placement** is the one branch of the obtain tree with no
-      wired source. Mining a block for an item ships as a `block_drop` producer, but *where* a
-      block generates (Y levels, biomes) is `GenerationInfo`'s section, not an obtain step, and
-      worldgen is not among the four mcmeta data groups the pipeline reads. Phase 6c owns it.
-- [ ] Decide what to do about the three oversized sprites the wiki serves as full images rather
-      than as cropped icons.
-      Measured on the 26.2 build: `InvSprite:Sculk` and `InvSprite:Sculk Shrieker` are 300x300 and
-      `InvSprite:Zombie Horse Spawn Egg` is 160x160, against 16x16 for 928 frames and 32x32 for
-      924 more.
-      Decision 15 records why a packer-level maximum frame size is rejected.
-      What remains open moves to Phase 6: curated per-sprite overrides naming verified `File:`
-      titles for these three, once a rendered icon exists to confirm a replacement actually reads
-      correctly at icon size.
-      Seven more frames are 1x1: `Cave Air`, `Void Air`, and the five marker and display entities.
-      Those are correct and need nothing, because the thing they draw really is invisible.
-
 ## Phase 6 — Content renderers
 
-- [ ] **Mob** — breeding items when breedable. The rest of this item shipped: HP, damage and armour
-      badges, the passive / hostile / neutral signal, the spawn biomes, and the loot table across
-      looting 0 to III.
-  - [ ] **Breeding, end to end.** Nothing writes a `BreedingInfo` section today, so this is a
-        pipeline task before it is a renderer task, and it needs a source decided first.
-        mcmeta does not carry breeding items: they live in the mob's Java code, not in a data
-        pack, so this is Tier B and there is no Tier A fallback to check it against.
-        The wiki states them in two places that do not agree in shape — the `Breeding` section
-        of each mob page as prose, and the `Breeding` row of the mob infobox as a short item
-        list. Prefer the infobox row: `pipeline/enrich/infobox.py` already parses that template
-        for 91 mobs, so the parser exists and only the field is missing.
-        What the section has to carry: the items that start love mode, the cooldown, the growth
-        time for a baby, and the taming items where they differ from the breeding ones, because
-        a wolf is tamed with bones and bred with meat and conflating those is the obvious bug.
-        Every item is an `EntityRef`, never a name, per Decision 13.
-      One deviation, made deliberately: this item asked for damage "only when hostile", and the
-      renderer shows damage whenever the infobox carries it. 26 mobs carry a damage figure without
-      a hostile behaviour, and they include Enderman, Iron Golem, Bee and Cave Spider. Hiding what
-      an iron golem hits for is the wrong answer to a question a match actually asks.
 - [ ] **Item** — obtain tree, crafting and smelting, with the correct tool shown for blocks
+  - [ ] For food items, hunger and saturation amounts, as well as other effects (like hunger from rotten flesh, poison from spider eyes and chances of each effect) should be displayed right after the burb at the top of the page. Add this to the pipeline. As well.
   - [ ] Walk `data/dist/obtain.json` into the tree at render time, rather than reading a
         pre-built one out of the entity shard. The pipeline ships the flat producer graph
         (0.60 MB raw, 48 kB gzipped, 4,002 producers) because materialising a per-entity tree
@@ -154,6 +117,7 @@ loot tables (see Decision 11).
       `Pufferfish (item)`, `Arrow of Poison` and similar. Those are wiki display names that name a
       group rather than one registry entry, so the lint has to tell the two cases apart rather than
       flagging every ref-less name.
+- [ ] This is more or less implemented already, but there are some links that should show up but dont. For example the elder guardian drops does not properly link to tide armor trim, and pig breeding does not properly link to potato. Root cause and fix ALL of these possible issues.
 
 ## Phase 7 — Collections (the special search terms)
 
@@ -387,6 +351,57 @@ New collections the added data makes nearly free:
     is a parallel `w` array of strength digits in `index.json` and the entity models, measured at
     +28 kB raw and +2.0 kB gzipped, and rejected here only because it changes the entity contract
     and grows every shard.
+
+17. **Split name-clashing registry IDs into two pages only when their registries carry different display names.**
+    Previously, one registry ID could produce only one entity page, causing the losing registry's
+    meaning to be unreachable (e.g. `minecraft:chicken` was the Chicken mob, leaving Raw Chicken food
+    item without a page).
+
+    Rule: Split an ID only when its registries carry different wiki display names.
+    This provides an objective, data-driven discriminator that excludes the 1,041 block + item pairs
+    where both registries represent the identical concept to a player (e.g. Stone), while splitting
+    genuinely distinct items and entities.
+
+    Measured: Exactly 8 IDs split: `chicken`, `cod`, `egg`, `ender_pearl`, `experience_bottle`,
+    `rabbit`, `salmon`, and `tnt`.
+    The precedence winner (item/block) retains the bare ID (e.g. `minecraft:chicken` for Raw Chicken),
+    while the entity side gains a qualified path `minecraft:entity_type/<path>` (e.g.
+    `minecraft:entity_type/chicken` for the mob).
+
+    Ranking: In `web/search/matcher.ts`, item ranks above entity/mob when both match an exact concept
+    query (one by display name and the other by phrase alias), ensuring items take precedence while
+    both pages remain discoverable.
+    Also fixed: `minecraft:wheat` display name correctly resolves to "Wheat" rather than "Wheat Crops".
+
+18. **Breeding is sourced from the wiki's `Breeding` page, and its timings are carried as data.**
+    The mob infobox was the expected source, but all 179 cached mob infoboxes carry zero
+    breeding parameters, so there was no field to read. The `Breeding` page's `Breeding foods`
+    sortable wikitable carries structured `EntityLink` and `ItemLink` templates for the 26
+    breedable mobs instead, filtered to Java through `markup.scope_editions`.
+
+    Taming is kept in a separate field from breeding, never merged: the table marks a mob
+    `(Tamed)` but does not say what tames it, so the items live in `/data/curated/taming.json`.
+    A wolf is tamed with bones and bred with meat, and conflating those is the obvious bug.
+
+    The cooldown and the baby growth time are `BreedingInfo.cooldownSeconds` and
+    `BreedingInfo.babyGrowthSeconds` rather than strings the renderer invents. Both are stated in
+    the page's prose rather than in the table -- "five minutes", and "Most baby mobs take 20
+    minutes to grow up, while snifflets take 40 minutes" -- so `pipeline/enrich/breeding.py`
+    owns them as constants keyed on the mob name the table's own `EntityLink` yields.
+    Keying on the mob is the whole point: the first cut inferred the Sniffer from its food list,
+    and a Chicken eats Torchflower Seeds too, so every chicken claimed a 40-minute baby.
+
+19. **A health row draws at most a full player bar of ten hearts, and marks the rest with `+`.**
+    Hearts are drawn from the value's minimum and capped at 20 HP; a maximum above that appends
+    a single `+`. The alternative the renderer shipped with -- one lone heart for anything over
+    20 HP or for any range -- made the Warden's 500 HP read as one heart of health, weaker on
+    screen than a chicken's four. Drawing 250 real hearts is the other wrong answer, since the
+    row has one line to fit in. The exact figure is always in the text beside the icons.
+
+    Damage is shown whenever the infobox carries it, not only for hostile mobs as first planned.
+    26 mobs carry a damage figure without a hostile behaviour, Enderman, Iron Golem, Bee and
+    Cave Spider among them, and hiding what an iron golem hits for is the wrong answer to a
+    question a match actually asks.
 
 ## Still open
 

@@ -80,16 +80,18 @@ from pipeline.normalize.entity import ENTITY_ID_PATTERN, EntityKind
 __all__ = [
     "ALIASES_FILENAME",
     "OVERRIDES_FILENAME",
+    "TAMING_FILENAME",
     "CuratedData",
     "EntityOverride",
     "StaleDocument",
     "load_curated",
 ]
 
-# The two documents this module reads, by their file name inside the
+# The documents this module reads, by their file name inside the
 # directory `load_curated` is given.
 ALIASES_FILENAME = "aliases.json"
 OVERRIDES_FILENAME = "overrides.json"
+TAMING_FILENAME = "taming.json"
 
 
 class EntityOverride(BaseModel, frozen=True, populate_by_name=True, extra="forbid"):
@@ -130,6 +132,7 @@ class CuratedData(BaseModel, frozen=True):
 
     aliases: Mapping[str, tuple[str, ...]]
     overrides: Mapping[str, EntityOverride]
+    taming: Mapping[str, tuple[str, ...]] = {}
     stale: tuple[StaleDocument, ...] = ()
 
 
@@ -200,14 +203,34 @@ def _parse_overrides(document: Mapping[str, Any], *, name: str) -> dict[str, Ent
     return parsed
 
 
+def _parse_taming(document: Mapping[str, Any], *, name: str) -> dict[str, tuple[str, ...]]:
+    """Return the `entityId -> tamingItems` map of `taming.json`, or raise on a fault."""
+    raw = document.get("entities", {})
+    if not isinstance(raw, dict):
+        raise NormalizeError(f"{name}'s 'entities' is {raw!r}, not an object.")
+    parsed: dict[str, tuple[str, ...]] = {}
+    for entity_id, values in raw.items():
+        if not isinstance(entity_id, str) or ENTITY_ID_PATTERN.fullmatch(entity_id) is None:
+            raise NormalizeError(
+                f"{name} names {entity_id!r} as a taming key, which is not a valid entity ID "
+                f"matching {ENTITY_ID_PATTERN.pattern!r}."
+            )
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise NormalizeError(
+                f"{name}'s taming items for {entity_id!r} is {values!r}, not a list of strings."
+            )
+        parsed[entity_id] = tuple(values)
+    return parsed
+
+
 def load_curated(
     directory: Path, *, release_order: Sequence[str], target_version: str
 ) -> CuratedData:
-    """Return the curated aliases and overrides of `directory`, or raise `NormalizeError`.
+    """Return the curated aliases, overrides, and taming items of `directory`.
 
-    Pure over the filesystem: reads `aliases.json` and `overrides.json` from
-    `directory` and touches no network. `release_order` is Mojang's own
-    ordering, newest first -- `pipeline.fetch.version_manifest.
+    Pure over the filesystem: reads `aliases.json`, `overrides.json`, and optional
+    `taming.json` from `directory` and touches no network. `release_order` is
+    Mojang's own ordering, newest first -- `pipeline.fetch.version_manifest.
     VersionManifest.versions`'s IDs -- and `target_version` is the release
     this build is running against, which is
     `VersionManifest.latest_release_id` rather than the front of the list.
@@ -219,7 +242,7 @@ def load_curated(
     judge staleness against at all. Raises when `target_version`, or a
     document's `verifiedFor`, names a release `release_order` does not
     contain -- a typo in this project's own file, not a version comparison
-    that can be silently skipped. Raises when either document is missing, is
+    that can be silently skipped. Raises when a document is missing, is
     not JSON, is not an object, or holds a malformed alias list or override.
     Never raises for a document that is merely behind the target version;
     that is `CuratedData.stale`'s job to carry, not a build-stopping fault.
@@ -244,11 +267,20 @@ def load_curated(
     aliases = _parse_aliases(aliases_document, name=ALIASES_FILENAME)
     overrides = _parse_overrides(overrides_document, name=OVERRIDES_FILENAME)
 
-    stale: list[StaleDocument] = []
-    for filename, document in (
+    documents_to_check: list[tuple[str, dict[str, Any]]] = [
         (ALIASES_FILENAME, aliases_document),
         (OVERRIDES_FILENAME, overrides_document),
-    ):
+    ]
+
+    taming: dict[str, tuple[str, ...]] = {}
+    taming_path = directory / TAMING_FILENAME
+    if taming_path.exists():
+        taming_document = _read_document(taming_path, name=TAMING_FILENAME)
+        taming = _parse_taming(taming_document, name=TAMING_FILENAME)
+        documents_to_check.append((TAMING_FILENAME, taming_document))
+
+    stale: list[StaleDocument] = []
+    for filename, document in documents_to_check:
         verified_for = document["verifiedFor"]
         try:
             position = release_order.index(verified_for)
@@ -263,4 +295,4 @@ def load_curated(
                 StaleDocument(document=filename, verified_for=verified_for, current=target_version)
             )
 
-    return CuratedData(aliases=aliases, overrides=overrides, stale=tuple(stale))
+    return CuratedData(aliases=aliases, overrides=overrides, taming=taming, stale=tuple(stale))
