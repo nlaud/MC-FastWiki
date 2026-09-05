@@ -24,6 +24,7 @@ needs, this test is the one that has to fail.
 import json
 
 from pipeline.emit.obtain import (
+    ChestSource,
     ObtainGraph,
     ObtainProducer,
     ObtainProducerInput,
@@ -113,6 +114,56 @@ def test_station_and_note_are_omitted_from_the_wire_shape_when_absent() -> None:
     assert "nt" not in producer
 
 
+def test_grid_fields_are_emitted_when_present_and_omitted_when_absent() -> None:
+    producer_with_grid = Producer(
+        method=ObtainMethod.CRAFTING,
+        output=ProducerOutput(item="minecraft:iron_pickaxe"),
+        inputs=(
+            ProducerInput(item="minecraft:stick", count=2),
+            ProducerInput(item="minecraft:iron_ingot", count=3),
+        ),
+        source_id="iron_pickaxe",
+        grid=(1, 1, 1, None, 0, None, None, 0, None),
+        grid_width=3,
+        grid_height=3,
+    )
+    producer_without_grid = make("minecraft:stick", ("minecraft:oak_planks", 2), source_id="stick")
+    index = ProducerIndex.from_producers([producer_with_grid, producer_without_grid])
+    graph = build_obtain_graph(index)
+    dumped = graph.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    pickaxe = dumped["producers"]["minecraft:iron_pickaxe"][0]
+    assert pickaxe["g"] == [1, 1, 1, None, 0, None, None, 0, None]
+    assert pickaxe["gw"] == 3
+    assert pickaxe["gh"] == 3
+
+    stick = dumped["producers"]["minecraft:stick"][0]
+    assert "g" not in stick
+    assert "gw" not in stick
+    assert "gh" not in stick
+
+
+def test_sources_map_is_emitted_and_sorted() -> None:
+    sources = {
+        "loot_table/chests/simple_dungeon.json": ChestSource(
+            structure="Dungeon", container="Chest"
+        ),
+        "loot_table/chests/abandoned_mineshaft.json": ChestSource(
+            structure="Mineshaft", container="Chest"
+        ),
+    }
+    graph = build_obtain_graph(ProducerIndex.from_producers([]), sources=sources)
+    dumped = graph.model_dump(mode="json", by_alias=True, exclude_none=True)
+    assert list(dumped["sources"].keys()) == [
+        "loot_table/chests/abandoned_mineshaft.json",
+        "loot_table/chests/simple_dungeon.json",
+    ]
+    assert dumped["sources"]["loot_table/chests/abandoned_mineshaft.json"] == {
+        "structure": "Mineshaft",
+        "container": "Chest",
+    }
+
+
 def test_a_tag_input_carries_no_item_and_carries_its_members() -> None:
     index = ProducerIndex.from_producers(
         [
@@ -154,6 +205,9 @@ def test_a_producer_has_no_field_naming_what_it_produces() -> None:
         "station",
         "note",
         "inputs",
+        "grid",
+        "grid_width",
+        "grid_height",
     }
 
 

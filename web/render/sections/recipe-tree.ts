@@ -1,348 +1,363 @@
-import type { RecipeTree } from "../../types/entity.js";
+import type { Entity, RecipeTree, TradeTable } from "../../types/entity.js";
+import type { ObtainProducer } from "../../types/obtain.js";
 import { loadObtain } from "../../search/load.js";
 import type { RenderContext } from "../context.js";
 import { entityLink } from "../link.js";
-import { type ObtainNode, type TreeInput, type TreeProducer, expandStub } from "../obtain-tree.js";
+import { type ObtainNode, type TreeInput, expandStub } from "../obtain-tree.js";
+import { renderLeafCard, renderStationCard } from "../station/index.js";
+import { renderTradeTable } from "./trade-table.js";
 
-const METHOD_LABELS: Record<string, string> = {
-  crafting: "Crafting",
-  smelting: "Smelting",
-  brewing: "Brewing",
-  filling: "Filling",
-  mob_loot: "Mob Drop",
-  chest_loot: "Chest Loot",
-  trade: "Trading",
-  block_drop: "Block Drop",
-};
-
-/**
- * The order the method groups are drawn in, most actionable first.
- *
- * This is a rendering order only. The walk itself keeps the graph's own
- * `(method, output id, source_id)` sort, which `pipeline.obtain.producer.
- * ProducerIndex.from_producers` fixes and the acceptance fixture pins, so
- * reordering here changes what a player reads without changing the tree
- * either implementation builds.
- *
- * The graph's order is alphabetical by method, which puts `chest_loot` above
- * `crafting` -- so an item you simply craft led with a list of chests that
- * might happen to contain one. A player mid-match wants the thing they can
- * act on: make it, then cook it, then break or kill something for it, and
- * only then the places it might be lying around. A method absent from this
- * list sorts last, in the graph's order, rather than being dropped.
- */
-const METHOD_ORDER: readonly string[] = [
-  "crafting",
-  "smelting",
-  "brewing",
-  "filling",
-  "block_drop",
-  "mob_loot",
-  "trade",
-  "chest_loot",
-];
-
-function methodRank(method: string): number {
-  const rank = METHOD_ORDER.indexOf(method);
-  return rank === -1 ? METHOD_ORDER.length : rank;
+function titleCase(str: string): string {
+  return str
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
-const STATION_LABELS: Record<string, string> = {
-  furnace: "Furnace",
-  blast_furnace: "Blast Furnace",
-  smoker: "Smoker",
-  campfire: "Campfire",
-  stonecutter: "Stonecutter",
-  smithing_table: "Smithing Table",
-  brewing_stand: "Brewing Stand",
-};
-
-function humanise(str: string): string {
-  return str.replace(/^minecraft:/, "").replace(/_/g, " ");
+function humaniseId(id: string): string {
+  const bare = id.replace(/^[a-z0-9_-]+:/, "");
+  return bare
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /**
- * Names where a producer that consumes nothing actually comes from.
- *
- * A chest loot producer has no inputs, so without this its row is the bare
- * word "Chest Loot" repeated once per chest -- which tells a player nothing.
- * `source_id` is the only field carrying the answer, as the loot table path
- * `loot_table/chests/abandoned_mineshaft.json`, so the basename is the chest.
- *
- * Only chest loot is read this way. A mob drop and a trade already carry a
- * readable `note` ("dropped by Evoker", "Farmer, Apprentice"), and a block
- * drop names its block in the input beside it, so reading the path for those
- * would repeat what the row already says.
+ * Returns a human-readable Title Case label for a chest loot source.
+ * Uses curated structure/container mapping when available.
  */
-function sourceLabel(producer: TreeProducer): string | null {
-  if (producer.method !== "chest_loot") {
+export function getChestSourceLabel(
+  sourceId: string,
+  sources?: Record<string, { s?: string; c?: string; structure?: string; container?: string }>,
+): string {
+  const curated = sources?.[sourceId];
+  if (curated) {
+    const struct = curated.structure ?? curated.s;
+    const cont = curated.container ?? curated.c;
+    if (struct && cont) {
+      return struct === cont ? struct : `${struct} - ${cont}`;
+    }
+  }
+
+  // Fallback: Title Case from path
+  const afterChests = sourceId.split("chests/").pop() ?? sourceId;
+  const cleaned = afterChests.replace(/\.json$/, "").replace(/[_/]+/g, " ");
+  return titleCase(cleaned);
+}
+
+interface SourcesData {
+  chestLoot: ObtainProducer[];
+  blockDrops: ObtainProducer[];
+  mobDrops: ObtainProducer[];
+  tradeProducers: ObtainProducer[];
+  tradeTableSection?: TradeTable | undefined;
+  sourcesMap?:
+    Record<string, { s?: string; c?: string; structure?: string; container?: string }> | undefined;
+}
+
+function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement | null {
+  const hasChest = data.chestLoot.length > 0;
+  const hasBlocks = data.blockDrops.length > 0;
+  const hasMobs = data.mobDrops.length > 0;
+  const hasTrades = Boolean(data.tradeTableSection) || data.tradeProducers.length > 0;
+
+  if (!hasChest && !hasBlocks && !hasMobs && !hasTrades) {
     return null;
   }
 
-  // Everything below `chests/`, not just the basename. Half the chest tables
-  // (27 of the 54 in 26.2) sit one directory deeper, where the basename alone
-  // is meaningless on its own: `chests/trial_chambers/intersection.json` reads
-  // as "intersection" without the directory that says what it is an
-  // intersection of.
-  const afterChests = producer.source_id.split("chests/").pop();
-  if (!afterChests) {
-    return null;
-  }
+  const panelEl = document.createElement("div");
+  panelEl.className = "obtaining-sources-pane";
 
-  const segments = afterChests.replace(/\.json$/, "").split("/");
-  // `village/village_armorer` would otherwise read "village village armorer".
-  // A segment whose successor already names it adds nothing.
-  const kept = segments.filter((segment, index) => {
-    const next = segments[index + 1];
-    return next === undefined || !next.startsWith(`${segment}_`);
-  });
+  const panelTitle = document.createElement("h4");
+  panelTitle.className = "sources-pane-title";
+  panelTitle.textContent = "Sources";
+  panelEl.append(panelTitle);
 
-  const label = humanise(kept.join(" "));
-  return label.length > 0 ? label : null;
-}
+  const INITIAL_LIMIT = 3;
 
-function renderInput(input: TreeInput, ctx: RenderContext, ancestors: string[]): HTMLElement {
-  const itemEl = document.createElement("li");
-  itemEl.className = "tree-input-item";
-
-  const headEl = document.createElement("div");
-  headEl.className = "tree-input-head";
-
-  if (input.count > 1) {
-    const countEl = document.createElement("span");
-    countEl.className = "tree-input-count";
-    countEl.textContent = `${input.count.toString()}×`;
-    headEl.append(countEl);
-  }
-
-  if (input.tag) {
-    const tagSpan = document.createElement("span");
-    tagSpan.className = "tree-tag-badge";
-    tagSpan.textContent = `#${humanise(input.tag)}`;
-    headEl.append(tagSpan);
-
-    if (input.members.length > 0) {
-      const membersSpan = document.createElement("span");
-      membersSpan.className = "tree-members-count";
-      membersSpan.textContent = ` (${input.members.length.toString()})`;
-      headEl.append(membersSpan);
-    }
-  } else if (input.item) {
-    const entry = ctx.lookup(input.item);
-    const linkEl = entityLink(
-      {
-        id: input.item,
-        name: entry?.n ?? humanise(input.label),
-      },
-      ctx,
-    );
-    headEl.append(linkEl);
-  } else {
-    const labelSpan = document.createElement("span");
-    labelSpan.className = "entity-plain";
-    labelSpan.textContent = input.label;
-    headEl.append(labelSpan);
-  }
-
-  itemEl.append(headEl);
-
-  // Child node
-  if (input.node) {
-    const node = input.node;
-    const backRef =
-      node.back_reference ?? (node as unknown as { backReference?: string }).backReference;
-
-    if (node.expandable) {
-      const stubContainer = document.createElement("div");
-      stubContainer.className = "tree-stub";
-
-      const expandBtn = document.createElement("button");
-      expandBtn.type = "button";
-      expandBtn.className = "tree-expand-stub-btn";
-      expandBtn.textContent = "Expand...";
-
-      expandBtn.addEventListener("click", () => {
-        void (async () => {
-          expandBtn.disabled = true;
-          expandBtn.textContent = "Loading...";
-          try {
-            const graph = await loadObtain();
-            const targetId = input.item ?? node.item;
-            const expanded = expandStub(targetId, graph, ancestors);
-            const expandedEl = renderNode(expanded, ctx, [...ancestors, targetId]);
-            stubContainer.replaceWith(expandedEl);
-          } catch {
-            expandBtn.textContent = "Failed to expand";
-          }
-        })();
-      });
-
-      stubContainer.append(expandBtn);
-      itemEl.append(stubContainer);
-    } else if (backRef) {
-      // Rule 4 collapsed a repeated subtree to the node path where it was
-      // first drawn. That path is an addressing detail of the walk, not
-      // something a player can act on, so the chip reads as the plain fact it
-      // stands for and the path stays on `title` for anyone debugging a tree.
-      const refSpan = document.createElement("span");
-      refSpan.className = "tree-back-reference";
-      refSpan.textContent = "(shown above)";
-      refSpan.title = backRef;
-      headEl.append(refSpan);
-    } else if (node.producers.length > 0) {
-      const nextAncestors = input.item ? [...ancestors, input.item] : ancestors;
-      const childNodeEl = renderNode(node, ctx, nextAncestors);
-      itemEl.append(childNodeEl);
-    }
-  }
-
-  return itemEl;
-}
-
-function renderProducer(
-  producer: TreeProducer,
-  ctx: RenderContext,
-  ancestors: string[],
-): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "tree-producer-row";
-
-  const header = document.createElement("div");
-  header.className = "tree-producer-header";
-
-  // No method badge: every row sits under a heading naming its own method
-  // already, so a badge here only repeats the line above it.
-  const source = sourceLabel(producer);
-  if (source) {
-    const sourceEl = document.createElement("span");
-    sourceEl.className = "tree-source-label";
-    sourceEl.textContent = source;
-    header.append(sourceEl);
-  }
-
-  if (producer.station) {
-    const stationBadge = document.createElement("span");
-    stationBadge.className = "station-badge";
-    stationBadge.textContent = STATION_LABELS[producer.station] ?? humanise(producer.station);
-    header.append(stationBadge);
-  }
-
-  if (producer.note) {
-    const noteBadge = document.createElement("span");
-    noteBadge.className = "note-badge";
-    noteBadge.textContent = producer.note;
-    header.append(noteBadge);
-  }
-
-  row.append(header);
-
-  if (producer.inputs.length > 0) {
-    const inputsList = document.createElement("ul");
-    inputsList.className = "tree-inputs-list";
-    for (const input of producer.inputs) {
-      inputsList.append(renderInput(input, ctx, ancestors));
-    }
-    row.append(inputsList);
-  }
-
-  return row;
-}
-
-function renderNode(node: ObtainNode, ctx: RenderContext, ancestors: string[]): HTMLElement {
-  const nodeContainer = document.createElement("div");
-  nodeContainer.className = "tree-node";
-
-  const producers = node.producers;
-  if (producers.length === 0) {
-    return nodeContainer;
-  }
-
-  // Group by method, preserving order of first appearance
-  const groups = new Map<string, TreeProducer[]>();
-  for (const producer of producers) {
-    const group = groups.get(producer.method);
-    if (group) {
-      group.push(producer);
-    } else {
-      groups.set(producer.method, [producer]);
-    }
-  }
-
-  const orderedGroups = [...groups.entries()].sort(
-    ([left], [right]) => methodRank(left) - methodRank(right),
-  );
-
-  for (const [method, groupProducers] of orderedGroups) {
+  function renderGroup(title: string, items: HTMLElement[], groupClass: string): HTMLElement {
     const groupEl = document.createElement("div");
-    groupEl.className = "tree-method-group";
+    groupEl.className = `sources-group ${groupClass}`;
 
-    const titleEl = document.createElement("h4");
-    titleEl.className = `tree-method-title method-${method}`;
-    titleEl.textContent = METHOD_LABELS[method] ?? method;
-    groupEl.append(titleEl);
+    const subtitle = document.createElement("h5");
+    subtitle.className = "sources-group-title";
+    subtitle.textContent = title;
+    groupEl.append(subtitle);
 
-    // Render up to 3 producers initially
-    const initialProducers = groupProducers.slice(0, 3);
-    for (const producer of initialProducers) {
-      groupEl.append(renderProducer(producer, ctx, ancestors));
+    const listEl = document.createElement("ul");
+    listEl.className = "sources-list";
+
+    const initial = items.slice(0, INITIAL_LIMIT);
+    for (const item of initial) {
+      listEl.append(item);
     }
+    groupEl.append(listEl);
 
-    // Overflow beyond 3 behind a control that builds it on first use.
-    //
-    // Building the overflow eagerly and hiding it with `display: none` costs
-    // the whole subtree of every hidden producer, at every level of the walk,
-    // for rows nobody has asked to see. Measured on `minecraft:emerald`, that
-    // was 883 of 932 producer rows and 8,507 DOM nodes in one window. The cap
-    // exists to bound what the page builds, so the rows have to not exist
-    // until the reader opens them.
-    if (groupProducers.length > 3) {
-      const overflowProducers = groupProducers.slice(3);
-      const overflowEl = document.createElement("div");
-      overflowEl.className = "tree-group-overflow";
-      overflowEl.hidden = true;
-      groupEl.append(overflowEl);
+    if (items.length > INITIAL_LIMIT) {
+      const overflow = items.slice(INITIAL_LIMIT);
+      const overflowContainer = document.createElement("ul");
+      overflowContainer.className = "sources-list sources-overflow";
+      overflowContainer.hidden = true;
+      groupEl.append(overflowContainer);
 
       const toggleBtn = document.createElement("button");
       toggleBtn.type = "button";
-      toggleBtn.className = "tree-more-button";
-      const remainingCount = overflowProducers.length;
-      const methodLabel = (METHOD_LABELS[method] ?? method).toLowerCase();
-      const showText = `Show ${remainingCount.toString()} more ${methodLabel}...`;
+      toggleBtn.className = "sources-more-button";
+      const remaining = overflow.length;
+      const showText = `Show ${remaining.toString()} more ${title.toLowerCase()}...`;
       toggleBtn.textContent = showText;
 
       let built = false;
       toggleBtn.addEventListener("click", () => {
         if (!built) {
-          for (const producer of overflowProducers) {
-            overflowEl.append(renderProducer(producer, ctx, ancestors));
+          for (const item of overflow) {
+            overflowContainer.append(item);
           }
           built = true;
         }
-        overflowEl.hidden = !overflowEl.hidden;
-        toggleBtn.textContent = overflowEl.hidden ? showText : `Show fewer ${methodLabel}`;
+        overflowContainer.hidden = !overflowContainer.hidden;
+        toggleBtn.textContent = overflowContainer.hidden
+          ? showText
+          : `Show fewer ${title.toLowerCase()}`;
       });
 
       groupEl.append(toggleBtn);
     }
 
-    nodeContainer.append(groupEl);
+    return groupEl;
   }
 
+  // 1. Chest Loot
+  if (hasChest) {
+    const chestItems = data.chestLoot.map((p) => {
+      const li = document.createElement("li");
+      li.className = "sources-item sources-chest-item";
+      const label = document.createElement("span");
+      label.className = "sources-chest-label";
+      label.textContent = getChestSourceLabel(p.src, data.sourcesMap);
+      li.append(label);
+      return li;
+    });
+    panelEl.append(renderGroup("Chest Loot", chestItems, "sources-chest-group"));
+  }
+
+  // 2. Block Drops
+  if (hasBlocks) {
+    const blockItems = data.blockDrops.map((p) => {
+      const li = document.createElement("li");
+      li.className = "sources-item sources-block-item";
+      const blockInput = p.in?.[0];
+      const blockId = blockInput?.i;
+      if (blockId) {
+        const entry = ctx.lookup(blockId);
+        const link = entityLink(
+          {
+            id: blockId,
+            name: entry?.n ?? humaniseId(blockId),
+          },
+          ctx,
+        );
+        li.append(link);
+      }
+      if (p.nt) {
+        const noteBadge = document.createElement("span");
+        noteBadge.className = "sources-note-badge";
+        noteBadge.textContent = p.nt;
+        li.append(noteBadge);
+      }
+      return li;
+    });
+    panelEl.append(renderGroup("Block Drops", blockItems, "sources-block-group"));
+  }
+
+  // 3. Mob Drops
+  if (hasMobs) {
+    const mobItems = data.mobDrops.map((p) => {
+      const li = document.createElement("li");
+      li.className = "sources-item sources-mob-item";
+      const text = p.nt ?? p.src.replace(/^droptable\//, "Dropped by ");
+      const span = document.createElement("span");
+      span.className = "sources-mob-label";
+      span.textContent = text;
+      li.append(span);
+      return li;
+    });
+    panelEl.append(renderGroup("Mob Drops", mobItems, "sources-mob-group"));
+  }
+
+  // 4. Trades
+  if (hasTrades) {
+    const tradeGroup = document.createElement("div");
+    tradeGroup.className = "sources-group sources-trade-group";
+
+    const subtitle = document.createElement("h5");
+    subtitle.className = "sources-group-title";
+    subtitle.textContent = "Villager Trades";
+    tradeGroup.append(subtitle);
+
+    if (data.tradeTableSection) {
+      const tradeEl = renderTradeTable(data.tradeTableSection, ctx, { withoutTitle: true });
+      if (tradeEl) {
+        tradeGroup.append(tradeEl);
+      }
+    } else {
+      const tradeList = document.createElement("ul");
+      tradeList.className = "sources-list";
+      for (const p of data.tradeProducers) {
+        const li = document.createElement("li");
+        li.className = "sources-item sources-trade-item";
+        li.textContent = p.nt ?? p.src;
+        tradeList.append(li);
+      }
+      tradeGroup.append(tradeList);
+    }
+    panelEl.append(tradeGroup);
+  }
+
+  return panelEl;
+}
+
+function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[]): HTMLElement {
+  const nodeContainer = document.createElement("div");
+  nodeContainer.className = "tree-node";
+
+  const cardWrapper = document.createElement("div");
+  cardWrapper.className = "tree-node-card";
+  nodeContainer.append(cardWrapper);
+
+  const backRef =
+    node.back_reference ?? (node as unknown as { backReference?: string }).backReference;
+
+  if (node.expandable) {
+    const stubContainer = document.createElement("div");
+    stubContainer.className = "tree-stub";
+
+    const expandBtn = document.createElement("button");
+    expandBtn.type = "button";
+    expandBtn.className = "tree-expand-stub-btn";
+    expandBtn.textContent = "Expand...";
+
+    expandBtn.addEventListener("click", () => {
+      void (async () => {
+        expandBtn.disabled = true;
+        expandBtn.textContent = "Loading...";
+        try {
+          const graph = await loadObtain();
+          const targetId = node.item;
+          const expanded = expandStub(targetId, graph, ancestors);
+          const expandedEl = renderTreeNode(expanded, ctx, [...ancestors, targetId]);
+          nodeContainer.replaceWith(expandedEl);
+        } catch {
+          expandBtn.textContent = "Failed to expand";
+        }
+      })();
+    });
+
+    stubContainer.append(expandBtn);
+    cardWrapper.append(stubContainer);
+    return nodeContainer;
+  }
+
+  if (backRef) {
+    const refSpan = document.createElement("span");
+    refSpan.className = "tree-back-reference";
+    refSpan.textContent = "(shown above)";
+    refSpan.title = backRef;
+    cardWrapper.append(refSpan);
+    return nodeContainer;
+  }
+
+  if (node.producers.length === 0) {
+    // Leaf node: item with no manipulation producers
+    const leafCard = renderLeafCard(node.item, ctx, { isRaw: node.is_raw });
+    cardWrapper.append(leafCard);
+    return nodeContainer;
+  }
+
+  // Node with 1 or more producers
+  let activeIndex = 0;
+  const childrenContainer = document.createElement("div");
+  childrenContainer.className = "tree-children";
+  nodeContainer.append(childrenContainer);
+
+  const updateCardAndChildren = (): void => {
+    cardWrapper.replaceChildren();
+    childrenContainer.replaceChildren();
+
+    const activeProducer = node.producers[activeIndex];
+    if (!activeProducer) return;
+
+    const card = renderStationCard(activeProducer, node.item, ctx, {
+      activeProducerIndex: activeIndex,
+      totalProducers: node.producers.length,
+      onSelectProducer: (newIdx) => {
+        activeIndex = newIdx;
+        updateCardAndChildren();
+      },
+    });
+    cardWrapper.append(card);
+
+    // Build children branches for active producer
+    const childInputs = activeProducer.inputs.filter((i: TreeInput) => i.node !== null);
+    if (childInputs.length > 0) {
+      childrenContainer.hidden = false;
+      for (const input of childInputs) {
+        if (!input.node) continue;
+        const branchEl = document.createElement("div");
+        branchEl.className = "tree-branch";
+        const nextAncestors = input.item ? [...ancestors, input.item] : ancestors;
+        const childNodeEl = renderTreeNode(input.node, ctx, nextAncestors);
+        branchEl.append(childNodeEl);
+        childrenContainer.append(branchEl);
+      }
+    } else {
+      childrenContainer.hidden = true;
+    }
+  };
+
+  updateCardAndChildren();
   return nodeContainer;
 }
 
+export interface RecipeTreeSectionData extends RecipeTree {
+  rawProducers?: ObtainProducer[] | undefined;
+  sources?:
+    Record<string, { s?: string; c?: string; structure?: string; container?: string }> | undefined;
+}
+
 /**
- * Renders an obtaining tree section:
+ * Renders an Obtaining section:
  * - Title "Obtaining"
- * - Producers grouped by method
- * - Max 3 producers per group visible by default, rest behind expand control
- * - Inputs rendered as entityLinks or tag references
- * - Nested nodes indented under their respective inputs
- * - Stubs expandable on click
+ * - Two-pane Obtaining shell:
+ *   - Left pane (.obtaining-tree-pane): Centered tree of workstation GUI cards with pure CSS connector lines.
+ *   - Right pane (.obtaining-sources-pane): Flat list of root acquisition sources (chest loot, block drops, mob drops, villager trades).
  */
-export function renderRecipeTree(section: RecipeTree, ctx: RenderContext): HTMLElement | null {
+export function renderRecipeTree(
+  section: RecipeTreeSectionData,
+  ctx: RenderContext,
+  entity?: Entity,
+): HTMLElement | null {
   const rootNode = section.root as unknown as ObtainNode;
-  if (rootNode.producers.length === 0) {
+
+  // Collect raw acquisition producers for the root item
+  const rawProducers = section.rawProducers ?? [];
+  const chestLoot = rawProducers.filter((p) => p.m === "chest_loot");
+  const blockDrops = rawProducers.filter((p) => p.m === "block_drop");
+  const mobDrops = rawProducers.filter((p) => p.m === "mob_loot");
+  const tradeProducers = rawProducers.filter((p) => p.m === "trade");
+
+  const tradeTableSection = entity?.sections.find((s): s is TradeTable => s.type === "TradeTable");
+
+  const hasTreeContent = rootNode.producers.length > 0;
+  const hasSourcesContent =
+    chestLoot.length > 0 ||
+    blockDrops.length > 0 ||
+    mobDrops.length > 0 ||
+    tradeProducers.length > 0 ||
+    Boolean(tradeTableSection);
+
+  // If there's neither manipulation tree content nor acquisition sources:
+  if (!hasTreeContent && !hasSourcesContent) {
     return null;
   }
 
@@ -354,10 +369,36 @@ export function renderRecipeTree(section: RecipeTree, ctx: RenderContext): HTMLE
   title.textContent = "Obtaining";
   container.append(title);
 
+  const shellEl = document.createElement("div");
+  shellEl.className = "obtaining-shell";
+
+  // Left pane: Workstation Tree
+  const treePaneEl = document.createElement("div");
+  treePaneEl.className = "obtaining-tree-pane";
+
   const rootItemId = rootNode.item;
+  const treeRootEl = renderTreeNode(rootNode, ctx, [rootItemId]);
+  treePaneEl.append(treeRootEl);
+  shellEl.append(treePaneEl);
 
-  const treeEl = renderNode(rootNode, ctx, [rootItemId]);
-  container.append(treeEl);
+  // Right pane: Sources panel
+  if (hasSourcesContent) {
+    const sourcesPaneEl = renderSourcesPanel(
+      {
+        chestLoot,
+        blockDrops,
+        mobDrops,
+        tradeProducers,
+        tradeTableSection,
+        sourcesMap: section.sources,
+      },
+      ctx,
+    );
+    if (sourcesPaneEl) {
+      shellEl.append(sourcesPaneEl);
+    }
+  }
 
+  container.append(shellEl);
   return container;
 }

@@ -737,84 +737,109 @@ describe("Section renderers with real committed build data", () => {
   });
 
   describe("renderRecipeTree", () => {
-    it("renders Obtaining heading and groups producers by method", () => {
+    it("renders Obtaining heading with workstation tree and sources panes", () => {
       const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
-      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
       const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
 
       expect(el.querySelector(".section-title")?.textContent).toBe("Obtaining");
-      const methodTitles = Array.from(el.querySelectorAll(".tree-method-title")).map(
-        (t) => t.textContent,
-      );
-      expect(methodTitles).toContain("Crafting");
-      expect(methodTitles).toContain("Smelting");
+      expect(el.querySelector(".obtaining-shell")).not.toBeNull();
+      expect(el.querySelector(".obtaining-tree-pane")).not.toBeNull();
+      expect(el.querySelector(".obtaining-sources-pane")).not.toBeNull();
+
+      // Station cards should be present in the tree pane
+      const cards = el.querySelectorAll(".obtaining-tree-pane .station-card");
+      expect(cards.length).toBeGreaterThan(0);
     });
 
-    it("orders method groups by usefulness, not by the graph's alphabetical sort", () => {
+    it("renders chest loot sources in Title Case without links", () => {
       const tree = buildObtainTree("minecraft:emerald", obtainGraph);
-      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
       const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
 
-      // Only the root node's own groups: a nested node orders its own.
-      const rootNode = requireItem(el.querySelector(".tree-node"), "root tree node");
-      const titles = Array.from(rootNode.children)
-        .filter((child) => child.classList.contains("tree-method-group"))
-        .map((group) => group.querySelector(".tree-method-title")?.textContent);
-
-      // The graph sorts chest_loot above crafting alphabetically, which led an
-      // item you simply craft with a list of chests it might be lying in.
-      expect(titles.indexOf("Crafting")).toBeLessThan(titles.indexOf("Chest Loot"));
-      expect(titles.indexOf("Smelting")).toBeLessThan(titles.indexOf("Trading"));
-      expect(titles[0]).toBe("Crafting");
-    });
-
-    it("names the chest a loot producer comes from, keeping the directory that qualifies it", () => {
-      const tree = buildObtainTree("minecraft:emerald", obtainGraph);
-      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
-      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
-
-      const labels = Array.from(el.querySelectorAll(".tree-source-label")).map(
+      const labels = Array.from(el.querySelectorAll(".sources-chest-label")).map(
         (e) => e.textContent,
       );
       expect(labels.length).toBeGreaterThan(0);
 
-      // A bare basename would read "intersection", which names nothing.
-      const nested = labels.filter((l) => l.startsWith("trial chambers"));
-      expect(nested.length).toBeGreaterThan(0);
+      // Curated chest sources are in Title Case
+      for (const label of labels) {
+        expect(label).toBeTruthy();
+        if (label) {
+          const words = label.split(/[\s\-()]+/);
+          for (const w of words) {
+            const firstChar = w[0];
+            if (firstChar) {
+              expect(firstChar).toBe(firstChar.toUpperCase());
+            }
+          }
+        }
+      }
 
-      // And the directory is not repeated: "village armorer", never
-      // "village village armorer".
-      expect(labels.some((l) => /^(\w+) \1\b/.test(l))).toBe(false);
+      // No anchor links in chest loot group (Decision 1)
+      const chestGroup = el.querySelector(".sources-chest-group");
+      expect(chestGroup?.querySelectorAll("a")).toHaveLength(0);
     });
 
-    it("shows up to 3 producers per group with remainder behind toggle button", () => {
+    it("shows up to 3 sources per group with remainder behind toggle button", () => {
       const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
-      const section = { type: "RecipeTree", root: tree.root } as unknown as RecipeTree;
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
       const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
 
       // Iron ingot has many chest_loot producers (> 3)
-      const moreBtn = el.querySelector<HTMLButtonElement>(".tree-more-button");
+      const moreBtn = el.querySelector<HTMLButtonElement>(".sources-more-button");
       expect(moreBtn).not.toBeNull();
       expect(moreBtn?.textContent).toMatch(/Show \d+ more/i);
 
-      // The overflow rows do not exist until the reader asks for them: building
-      // them eagerly and hiding them costs the whole subtree of every hidden
-      // producer for rows nobody has opened.
-      const overflow = el.querySelector<HTMLElement>(".tree-group-overflow");
+      const overflow = el.querySelector<HTMLElement>(".sources-overflow");
       expect(overflow?.hidden).toBe(true);
-      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBe(0);
+      expect(overflow?.querySelectorAll(".sources-item").length).toBe(0);
 
       moreBtn?.click();
       expect(overflow?.hidden).toBe(false);
-      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBeGreaterThan(0);
+      expect(overflow?.querySelectorAll(".sources-item").length).toBeGreaterThan(0);
       expect(moreBtn?.textContent).toMatch(/Show fewer/i);
 
-      // Collapsing keeps the rows already built, rather than rebuilding on
-      // every toggle.
-      const builtRows = overflow?.querySelectorAll(".tree-producer-row").length;
+      // Collapsing keeps the rows already built
+      const builtRows = overflow?.querySelectorAll(".sources-item").length;
       moreBtn?.click();
       expect(overflow?.hidden).toBe(true);
-      expect(overflow?.querySelectorAll(".tree-producer-row").length).toBe(builtRows);
+      expect(overflow?.querySelectorAll(".sources-item").length).toBe(builtRows);
+    });
+
+    it("embeds entity trades inside Sources panel and not in the workstation tree", () => {
+      const tree = buildObtainTree("minecraft:apple", obtainGraph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
+
+      const el = requireItem(renderRecipeTree(section, ctx, apple), "RecipeTree element");
+
+      // Trade table is embedded inside sources panel
+      const tradeGroup = el.querySelector(".sources-trade-group");
+      expect(tradeGroup).not.toBeNull();
+      expect(tradeGroup?.querySelector(".trade-table")).not.toBeNull();
+
+      // Tree pane must NOT contain trades
+      expect(el.querySelector(".obtaining-tree-pane .trade-table")).toBeNull();
     });
 
     it("renders stub with expand button and clicking expands the subtree", async () => {
@@ -866,8 +891,6 @@ describe("Section renderers with real committed build data", () => {
       const section = { type: "RecipeTree", root: backRefNode } as unknown as RecipeTree;
       const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
 
-      // The node path is an addressing detail of the walk, so it rides on
-      // `title` rather than being printed at a player.
       const backRefEl = el.querySelector<HTMLElement>(".tree-back-reference");
       expect(backRefEl).not.toBeNull();
       expect(backRefEl?.textContent).toBe("(shown above)");
@@ -875,7 +898,7 @@ describe("Section renderers with real committed build data", () => {
       expect(backRefEl?.textContent).not.toContain("producers.0");
     });
 
-    it("prints plain text instead of link when item is absent from search index", () => {
+    it("falls back to readable text when item sprite is absent", () => {
       const unindexedNode = {
         item: "minecraft:test_item",
         producers: [
@@ -902,11 +925,10 @@ describe("Section renderers with real committed build data", () => {
       const section = { type: "RecipeTree", root: unindexedNode } as unknown as RecipeTree;
       const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
 
-      expect(el.querySelector("a.entity-link[data-id='minecraft:unknown_material']")).toBeNull();
-      expect(el.querySelector(".entity-plain")?.textContent).toBe("unknown material");
+      expect(el.querySelector(".slot-fallback-text")?.textContent).toBe("Unknown Material");
     });
 
-    it("returns null when root has no producers", () => {
+    it("returns null when root has no producers and no sources", () => {
       const emptyTree = {
         item: "minecraft:bedrock",
         producers: [],

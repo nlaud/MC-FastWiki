@@ -109,6 +109,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, Field
 
+from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.producer import (
     ObtainMethod,
     Producer,
@@ -119,6 +120,7 @@ from pipeline.obtain.producer import (
 
 __all__ = [
     "OBTAIN_SCHEMA_VERSION",
+    "ChestSource",
     "ObtainGraph",
     "ObtainProducer",
     "ObtainProducerInput",
@@ -170,11 +172,14 @@ class ObtainProducer(BaseModel, frozen=True, populate_by_name=True):
     station: str | None = Field(default=None, alias="st")
     note: str | None = Field(default=None, alias="nt")
     inputs: tuple[ObtainProducerInput, ...] = Field(default=(), alias="in")
+    grid: tuple[int | None, ...] | None = Field(default=None, alias="g")
+    grid_width: int | None = Field(default=None, alias="gw")
+    grid_height: int | None = Field(default=None, alias="gh")
 
 
 class ObtainGraph(BaseModel, frozen=True, populate_by_name=True):
-    """The whole `obtain.json` payload: a schema version and every producer, keyed by output
-    item id.
+    """The whole `obtain.json` payload: a schema version, every producer keyed by output
+    item id, and curated sources metadata.
 
     Unlike `pipeline.emit.search_index.SearchIndex.entities`, `producers`
     carries no `min_length`. An empty `SearchIndex` is a search payload that
@@ -192,6 +197,7 @@ class ObtainGraph(BaseModel, frozen=True, populate_by_name=True):
 
     schema_version: int = Field(default=OBTAIN_SCHEMA_VERSION, alias="schemaVersion")
     producers: Mapping[str, tuple[ObtainProducer, ...]]
+    sources: Mapping[str, ChestSource] = Field(default_factory=dict)
 
 
 def _to_obtain_input(input_spec: ProducerInput) -> ObtainProducerInput:
@@ -211,10 +217,15 @@ def _to_obtain_producer(producer: Producer) -> ObtainProducer:
         station=producer.station,
         note=producer.note,
         inputs=tuple(_to_obtain_input(one_input) for one_input in producer.inputs),
+        grid=producer.grid,
+        grid_width=producer.grid_width,
+        grid_height=producer.grid_height,
     )
 
 
-def build_obtain_graph(index: ProducerIndex) -> ObtainGraph:
+def build_obtain_graph(
+    index: ProducerIndex, sources: Mapping[str, ChestSource] | None = None
+) -> ObtainGraph:
     """Return the `ObtainGraph` of every producer `index` holds, keyed by output item id.
 
     Sorted by item id -- see the module docstring's determinism section for
@@ -223,11 +234,23 @@ def build_obtain_graph(index: ProducerIndex) -> ObtainGraph:
     *within* one item id is left exactly as `index.producers_of` already
     returns it.
     """
+    if sources is None:
+        try:
+            from pipeline.obtain.chests import DEFAULT_CHEST_SOURCES_PATH, load_chest_sources
+
+            if DEFAULT_CHEST_SOURCES_PATH.is_file():
+                sources = load_chest_sources(DEFAULT_CHEST_SOURCES_PATH)
+            else:
+                sources = {}
+        except Exception:
+            sources = {}
+
+    sorted_sources = {k: sources[k] for k in sorted(sources)}
     producers = {
         item_id: tuple(_to_obtain_producer(producer) for producer in index.producers_of(item_id))
         for item_id in sorted(index.by_output)
     }
-    return ObtainGraph(producers=producers)
+    return ObtainGraph(producers=producers, sources=sorted_sources)
 
 
 def _from_obtain_input(input_spec: ObtainProducerInput) -> ProducerInput:
@@ -260,6 +283,9 @@ def producer_index_from_graph(graph: ObtainGraph) -> ProducerIndex:
             source_id=entry.source_id,
             station=entry.station,
             note=entry.note,
+            grid=entry.grid,
+            grid_width=entry.grid_width,
+            grid_height=entry.grid_height,
         )
         for item_id, group in graph.producers.items()
         for entry in group

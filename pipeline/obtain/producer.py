@@ -147,6 +147,32 @@ class Producer(BaseModel, frozen=True):
     source_id: str
     station: str | None = None
     note: str | None = None
+    grid: tuple[int | None, ...] | None = None
+    grid_width: int | None = None
+    grid_height: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_grid(self) -> "Producer":
+        if self.grid is not None:
+            if self.grid_width is None or self.grid_height is None:
+                raise ObtainError("a producer with a grid must declare grid_width and grid_height.")
+            if len(self.grid) != self.grid_width * self.grid_height:
+                raise ObtainError(
+                    f"a producer grid of length {len(self.grid)} does not match "
+                    f"grid_width={self.grid_width} * grid_height={self.grid_height}."
+                )
+            num_inputs = len(self.inputs)
+            for idx in self.grid:
+                if idx is not None and not (0 <= idx < num_inputs):
+                    raise ObtainError(
+                        f"grid cell index {idx} is out of range for {num_inputs} inputs."
+                    )
+        else:
+            if self.grid_width is not None or self.grid_height is not None:
+                raise ObtainError(
+                    "a producer without a grid cannot declare grid_width or grid_height."
+                )
+        return self
 
 
 def _sort_key(producer: Producer) -> tuple[str, str, str]:

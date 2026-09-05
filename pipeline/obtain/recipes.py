@@ -199,17 +199,35 @@ def _crafting_shaped(
                 )
             counts[symbol] = counts.get(symbol, 0) + 1
 
+    sorted_symbols = sorted(counts)
+    symbol_to_input_idx = {sym: idx for idx, sym in enumerate(sorted_symbols)}
+
     inputs = tuple(
         _resolve_ingredient(key[symbol], tags=tags, source=source).model_copy(
             update={"count": counts[symbol]}
         )
-        for symbol in sorted(counts)
+        for symbol in sorted_symbols
     )
+
+    grid_height = len(pattern)
+    grid_width = max(len(row) for row in pattern) if pattern else 0
+    grid_cells: list[int | None] = []
+    for row in pattern:
+        for col_idx in range(grid_width):
+            symbol = row[col_idx] if col_idx < len(row) else _EMPTY_CELL
+            if symbol == _EMPTY_CELL:
+                grid_cells.append(None)
+            else:
+                grid_cells.append(symbol_to_input_idx[symbol])
+
     return Producer(
         method=ObtainMethod.CRAFTING,
         output=_result(document, source=source),
         inputs=inputs,
         source_id=recipe_id,
+        grid=tuple(grid_cells),
+        grid_width=grid_width,
+        grid_height=grid_height,
     )
 
 

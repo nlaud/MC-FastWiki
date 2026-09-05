@@ -1053,152 +1053,478 @@ canvas,
 }
 
 /* ---------------------------------------------------------------------------
-   RecipeTree section (Obtaining)
+   RecipeTree section (Obtaining) - Workstation Tree & Sources
    --------------------------------------------------------------------------- */
 .recipe-tree-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /*
+   * The shell below stacks on the width of *this window*, not of the viewport.
+   * A media query cannot see that difference: four windows on a 1280px screen
+   * are ~630px each while `max-width: 768px` never fires, which left a 280px
+   * Sources pane pinned beside a squeezed tree and pushed the embedded trade
+   * table into a 250px horizontal scroller.
+   */
+  container-type: inline-size;
+  container-name: obtaining;
 }
 
-.tree-method-group {
+.obtaining-shell {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/*
+ * Below this width the window cannot host a readable tree and a 460px Sources
+ * pane side by side, so Sources drops underneath and takes the full width --
+ * which is also what gives the villager trade table room to lay out as a table
+ * rather than as a scroller.
+ */
+@container obtaining (max-width: 900px) {
+  .obtaining-shell {
+    flex-direction: column;
+  }
+
+  /*
+   * `flex: 1 1 0` on the tree pane sizes the main axis, which is width while
+   * the shell is a row and height once it is a column. Left alone, the pane
+   * collapsed to zero height here and the whole tree vanished, leaving a bare
+   * Sources panel under the Obtaining heading.
+   */
+  .obtaining-tree-pane {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .obtaining-sources-pane {
+    width: 100%;
+  }
+}
+
+/* Left Pane: Workstation Tree */
+.obtaining-tree-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  container-type: inline-size;
+}
+
+.tree-node {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
+  align-items: center;
+  position: relative;
 }
 
-.tree-method-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #adc8ff;
-  margin: 0 0 4px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.tree-node-card {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
 }
 
-.tree-producer-row {
+/* Connectors: Centered tree when wide */
+.tree-children {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  position: relative;
+  margin-top: 24px;
+}
+
+.tree-children::before {
+  content: "";
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  background: #444;
+  transform: translateX(-50%);
+}
+
+.tree-branch {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
+  align-items: center;
+  position: relative;
+  padding: 24px 12px 0 12px;
+}
+
+.tree-branch::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  background: #444;
+  transform: translateX(-50%);
+}
+
+.tree-branch::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #444;
+}
+
+.tree-branch:first-child::after {
+  left: 50%;
+  width: 50%;
+}
+
+.tree-branch:last-child::after {
+  left: 0;
+  width: 50%;
+}
+
+.tree-branch:only-child::after {
+  display: none;
+}
+
+/* Narrow container query: Vertical rail layout under ~460px */
+@container (max-width: 460px) {
+  .tree-node {
+    align-items: flex-start;
+  }
+
+  .tree-children {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: 12px;
+    margin-left: 20px;
+    padding-left: 20px;
+    border-left: 2px solid #444;
+  }
+
+  .tree-children::before {
+    display: none;
+  }
+
+  .tree-branch {
+    padding: 8px 0 0 0;
+    align-items: flex-start;
+  }
+
+  .tree-branch::after {
+    display: none;
+  }
+
+  .tree-branch::before {
+    top: 22px;
+    left: -20px;
+    width: 20px;
+    height: 2px;
+    transform: none;
+  }
+}
+
+/* Station Cards */
+.station-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   background: #181818;
-  border: 1px solid #282828;
+  border: 1px solid #2e2e2e;
   border-radius: 6px;
-  margin-bottom: 6px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-.tree-producer-header {
+.station-chips {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 6px;
+  margin-bottom: 8px;
+  justify-content: center;
 }
 
-/* Per-method colour on the group heading. Every producer row sits under a
-   heading naming its method, so the colour belongs on the heading rather than
-   on a badge repeated once per row. */
-.tree-method-title.method-crafting {
-  color: #8ab4f8;
-}
-
-.tree-method-title.method-smelting {
-  color: #ffb74d;
-}
-
-.tree-method-title.method-brewing {
-  color: #d7aefb;
-}
-
-.tree-method-title.method-mob_loot {
-  color: #f28b82;
-}
-
-.tree-method-title.method-chest_loot {
-  color: #fdd663;
-}
-
-.tree-method-title.method-trade {
-  color: #81c995;
-}
-
-.station-badge,
-.note-badge {
+.station-chip {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #242424;
+  color: #ccc;
+  border: 1px solid #383838;
+}
+
+.station-chip-furnace {
+  color: #ffb74d;
+  background: rgba(255, 183, 77, 0.15);
+  border-color: rgba(255, 183, 77, 0.35);
+}
+
+.station-chip-blast_furnace {
+  color: #ff8a65;
+  background: rgba(255, 138, 101, 0.15);
+  border-color: rgba(255, 138, 101, 0.35);
+}
+
+.station-chip-smoker {
+  color: #ce93d8;
+  background: rgba(206, 147, 216, 0.15);
+  border-color: rgba(206, 147, 216, 0.35);
+}
+
+.station-chip-campfire {
+  color: #ffcc80;
+  background: rgba(255, 204, 128, 0.15);
+  border-color: rgba(255, 204, 128, 0.35);
+}
+
+.station-chip-stonecutter {
+  color: #b0bec5;
+  background: rgba(176, 190, 197, 0.15);
+  border-color: rgba(176, 190, 197, 0.35);
+}
+
+.station-chip-smithing {
+  color: #81c995;
+  background: rgba(129, 201, 149, 0.15);
+  border-color: rgba(129, 201, 149, 0.35);
+}
+
+.station-chip-brewing {
+  color: #d7aefb;
+  background: rgba(215, 174, 251, 0.15);
+  border-color: rgba(215, 174, 251, 0.35);
+}
+
+.station-chip-filling {
+  color: #8ab4f8;
+  background: rgba(138, 180, 248, 0.15);
+  border-color: rgba(138, 180, 248, 0.35);
+}
+
+.station-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.station-arrow {
+  font-size: 1.25rem;
+  color: #777;
+  user-select: none;
+  font-weight: bold;
+}
+
+.station-plus {
+  font-size: 1rem;
+  color: #666;
+  user-select: none;
+}
+
+/* Station Slots */
+.station-slot {
+  width: 36px;
+  height: 36px;
+  background: #141414;
+  border: 2px solid #3a3a3a;
+  border-top-color: #101010;
+  border-left-color: #101010;
+  border-right-color: #4a4a4a;
+  border-bottom-color: #4a4a4a;
+  border-radius: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.station-slot.slot-result {
+  width: 40px;
+  height: 40px;
+  border-color: #555;
+  border-top-color: #151515;
+  border-left-color: #151515;
+}
+
+.station-slot.is-empty {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.station-slot[role="button"] {
+  cursor: pointer;
+}
+
+.station-slot[role="button"]:hover,
+.station-slot[role="button"]:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: 1px;
+}
+
+.slot-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.slot-count {
+  position: absolute;
+  right: 2px;
+  bottom: 0px;
+  font-family: monospace;
   font-size: 0.75rem;
-  border-radius: 4px;
-  background: #222;
-  color: #aaa;
-  border: 1px solid #333;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #222;
+  user-select: none;
+  pointer-events: none;
 }
 
-/* Names the chest a loot producer comes from. Such a producer consumes
-   nothing, so without this its row is the bare method name repeated once per
-   chest. Reads as the primary text of the row, not as another badge. */
-.tree-source-label {
-  color: #d0d0d0;
-  font-size: 0.85rem;
+.slot-fallback-text {
+  font-size: 0.65rem;
+  line-height: 1;
+  text-align: center;
+  color: #ddd;
+  max-width: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tree-inputs-list {
+/* Crafting Grid */
+.crafting-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+  gap: 2px;
+}
+
+.crafting-grid .station-slot {
+  width: 34px;
+  height: 34px;
+}
+
+/* Furnace Card */
+.furnace-column {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.tree-input-item {
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
-.tree-input-head {
+.station-flame {
+  font-size: 0.85rem;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Brewing Card */
+.brewing-stand {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.tree-input-count {
-  color: #aaa;
-  font-size: 0.85em;
-  font-weight: 500;
+.brewing-pipes {
+  width: 2px;
+  height: 10px;
+  background: #555;
 }
 
-.tree-tag-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 5px;
-  font-size: 0.8rem;
-  border-radius: 3px;
+.brewing-bottles {
+  display: flex;
+  gap: 4px;
+}
+
+/* Leaf Card */
+.station-card.station-leaf {
+  padding: 8px 12px;
+  cursor: pointer;
+  background: #181818;
+  border: 1px solid #333;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.station-card.station-leaf:hover,
+.station-card.station-leaf:focus-visible {
   background: #242424;
-  color: #c58af9;
-  border: 1px solid #382d47;
+  border-color: #555;
+  outline: 2px solid #5c85d6;
+  outline-offset: 1px;
 }
 
-.tree-members-count {
+.leaf-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leaf-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #8ab4f8;
+}
+
+.leaf-badge {
+  font-size: 0.7rem;
   color: #888;
-  font-size: 0.75rem;
+  background: #222;
+  border: 1px solid #383838;
+  border-radius: 3px;
+  padding: 1px 5px;
 }
 
-.tree-back-reference {
-  color: #888;
-  font-size: 0.8rem;
-  font-style: italic;
+/* Station Pagination Dots */
+.station-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
 }
 
+.station-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #444;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    transform 0.1s ease;
+}
+
+.station-dot.is-active {
+  background: #8ab4f8;
+  transform: scale(1.2);
+}
+
+.station-dot:hover {
+  background: #666;
+}
+
+/* Stubs & Back references */
 .tree-stub {
-  margin-left: 18px;
-  margin-top: 2px;
+  margin: 4px 0;
 }
 
 .tree-expand-stub-btn,
-.tree-more-button {
+.sources-more-button {
   display: inline-flex;
   align-items: center;
   padding: 3px 8px;
@@ -1215,21 +1541,112 @@ canvas,
 }
 
 .tree-expand-stub-btn:hover,
-.tree-more-button:hover {
+.sources-more-button:hover {
   background: #333;
   border-color: #555;
   color: #adc8ff;
 }
 
 .tree-expand-stub-btn:focus-visible,
-.tree-more-button:focus-visible {
+.sources-more-button:focus-visible {
   outline: 2px solid #5c85d6;
   outline-offset: 1px;
 }
 
-.tree-node .tree-node {
-  margin-left: 16px;
-  border-left: 2px solid #2a2a2a;
-  padding-left: 10px;
-  margin-top: 4px;
+.tree-back-reference {
+  color: #888;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* Right Pane: Sources Panel */
+.obtaining-sources-pane {
+  /*
+   * Wide enough for the villager trade table, which is a four-column table
+   * built for a full-width section and lays out at 488px. At 280px it clipped
+   * its GIVEN column. 520px covers that plus this pane's own padding.
+   */
+  width: 520px;
+  max-width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #161616;
+  border: 1px solid #282828;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.sources-pane-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  border-bottom: 1px solid #2e2e2e;
+  padding-bottom: 6px;
+}
+
+.sources-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sources-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #adc8ff;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sources-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sources-item {
+  font-size: 0.85rem;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sources-chest-label {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.sources-note-badge {
+  font-size: 0.75rem;
+  color: #aaa;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.sources-mob-label {
+  color: #ccc;
+}
+
+.trade-table-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  /*
+   * Last-resort safety only. The pane is sized below to fit this table at its
+   * natural width; forcing the table narrower instead (fixed layout plus
+   * `overflow-wrap: anywhere`) breaks every cell into a column of single
+   * letters, which is far worse than the scrollbar it removes.
+   */
+  overflow-x: auto;
 }

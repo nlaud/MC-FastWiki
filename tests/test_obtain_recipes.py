@@ -67,6 +67,9 @@ def test_crafting_shaped_reads_the_key_pattern_and_result() -> None:
     assert producer.output.count == 1
     inputs = {i.item: i.count for i in producer.inputs}
     assert inputs == {"minecraft:stick": 2, "minecraft:iron_ingot": 3}
+    assert producer.grid_width == 3
+    assert producer.grid_height == 3
+    assert producer.grid == (1, 1, 1, None, 0, None, None, 0, None)
 
 
 def test_crafting_shaped_resolves_a_tag_ingredient_through_the_item_registry() -> None:
@@ -130,6 +133,9 @@ def test_crafting_shapeless_reads_a_list_of_ingredients() -> None:
     alternatives = by_item["minecraft:charcoal"]
     assert alternatives.tag is None
     assert alternatives.members == ("minecraft:charcoal", "minecraft:coal")
+    assert producer.grid is None
+    assert producer.grid_width is None
+    assert producer.grid_height is None
 
 
 def test_crafting_shapeless_sums_the_count_of_a_repeated_ingredient() -> None:

@@ -153,3 +153,75 @@ def test_obtain_method_has_the_eight_named_members() -> None:
         "trade",
         "block_drop",
     }
+
+
+# --- Producer grid validation ------------------------------------------------
+
+
+def test_producer_with_valid_grid_is_valid() -> None:
+    p = Producer(
+        method=ObtainMethod.CRAFTING,
+        output=ProducerOutput(item="minecraft:iron_pickaxe"),
+        inputs=(
+            ProducerInput(item="minecraft:stick"),
+            ProducerInput(item="minecraft:iron_ingot"),
+        ),
+        source_id="iron_pickaxe",
+        grid=(1, 1, 1, None, 0, None, None, 0, None),
+        grid_width=3,
+        grid_height=3,
+    )
+    assert p.grid_width == 3
+    assert p.grid_height == 3
+    assert p.grid == (1, 1, 1, None, 0, None, None, 0, None)
+
+
+def test_producer_with_mismatched_grid_length_raises() -> None:
+    with pytest.raises(ObtainError, match="does not match"):
+        Producer(
+            method=ObtainMethod.CRAFTING,
+            output=ProducerOutput(item="minecraft:iron_pickaxe"),
+            inputs=(ProducerInput(item="minecraft:stick"),),
+            source_id="iron_pickaxe",
+            grid=(0, 0),
+            grid_width=3,
+            grid_height=3,
+        )
+
+
+def test_producer_with_out_of_range_grid_index_raises() -> None:
+    with pytest.raises(ObtainError, match="out of range"):
+        Producer(
+            method=ObtainMethod.CRAFTING,
+            output=ProducerOutput(item="minecraft:iron_pickaxe"),
+            inputs=(ProducerInput(item="minecraft:stick"),),
+            source_id="iron_pickaxe",
+            grid=(5,),
+            grid_width=1,
+            grid_height=1,
+        )
+
+
+def test_producer_with_grid_but_no_width_or_height_raises() -> None:
+    with pytest.raises(ObtainError, match="must declare grid_width and grid_height"):
+        Producer(
+            method=ObtainMethod.CRAFTING,
+            output=ProducerOutput(item="minecraft:iron_pickaxe"),
+            inputs=(ProducerInput(item="minecraft:stick"),),
+            source_id="iron_pickaxe",
+            grid=(0,),
+        )
+
+
+def test_producer_without_grid_but_with_width_or_height_raises() -> None:
+    with pytest.raises(
+        ObtainError, match="without a grid cannot declare grid_width or grid_height"
+    ):
+        Producer(
+            method=ObtainMethod.CRAFTING,
+            output=ProducerOutput(item="minecraft:iron_pickaxe"),
+            inputs=(ProducerInput(item="minecraft:stick"),),
+            source_id="iron_pickaxe",
+            grid_width=3,
+            grid_height=3,
+        )

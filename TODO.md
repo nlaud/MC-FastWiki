@@ -28,8 +28,6 @@ reasoning survives even after the choice is made.
       `minecraft:white_banner` truthfully and the window draws a plain white banner.
       Both want a curated per-sprite override naming a verified `File:` title, the same
       mechanism Decision 15 leaves open for the three oversized sprites.
-- [ ] Render crafting recipes **collapsed** — "Wooden Stairs — any plank type" rather than
-      thirteen near-identical rows (see Decision 9)
 - [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
       `InvSprite:Sculk Shrieker`, `InvSprite:Zombie Horse Spawn Egg`), naming a verified `File:`
       title in `/data/curated` per Decision 3.

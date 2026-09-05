@@ -44,6 +44,9 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
         const sectionsContainer = document.createElement("div");
         sectionsContainer.className = "entity-sections";
         for (const section of entity.sections) {
+          if (section.type === "TradeTable") {
+            continue;
+          }
           const el = renderSection(section, ctx, entity);
           if (el) {
             sectionsContainer.append(el);
@@ -76,13 +79,16 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
       void loadObtain()
         .then((graph) => {
           const producers = graph.producers[entity.id];
-          if (!producers || producers.length === 0) {
+          const hasTrades = entity.sections.some((s) => s.type === "TradeTable");
+          if ((!producers || producers.length === 0) && !hasTrades) {
             return;
           }
           const tree = buildObtainTree(entity.id, graph);
           const recipeTreeSection = {
             type: "RecipeTree",
             root: tree.root,
+            rawProducers: tree.rawProducers,
+            sources: tree.sources,
           } as unknown as Section;
           const el = renderSection(recipeTreeSection, ctx, entity);
           if (el) {
