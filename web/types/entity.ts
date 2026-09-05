@@ -26,7 +26,7 @@ export type EntityKind =
  */
 export type SourceTier = "A" | "B" | "C";
 /**
- * One render block. The `type` field selects the renderer. Six members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo` -- carry real, closed fields. The other seven are still open payloads; each one's own description names the later phase that fills it in.
+ * One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` carry real, closed fields. The other six are still open payloads; each one's own description names the later phase that fills it in.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "section".
@@ -38,6 +38,7 @@ export type Section =
   | RecipeTree
   | ObtainList
   | BreedingInfo
+  | FoodInfo
   | EffectSources
   | AdvancementInfo
   | TradeTable
@@ -318,6 +319,72 @@ export interface BreedingInfo {
  * via the `definition` "breedingItem".
  */
 export interface BreedingItem {
+  name: string;
+  ref?: EntityRef;
+}
+/**
+ * What eating an item restores, and what else it does, from the minecraft:food and minecraft:consumable components. nutrition and saturation are absent together for an item that is consumable without being food, such as the milk bucket; a renderer reads that pair to choose between a Food heading and a Consuming one.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "foodInfo".
+ */
+export interface FoodInfo {
+  type: "FoodInfo";
+  /**
+   * Hunger points restored, out of a full bar of 20. Two points are one shank.
+   */
+  nutrition?: number;
+  /**
+   * Saturation restored, rounded to two decimal places by the extract because the source carries float32 noise.
+   */
+  saturation?: number;
+  /**
+   * Whether the item can be eaten on a full hunger bar.
+   */
+  canAlwaysEat: boolean;
+  effects: FoodEffect[];
+  /**
+   * Status effects this item cures, from a remove_effects consume effect.
+   */
+  removes: EffectLink[];
+  /**
+   * Whether consuming this removes every active status effect, as the milk bucket does.
+   */
+  clearsAllEffects: boolean;
+  /**
+   * Whether consuming this teleports the player, as the chorus fruit does.
+   */
+  teleportsRandomly: boolean;
+}
+/**
+ * One status effect that eating an item applies. durationTicks is raw game ticks and level is 1-based, so Regeneration II is level 2; the renderer formats both. probability is the chance of the whole apply_effects group the source put this effect in.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "foodEffect".
+ */
+export interface FoodEffect {
+  name: string;
+  ref?: EntityRef;
+  /**
+   * How long the effect lasts, in game ticks. 20 ticks is one second.
+   */
+  durationTicks: number;
+  /**
+   * The level shown on screen, counting from 1. One higher than the amplifier the vanilla component carries.
+   */
+  level: number;
+  /**
+   * The chance the effect lands, from just above 0 to 1. Only three items in 26.2 carry one below 1.
+   */
+  probability: number;
+}
+/**
+ * One status effect a food section names, following the name/ref pattern. When ref is absent or unresolvable, the renderer prints name as plain text.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "effectLink".
+ */
+export interface EffectLink {
   name: string;
   ref?: EntityRef;
 }

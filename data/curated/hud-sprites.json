@@ -1,0 +1,10 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Icon key to wiki `File:` title, for HUD icons that no entity references and the `spritefile` bucket does not carry. Decision 3 forbids constructing a sprite filename and says to resolve it through the bucket. These four are not in the bucket at all: querying `spritefile` for the families `HungerSprite`, `HudSprite`, `GuiSprite`, `FoodSprite`, `BarSprite` and `IconSprite` returns zero rows each, against a control query for `EffectSprite` that returns rows. So they arrive the other way Decision 15 already leaves open, as a curated override naming a verified `File:` title. Every title below was read out of `Template:Hungerbar`, which invokes `Module:iconbar` with `full = Hunger (icon).png` and `empty = Empty Hunger (icon).png`, and then confirmed live through `prop=imageinfo` on 2026-09-05: all four exist and all four are 9x9 PNGs. Do not add a saturation icon here. The game draws no saturation meter, the wiki has no `Saturation (icon).png` and no `Template:Saturation`, and `File:Saturation.png` is the 180x180 status-effect render rather than a HUD icon. The food renderer labels saturation with `EffectSprite:saturation`, which is already in the atlas because the Saturation status effect is an entity of this build.",
+  "icons": {
+    "HudSprite:hunger-full": "File:Hunger (icon).png",
+    "HudSprite:hunger-half": "File:Half Hunger (icon).png",
+    "HudSprite:hunger-empty": "File:Empty Hunger (icon).png",
+    "HudSprite:hunger-poisoned": "File:Poisoned Hunger (icon).png"
+  }
+}

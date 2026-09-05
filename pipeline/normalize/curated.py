@@ -79,6 +79,7 @@ from pipeline.normalize.entity import ENTITY_ID_PATTERN, EntityKind
 
 __all__ = [
     "ALIASES_FILENAME",
+    "HUD_SPRITES_FILENAME",
     "OVERRIDES_FILENAME",
     "TAMING_FILENAME",
     "CuratedData",
@@ -92,6 +93,7 @@ __all__ = [
 ALIASES_FILENAME = "aliases.json"
 OVERRIDES_FILENAME = "overrides.json"
 TAMING_FILENAME = "taming.json"
+HUD_SPRITES_FILENAME = "hud-sprites.json"
 
 
 class EntityOverride(BaseModel, frozen=True, populate_by_name=True, extra="forbid"):
@@ -133,6 +135,7 @@ class CuratedData(BaseModel, frozen=True):
     aliases: Mapping[str, tuple[str, ...]]
     overrides: Mapping[str, EntityOverride]
     taming: Mapping[str, tuple[str, ...]] = {}
+    hud_sprites: Mapping[str, str] = {}
     stale: tuple[StaleDocument, ...] = ()
 
 
@@ -223,13 +226,45 @@ def _parse_taming(document: Mapping[str, Any], *, name: str) -> dict[str, tuple[
     return parsed
 
 
+def _parse_hud_sprites(document: Mapping[str, Any], *, name: str) -> dict[str, str]:
+    """Return the `iconKey -> File: title` map of `hud-sprites.json`, or raise on a fault.
+
+    The one curated document that names a sprite rather than an entity.
+    Decision 3 says to resolve a sprite filename through the `spritefile`
+    bucket and never to construct one, and these icons are not in that bucket
+    under any family -- the file's own `note` records the queries that
+    established it. So they arrive the way Decision 15 leaves open instead, as
+    a hand-verified `File:` title, and the shape check here is what stops a
+    typo in our own file from reaching the atlas packer as a silent miss.
+    """
+    raw = document.get("icons", {})
+    if not isinstance(raw, dict):
+        raise NormalizeError(f"{name}'s 'icons' is {raw!r}, not an object.")
+    parsed: dict[str, str] = {}
+    for icon_key, title in raw.items():
+        if not isinstance(icon_key, str) or ":" not in icon_key:
+            raise NormalizeError(
+                f"{name} names {icon_key!r} as an icon key. An icon key is "
+                f"'<Family>:<id>', the same shape Entity.icon carries."
+            )
+        if not isinstance(title, str) or not title.startswith("File:"):
+            raise NormalizeError(
+                f"{name} maps {icon_key!r} to {title!r}, which is not a wiki 'File:' title. "
+                f"Decision 3 forbids constructing a sprite filename, so this value has to be a "
+                f"title someone verified on the wiki."
+            )
+        parsed[icon_key] = title
+    return parsed
+
+
 def load_curated(
     directory: Path, *, release_order: Sequence[str], target_version: str
 ) -> CuratedData:
     """Return the curated aliases, overrides, and taming items of `directory`.
 
     Pure over the filesystem: reads `aliases.json`, `overrides.json`, and optional
-    `taming.json` from `directory` and touches no network. `release_order` is
+    `taming.json`, and optional `hud-sprites.json` from `directory` and
+    touches no network. `release_order` is
     Mojang's own ordering, newest first -- `pipeline.fetch.version_manifest.
     VersionManifest.versions`'s IDs -- and `target_version` is the release
     this build is running against, which is
@@ -279,6 +314,13 @@ def load_curated(
         taming = _parse_taming(taming_document, name=TAMING_FILENAME)
         documents_to_check.append((TAMING_FILENAME, taming_document))
 
+    hud_sprites: dict[str, str] = {}
+    hud_sprites_path = directory / HUD_SPRITES_FILENAME
+    if hud_sprites_path.exists():
+        hud_document = _read_document(hud_sprites_path, name=HUD_SPRITES_FILENAME)
+        hud_sprites = _parse_hud_sprites(hud_document, name=HUD_SPRITES_FILENAME)
+        documents_to_check.append((HUD_SPRITES_FILENAME, hud_document))
+
     stale: list[StaleDocument] = []
     for filename, document in documents_to_check:
         verified_for = document["verifiedFor"]
@@ -295,4 +337,10 @@ def load_curated(
                 StaleDocument(document=filename, verified_for=verified_for, current=target_version)
             )
 
-    return CuratedData(aliases=aliases, overrides=overrides, taming=taming, stale=tuple(stale))
+    return CuratedData(
+        aliases=aliases,
+        overrides=overrides,
+        taming=taming,
+        hud_sprites=hud_sprites,
+        stale=tuple(stale),
+    )

@@ -153,6 +153,7 @@ from pipeline.enrich.sprite import fetch_sprite_index
 from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
+from pipeline.extract.food import extract_food
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
@@ -525,6 +526,14 @@ def run_build(
     registries: dict[str, list[str]] = decode_json(
         registries_payload, source=summary_tag.raw_url(registries_path)
     )
+    item_components_path = "item_components/data.json"
+    item_components_payload = fetch_summary_payload(
+        summary_tag, "item_components", cache=store, transport=mcmeta_transport
+    )
+    item_components: dict[str, dict[str, object]] = decode_json(
+        item_components_payload, source=summary_tag.raw_url(item_components_path)
+    )
+    food_index = extract_food(item_components)
     files = fetch_data_files(
         data_tag,
         groups=("advancement", "loot_table", "recipe", "tags"),
@@ -535,7 +544,8 @@ def run_build(
     classification = classify_entity_types(files, registries)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
-        f"{len(classification.by_path)} entity_type paths classified"
+        f"{len(classification.by_path)} entity_type paths classified, "
+        f"{len(food_index)} items that can be eaten"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and block/chest loot ---
@@ -644,6 +654,7 @@ def run_build(
         curated=curated,
         entity_classification=classification,
         breeding_index=breeding_index,
+        food_index=food_index,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
@@ -655,7 +666,9 @@ def run_build(
     # against `atlas.schema.json` before anything reaches disk, and stage 8 needs it to write
     # `sprites.png` and `sprites.json` at all. See `pipeline.emit.atlas`'s own module docstring
     # for the packer itself; this stage is wiring, the same role every other stage here plays.
-    selection = collect_sprite_files(result.entities, sprite_index)
+    selection = collect_sprite_files(
+        result.entities, sprite_index, extra_icons=curated.hud_sprites
+    )
     image_report = fetch_file_images(
         selection.file_titles, revision=version, cache=store, transport=network_transport
     )

@@ -129,3 +129,27 @@ export function computeLayout(occupiedSlots: number[]): LayoutPlan {
 
   return { count, columns: 4, rows: 2, slots };
 }
+
+/**
+ * Returns `occupiedSlots` in the order the eye reads them: along each row from
+ * left to right, then down to the next row.
+ *
+ * Tab used to step through slot numbers in ascending order, which is the order
+ * windows were opened rather than the order they appear. `computeLayout` maps
+ * slots onto cells non-monotonically on purpose -- an open window keeps its
+ * position when a new one appears (Decision 2) -- so for four windows slot 2 is
+ * the bottom-right cell and slot 3 the bottom-left, and ascending slot order
+ * walked the grid clockwise.
+ *
+ * Sorting by the cell rather than by the slot fixes every layout at once
+ * instead of special-casing the 2x2, and a slot that somehow has no cell sorts
+ * last rather than throwing, because a focus ring that skips a window is a far
+ * smaller fault than one that cannot move at all.
+ */
+export function orderedSlots(occupiedSlots: number[]): number[] {
+  const layout = computeLayout(occupiedSlots);
+  const rowOf = (slot: number): number => layout.slots[slot]?.row ?? Number.MAX_SAFE_INTEGER;
+  const colOf = (slot: number): number => layout.slots[slot]?.col ?? Number.MAX_SAFE_INTEGER;
+
+  return [...occupiedSlots].sort((a, b) => rowOf(a) - rowOf(b) || colOf(a) - colOf(b) || a - b);
+}

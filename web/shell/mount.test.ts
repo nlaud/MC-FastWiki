@@ -331,6 +331,59 @@ describe("mount", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("keeps the bar's focus class through a click inside a window", async () => {
+    // The focus-ring bug. Pressing the mouse inside a window moves DOM focus
+    // onto that window's article, and the mouseup guard hands it straight back,
+    // so a ring bound to `:focus` animated out and in on every click. The class
+    // records the shell's intent instead, and an incidental click never
+    // changes it -- so the computed style never changes and nothing animates.
+    const corpus = buildCorpus(mockIndex);
+    mount(root, corpus);
+
+    const input = root.querySelector<HTMLInputElement>("input.search-input");
+    if (!input) throw new Error("Missing input");
+    input.value = "creeper";
+    input.dispatchEvent(new Event("input"));
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(input.classList.contains("is-bar-focused")).toBe(true);
+
+    const body = root.querySelector<HTMLElement>(".wiki-window .window-body");
+    if (!body) throw new Error("Missing window body");
+
+    // A real browser moves focus to the window article on mousedown. jsdom does
+    // not, so the blur is performed here to reproduce what the browser does.
+    body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    input.blur();
+    expect(input.classList.contains("is-bar-focused")).toBe(true);
+
+    body.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    expect(input.classList.contains("is-bar-focused")).toBe(true);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("drops the bar's focus class when Tab hands the keyboard to a window", async () => {
+    const corpus = buildCorpus(mockIndex);
+    mount(root, corpus);
+
+    const input = root.querySelector<HTMLInputElement>("input.search-input");
+    if (!input) throw new Error("Missing input");
+    input.value = "creeper";
+    input.dispatchEvent(new Event("input"));
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(input.classList.contains("is-bar-focused")).toBe(true);
+
+    // Tab is the one gesture that genuinely gives the keyboard away, so this is
+    // the case where the ring is supposed to fade out -- exactly once.
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(input.classList.contains("is-bar-focused")).toBe(false);
+  });
+
   it("opens a second window when clicking a rendered entity link", async () => {
     const corpus = buildCorpus(mockIndex);
     mount(root, corpus);

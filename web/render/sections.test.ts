@@ -6,6 +6,7 @@ import type {
   BreedingInfo,
   DropTable,
   Entity,
+  FoodInfo,
   SpawnInfo,
   StatBlock,
   TradeTable,
@@ -15,6 +16,7 @@ import type { RenderContext } from "./context.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
+import { renderFoodInfo } from "./sections/food-info.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
 import { renderTradeTable } from "./sections/trade-table.js";
@@ -32,6 +34,9 @@ describe("Section renderers with real committed build data", () => {
   let emerald: Entity;
   let sneak100: Entity;
   let ctx: RenderContext;
+
+  /** Every item entity of the committed build, across all item shards. */
+  let itemsById: Map<string, Entity>;
 
   beforeAll(() => {
     // Load real dist data
@@ -68,6 +73,19 @@ describe("Section renderers with real committed build data", () => {
       adv0.entities.find((e) => e.id === "minecraft:adventure/avoid_vibration"),
       "Sneak 100",
     );
+
+    // The food section lands on items spread across three shards, so this
+    // reads them all rather than guessing which shard holds the milk bucket.
+    itemsById = new Map<string, Entity>();
+    for (const shard of ["item-0", "item-1", "item-2"]) {
+      const raw = fs.readFileSync(
+        path.resolve(process.cwd(), `data/dist/entities/${shard}.json`),
+        "utf8",
+      );
+      for (const entity of (JSON.parse(raw) as { entities: Entity[] }).entities) {
+        itemsById.set(entity.id, entity);
+      }
+    }
 
     const indexRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/index.json"), "utf8");
     const index = JSON.parse(indexRaw) as Index;
@@ -541,6 +559,117 @@ describe("Section renderers with real committed build data", () => {
       };
 
       expect(renderBreedingInfo(section, ctx)).toBeNull();
+    });
+  });
+  describe("FoodInfo", () => {
+    const foodSectionOf = (id: string): FoodInfo => {
+      const entity = requireItem(itemsById.get(id), id);
+      const section = entity.sections.find((s) => s.type === "FoodInfo");
+      return requireItem(section, `${id} FoodInfo`);
+    };
+
+    it("is the first section of a food item, so it renders directly under the blurb", () => {
+      // TODO.md's Phase 6 line asks for this block "right after the blurb at
+      // the top of the page". `web/render/entity.ts` draws sections in array
+      // order, so position in the array is the whole of that guarantee.
+      const rottenFlesh = requireItem(itemsById.get("minecraft:rotten_flesh"), "Rotten Flesh");
+      expect(rottenFlesh.sections[0]?.type).toBe("FoodInfo");
+    });
+
+    it("draws hunger as real shank sprites, one per two points", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:rotten_flesh"), ctx), "el");
+
+      const icons = el.querySelectorAll(".food-icons .entity-icon");
+      expect(icons).toHaveLength(2);
+      // Real atlas keys, not hand-drawn SVG: the sprites exist, so the
+      // renderer uses them.
+      expect(icons[0]?.getAttribute("data-icon")).toBe("HudSprite:hunger-full");
+      expect(el.querySelector(".food-hunger")?.textContent).toBe("4 hunger");
+    });
+
+    it("prints saturation with no float32 noise", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:beef"), ctx), "el");
+      // Upstream this value is 1.8000001.
+      expect(el.querySelector(".food-saturation")?.textContent).toBe("1.8 saturation");
+    });
+
+    it("formats an effect duration as m:ss and links the effect", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:rotten_flesh"), ctx), "el");
+
+      const row = requireItem(el.querySelector(".food-effect-row"), "effect row");
+      const link = requireItem(
+        row.querySelector<HTMLAnchorElement>("a.entity-link"),
+        "effect link",
+      );
+      expect(link.textContent).toContain("Hunger");
+      expect(link.dataset["id"]).toBe("minecraft:hunger");
+      // 600 ticks.
+      expect(row.querySelector(".food-effect-duration")?.textContent).toBe("0:30");
+    });
+
+    it("shows a probability only when the effect is not certain", () => {
+      const gamble = requireItem(renderFoodInfo(foodSectionOf("minecraft:rotten_flesh"), ctx), "a");
+      expect(gamble.querySelector(".food-effect-chance")?.textContent).toBe("80% chance");
+
+      const certain = requireItem(renderFoodInfo(foodSectionOf("minecraft:spider_eye"), ctx), "b");
+      expect(certain.querySelector(".food-effect-chance")).toBeNull();
+    });
+
+    it("writes a Roman level only above level I", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:golden_apple"), ctx), "el");
+      const rows = el.querySelectorAll(".food-effect-row");
+
+      // Regeneration is amplifier 1 upstream, so level II on screen.
+      expect(rows[0]?.textContent).toContain("Regeneration II");
+      // Absorption is amplifier 0, and carries no numeral at all.
+      expect(rows[1]?.textContent).toContain("Absorption");
+      expect(rows[1]?.textContent).not.toContain("Absorption I");
+    });
+
+    it("badges an item that can be eaten on a full hunger bar", () => {
+      const golden = requireItem(renderFoodInfo(foodSectionOf("minecraft:golden_apple"), ctx), "a");
+      expect(golden.querySelector(".food-always-badge")?.textContent).toBe("Always edible");
+
+      const flesh = requireItem(renderFoodInfo(foodSectionOf("minecraft:rotten_flesh"), ctx), "b");
+      expect(flesh.querySelector(".food-always-badge")).toBeNull();
+    });
+
+    it("heads a consumable that restores no hunger as Consuming, not Food", () => {
+      // The milk bucket is the one item in 26.2 that reaches this branch.
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:milk_bucket"), ctx), "el");
+
+      expect(el.querySelector(".section-title")?.textContent).toBe("Consuming");
+      expect(el.querySelector(".food-hunger")).toBeNull();
+      expect(el.textContent).toContain("Removes every active status effect.");
+    });
+
+    it("names the effect a cure removes, as a link", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:honey_bottle"), ctx), "el");
+
+      expect(el.textContent).toContain("Cures");
+      const link = requireItem(
+        el.querySelector<HTMLAnchorElement>("a.entity-link"),
+        "cured effect link",
+      );
+      expect(link.dataset["id"]).toBe("minecraft:poison");
+    });
+
+    it("states the chorus fruit's teleport", () => {
+      const el = requireItem(renderFoodInfo(foodSectionOf("minecraft:chorus_fruit"), ctx), "el");
+      expect(el.textContent).toContain("Teleports");
+    });
+
+    it("returns null for a section carrying nothing at all", () => {
+      const empty: FoodInfo = {
+        type: "FoodInfo",
+        canAlwaysEat: false,
+        effects: [],
+        removes: [],
+        clearsAllEffects: false,
+        teleportsRandomly: false,
+      };
+
+      expect(renderFoodInfo(empty, ctx)).toBeNull();
     });
   });
 });

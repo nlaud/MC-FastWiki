@@ -31,7 +31,7 @@ import pytest
 from PIL import Image
 
 from pipeline.cli import CliError
-from pipeline.cli.build import BuildOptions, run_build
+from pipeline.cli.build import CURATED_DIRECTORY, BuildOptions, run_build
 from pipeline.enrich.advancement import COLUMNS as ADVANCEMENT_COLUMNS
 from pipeline.enrich.droptable import COLUMNS as DROPTABLE_COLUMNS
 from pipeline.enrich.resource_location import COLUMNS as RESOURCE_LOCATION_COLUMNS
@@ -62,6 +62,24 @@ BUILT_AT = datetime(2026, 9, 1, tzinfo=UTC)
 # real one here.
 CREEPER_SPRITE_SHA1 = "c" * 40
 CREEPER_SPRITE_URL = "https://minecraft.wiki/images/Creeper.png?d47d8"
+
+
+# The `File:` titles `data/curated/hud-sprites.json` names. Read from the
+# curated file itself rather than repeated here, so adding a fifth HUD icon
+# does not silently leave this fixture one short.
+HUD_SPRITE_TITLES = tuple(
+    json.loads(
+        (CURATED_DIRECTORY / "hud-sprites.json").read_text(encoding="utf-8")
+    )["icons"].values()
+)
+
+
+def _sprite_url(file_title: str) -> str:
+    """Return the fixture image URL of one `File:` title."""
+    if file_title == "File:Creeper.png":
+        return CREEPER_SPRITE_URL
+    slug = file_title.removeprefix("File:").replace(" ", "_")
+    return f"https://minecraft.wiki/images/{slug}?d47d8"
 
 
 def _creeper_sprite_png() -> bytes:
@@ -251,6 +269,20 @@ def _build_fixtures() -> dict[str, bytes]:
     )
     fixtures[summary_url] = json.dumps(registries).encode("utf-8")
 
+    # `item_components/data.json`, the second summary payload a build reads.
+    # Its keys are unprefixed, matching the real branch, and the one item here
+    # is food so that the fixture exercises `pipeline.extract.food` rather than
+    # tripping its "an empty read is a broken fetch" guard.
+    item_components = {
+        "creeper_spawn_egg": {"minecraft:max_stack_size": 64},
+        "apple": {"minecraft:food": {"nutrition": 4, "saturation": 2.4}},
+    }
+    item_components_url = (
+        f"https://raw.githubusercontent.com/{MCMETA_REPOSITORY}/{SUMMARY_SHA}"
+        f"/item_components/data.json"
+    )
+    fixtures[item_components_url] = json.dumps(item_components).encode("utf-8")
+
     recipe_json = json.dumps(
         {
             "type": "minecraft:crafting_shapeless",
@@ -304,7 +336,13 @@ def _build_fixtures() -> dict[str, bytes]:
     # The sprite-atlas stage: `Creeper`'s icon key is `EntitySprite:creeper`, which resolves to
     # `File:Creeper.png` through the bucket row above, so a build needs that file's imageinfo and
     # its bytes.
-    imageinfo_url = build_imageinfo_url(["File:Creeper.png"])
+    #
+    # The four hunger shanks join it. They belong to no entity and reach the
+    # atlas through `data/curated/hud-sprites.json`, which this build reads
+    # from the real curated directory, so an atlas fixture that named only
+    # `File:Creeper.png` would fail the moment that file existed.
+    sprite_titles = ["File:Creeper.png", *sorted(HUD_SPRITE_TITLES)]
+    imageinfo_url = build_imageinfo_url(sprite_titles)
     fixtures[imageinfo_url] = json.dumps(
         {
             "batchcomplete": True,
@@ -312,10 +350,10 @@ def _build_fixtures() -> dict[str, bytes]:
                 "pages": [
                     {
                         "ns": 6,
-                        "title": "File:Creeper.png",
+                        "title": title,
                         "imageinfo": [
                             {
-                                "url": CREEPER_SPRITE_URL,
+                                "url": _sprite_url(title),
                                 "sha1": CREEPER_SPRITE_SHA1,
                                 "size": 250,
                                 "width": 2,
@@ -324,11 +362,13 @@ def _build_fixtures() -> dict[str, bytes]:
                             }
                         ],
                     }
+                    for title in sprite_titles
                 ]
             },
         }
     ).encode("utf-8")
-    fixtures[CREEPER_SPRITE_URL] = _creeper_sprite_png()
+    for title in sprite_titles:
+        fixtures[_sprite_url(title)] = _creeper_sprite_png()
 
     fixtures[_bucket_url("droptable", DROPTABLE_COLUMNS)] = _bucket_answer([])
     fixtures[_bucket_url("spawn_table", SPAWN_TABLE_COLUMNS)] = _bucket_answer([])
@@ -459,7 +499,8 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     assert (dist / "sprites.png").is_file()
     sprites_map = json.loads((dist / "sprites.json").read_text(encoding="utf-8"))
     assert sprites_map["sprites"]["EntitySprite:creeper"] == {"x": 0, "y": 0, "w": 2, "h": 2}
-    assert outcome.emit_report.atlas_frame_count == 1
+    # One creeper sprite plus the four curated hunger shanks.
+    assert outcome.emit_report.atlas_frame_count == 5
     assert outcome.emit_report.atlas_png_bytes > 0
 
     mob_shard = json.loads((dist / "entities" / "mob-0.json").read_text(encoding="utf-8"))
@@ -768,9 +809,10 @@ def test_the_sprite_atlas_progress_line_names_every_count(tmp_path: Path) -> Non
     atlas_line = next(
         line for line in stream.getvalue().splitlines() if line.startswith("sprite atlas:")
     )
-    assert "1 icon keys requested" in atlas_line
-    assert "1 files resolved" in atlas_line
-    assert "1 sprites downloaded" in atlas_line
-    assert "1 frames packed" in atlas_line
-    assert "2x2" in atlas_line
+    # Five, not one: the creeper's own icon plus the four hunger shanks that
+    # `data/curated/hud-sprites.json` adds to every build's atlas.
+    assert "5 icon keys requested" in atlas_line
+    assert "5 files resolved" in atlas_line
+    assert "5 sprites downloaded" in atlas_line
+    assert "5 frames packed" in atlas_line
     assert "0 failures" in atlas_line

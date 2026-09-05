@@ -385,7 +385,9 @@ def pack_atlas(
 
 
 def collect_sprite_files(
-    entities: Sequence[Entity], sprite_index: SpriteIndex
+    entities: Sequence[Entity],
+    sprite_index: SpriteIndex,
+    extra_icons: Mapping[str, str] | None = None,
 ) -> SpriteSelection:
     """Return the `File:` titles, and the icon-key-to-file mapping, one build's entities need.
 
@@ -394,10 +396,17 @@ def collect_sprite_files(
     (219 of the real 26.2 build) contributes nothing here, matching that stage's own decision that
     an absent icon is not this pipeline's fault to raise over.
 
+    `extra_icons` is `CuratedData.hud_sprites`: icon keys that belong to no entity and that the
+    `spritefile` bucket does not carry, so they cannot be looked up in `sprite_index` at all. The
+    hunger shanks the food section draws are the whole of it today. They are already `File:`
+    titles a person verified, which is why they join `icon_to_file` directly rather than through
+    a lookup, and why one that is wrong shows up as a download failure naming the title rather
+    than as an `unresolved_icons` entry naming a key no index was ever asked about.
+
     See `SpriteSelection`'s own docstring for why an icon key that no longer resolves is reported
     in `unresolved_icons` rather than raised.
     """
-    icon_to_file: dict[str, str] = {}
+    icon_to_file: dict[str, str] = dict(extra_icons or {})
     unresolved: list[str] = []
     for entity in entities:
         icon = entity.icon

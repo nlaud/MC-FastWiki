@@ -213,6 +213,7 @@ from pipeline.enrich import trade as enrich_trade
 from pipeline.enrich.resource_location import NAMESPACE, JoinTable, ResourceLocation
 from pipeline.enrich.sprite import SpriteIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
+from pipeline.extract.food import ConsumeEffectKind, FoodFacts
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.aliases import AliasStrength, generate_aliases
@@ -226,10 +227,13 @@ from pipeline.normalize.entity import (
     DropEntry,
     DropNote,
     DropTable,
+    EffectLink,
     Entity,
     EntityDraft,
     EntityKind,
     EntityRef,
+    FoodEffect,
+    FoodInfo,
     IntegerRange,
     ItemAmount,
     JavaProbability,
@@ -1066,6 +1070,86 @@ def _registry_the_wiki_names_the_id_under(
     return None
 
 
+def _effect_link(
+    effect_id: str, display_names: Mapping[str, str], by_id: Mapping[str, object]
+) -> tuple[str, EntityRef | None]:
+    """Return the display name of one status effect, and a ref to it when this build has one.
+
+    The `name`/`ref` pattern, reached from the other direction than
+    `_maybe_ref`. A consume effect names its target by registry ID rather than
+    by wiki display name -- `minecraft:hunger`, straight out of Tier A -- so
+    there is no join to walk and nothing to report as unplaced. The name comes
+    from the draft set when the effect is an entity of this build, and falls
+    back to the prettified registry path when it is not, which keeps the row
+    readable rather than printing a raw ID at a reader.
+    """
+    if effect_id in by_id:
+        name = display_names.get(effect_id) or _fallback_name(effect_id.split(":", 1)[-1])
+        return name, EntityRef(id=effect_id, name=name)
+    return _fallback_name(effect_id.split(":", 1)[-1]), None
+
+
+def _build_food_info(
+    facts: FoodFacts, display_names: Mapping[str, str], by_id: Mapping[str, object]
+) -> FoodInfo | None:
+    """Return the `FoodInfo` of one item, or `None` when it has nothing to show.
+
+    Four of the five consume-effect kinds land somewhere in the section. The
+    fifth, `PLAY_SOUND`, lands nowhere: a sound is not something a page can
+    draw, and the extract parses it only so that a genuinely unknown sixth kind
+    still raises rather than passing as a sound. `ominous_bottle` is the one
+    item in 26.2 whose entire consume behaviour is a sound and which restores
+    no hunger, so it is also the one item this function answers `None` for.
+    """
+    effects: list[FoodEffect] = []
+    removes: list[EffectLink] = []
+    clears_all_effects = False
+    teleports_randomly = False
+
+    for entry in facts.effects:
+        if entry.kind is ConsumeEffectKind.APPLY_EFFECTS:
+            for applied in entry.applied:
+                name, ref = _effect_link(applied.effect, display_names, by_id)
+                effects.append(
+                    FoodEffect(
+                        name=name,
+                        ref=ref,
+                        duration_ticks=applied.duration_ticks,
+                        # The component counts from 0 and the screen counts
+                        # from 1: amplifier 1 is the level a player reads as II.
+                        level=applied.amplifier + 1,
+                        probability=applied.probability,
+                    )
+                )
+        elif entry.kind is ConsumeEffectKind.REMOVE_EFFECTS:
+            for removed in entry.removed:
+                name, ref = _effect_link(removed, display_names, by_id)
+                removes.append(EffectLink(name=name, ref=ref))
+        elif entry.kind is ConsumeEffectKind.CLEAR_ALL_EFFECTS:
+            clears_all_effects = True
+        elif entry.kind is ConsumeEffectKind.TELEPORT_RANDOMLY:
+            teleports_randomly = True
+
+    if (
+        facts.nutrition is None
+        and not effects
+        and not removes
+        and not clears_all_effects
+        and not teleports_randomly
+    ):
+        return None
+
+    return FoodInfo(
+        nutrition=facts.nutrition,
+        saturation=facts.saturation,
+        can_always_eat=facts.can_always_eat,
+        effects=tuple(effects),
+        removes=tuple(removes),
+        clears_all_effects=clears_all_effects,
+        teleports_randomly=teleports_randomly,
+    )
+
+
 def merge_entities(
     *,
     registries: Mapping[str, Sequence[str]],
@@ -1081,6 +1165,7 @@ def merge_entities(
     curated: CuratedData,
     entity_classification: EntityClassification,
     breeding_index: enrich_breeding.BreedingIndex | None = None,
+    food_index: Mapping[str, FoodFacts] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1143,6 +1228,11 @@ def merge_entities(
 
     blurbs = extract_report.blurbs()
     drafts: dict[str, EntityDraft] = {}
+    # The display name each ID settled on, collected as the loop resolves it.
+    # The food section reads it to name an effect it links to, and it cannot
+    # ask the draft: `EntityDraft` deliberately exposes no name accessor, and
+    # the value is known here anyway.
+    display_names: dict[str, str] = {}
     entity_registries: dict[str, tuple[str, ...]] = {}
     entity_type_kind_counts: dict[EntityKind, int] = {}
 
@@ -1210,6 +1300,8 @@ def merge_entities(
                 draft.set("icon", icon_key, SourceTier.B)
             elif not exempt:
                 missing_icons.append(MissingIconEntity(id=entity_id, routes_tried=routes))
+
+        display_names[entity_id] = resolved_name
 
         curated_aliases = curated.aliases.get(entity_id, ())
         for alias, strength in generate_aliases(
@@ -1468,6 +1560,30 @@ def merge_entities(
                 table="breeding",
                 subject=mob_name,
             )
+
+    if food_index is not None:
+        for item_id, facts in food_index.items():
+            item_draft = drafts.get(item_id)
+            if item_draft is None:
+                unplaced.append(
+                    UnplacedRow(
+                        table="food",
+                        subject=item_id,
+                        reason="the item has a food or consumable component and this build does "
+                        "not enumerate it as an entity",
+                    )
+                )
+                continue
+            food_section = _build_food_info(facts, display_names, drafts)
+            if food_section is None:
+                continue
+            # `add_section_first`, not `add_section`: TODO.md's Phase 6 line
+            # asks for this block "right after the blurb at the top of the
+            # page", and this loop runs after the Tier B tables have already
+            # attached theirs. Tier A, because both components come from
+            # mcmeta and no wiki page was read to build the section -- so it
+            # incurs no D1 attribution requirement of its own.
+            item_draft.add_section_first(food_section, SourceTier.A)
 
     # --- Curated overrides: the last field-level write before `.build()` ---
 

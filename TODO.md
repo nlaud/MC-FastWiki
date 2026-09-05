@@ -11,7 +11,19 @@ reasoning survives even after the choice is made.
 ## Phase 6 — Content renderers
 
 - [ ] **Item** — obtain tree, crafting and smelting, with the correct tool shown for blocks
-  - [ ] For food items, hunger and saturation amounts, as well as other effects (like hunger from rotten flesh, poison from spider eyes and chances of each effect) should be displayed right after the burb at the top of the page. Add this to the pipeline. As well.
+  - [x] For food items, hunger and saturation amounts, as well as other effects (like hunger from rotten flesh, poison from spider eyes and chances of each effect) should be displayed right after the burb at the top of the page. Add this to the pipeline. As well.
+        Shipped as the `FoodInfo` section, from the Tier A `minecraft:food` and
+        `minecraft:consumable` components of `item_components/data.json`. 45 entities carry it:
+        the 44 items with a food component, plus the Milk Bucket, which clears every effect while
+        restoring no hunger and so is headed `Consuming` rather than `Food`. `Ominous Bottle` is
+        the third consumable-only item and deliberately has no section, because its whole consume
+        behaviour is a sound.
+        Hunger draws the real wiki HUD shanks, which the `spritefile` bucket does not carry at
+        all: they arrive as curated `File:` titles in `data/curated/hud-sprites.json`, packed
+        into the atlas under a new `HudSprite:` family. **Saturation has no sprite anywhere** --
+        the game draws no saturation meter and the wiki has no icon or template for one -- so the
+        figure is labelled with `EffectSprite:saturation`, the status effect's own icon. That
+        conflates two different things and is the one part of this worth revisiting.
   - [ ] Walk `data/dist/obtain.json` into the tree at render time, rather than reading a
         pre-built one out of the entity shard. The pipeline ships the flat producer graph
         (0.60 MB raw, 48 kB gzipped, 4,002 producers) because materialising a per-entity tree

@@ -135,9 +135,17 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "DropTable": 65,
         "SpawnInfo": 53,
         "BreedingInfo": 26,
+        # 44 items with a `minecraft:food` component, plus the milk bucket,
+        # which clears every effect while restoring no hunger. `ominous_bottle`
+        # is the third consumable-only item and is deliberately absent: its
+        # whole consume behaviour is a sound, which a page cannot draw.
+        "FoodInfo": 45,
     }
     assert snapshot.obtain_producer_count == 4002
-    assert snapshot.atlas_icon_count == 1910
+    # 1910 before the four HudSprite hunger shanks joined the atlas. They belong
+    # to no entity, so they arrive through `CuratedData.hud_sprites` rather than
+    # through an `Entity.icon`; see `data/curated/hud-sprites.json`.
+    assert snapshot.atlas_icon_count == 1914
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:

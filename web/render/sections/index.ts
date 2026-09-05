@@ -3,6 +3,7 @@ import type {
   BreedingInfo,
   DropTable,
   Entity,
+  FoodInfo,
   Section,
   SpawnInfo,
   StatBlock,
@@ -12,6 +13,7 @@ import type { RenderContext } from "../context.js";
 import { renderAdvancementInfo } from "./advancement-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
 import { renderDropTable } from "./drop-table.js";
+import { renderFoodInfo } from "./food-info.js";
 import { renderSpawnInfo } from "./spawn-info.js";
 import { renderStatBlock } from "./stat-block.js";
 import { renderTradeTable } from "./trade-table.js";
@@ -29,6 +31,7 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   TradeTable: (s, ctx) => renderTradeTable(s as TradeTable, ctx),
   AdvancementInfo: (s, ctx) => renderAdvancementInfo(s as AdvancementInfo, ctx),
   BreedingInfo: (s, ctx) => renderBreedingInfo(s as BreedingInfo, ctx),
+  FoodInfo: (s, ctx) => renderFoodInfo(s as FoodInfo, ctx),
 };
 
 /**

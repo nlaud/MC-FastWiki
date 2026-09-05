@@ -328,7 +328,14 @@ body {
     box-shadow 0.15s ease;
 }
 
-.search-input:focus {
+.search-input:focus,
+/* Not only `:focus`. Pressing the mouse inside a window moves DOM focus onto
+   that window's article, and the mouseup guard in `mount.ts` moves it straight
+   back, so binding the ring to `:focus` alone animated it out and in again on
+   every click anywhere on the page. `is-bar-focused` is the shell's own record
+   of whether the bar is meant to own the keyboard, and that does not change
+   during a click. */
+.search-input.is-bar-focused {
   border-color: #5c85d6;
   box-shadow:
     0 0 0 2px rgba(92, 133, 214, 0.4),
@@ -900,4 +907,90 @@ canvas,
 .show-more-btn:focus-visible {
   outline: 2px solid #5c85d6;
   outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+   FoodInfo section
+
+   Sits directly under the blurb on an item page, because the pipeline puts it
+   first in `sections`. Icon rows reuse `.entity-icon`, so the hunger shanks and
+   the saturation marker are real atlas sprites and inherit the global
+   `image-rendering: pixelated` rule with them.
+   --------------------------------------------------------------------------- */
+.food-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.food-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.food-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.food-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.food-hunger {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #ffb74d;
+}
+
+.food-saturation {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fdd663;
+}
+
+.food-saturation-icon {
+  flex-shrink: 0;
+}
+
+.food-always-badge {
+  color: #81c995;
+  background: rgba(129, 201, 149, 0.15);
+  border-color: rgba(129, 201, 149, 0.35);
+}
+
+.food-effect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.food-effect-duration {
+  color: #aaa;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.food-effect-chance {
+  color: #888;
+  font-size: 0.78rem;
+}
+
+.food-effect-note {
+  color: #aaa;
+  font-size: 0.82rem;
 }
