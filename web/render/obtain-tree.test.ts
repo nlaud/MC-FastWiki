@@ -8,6 +8,7 @@ import {
   buildObtainTree,
   expandStub,
   isOreSmelt,
+  isStorageRoundTrip,
   nodeDepth,
   preferPlainMembers,
   truncateNode,
@@ -117,20 +118,78 @@ describe("obtain-tree workstation tree rules", () => {
   });
 
   describe("storage block round trips", () => {
-    it("drops unpacking a storage block but keeps packing one", () => {
+    // Opening a Block of Iron into nine ingots is a thing players do, and the
+    // Iron Ingot page is where it belongs -- but it is never the answer the
+    // page opens on, because the block is made of the ingots being sought.
+    it("offers unpacking on the item's own page, behind the real recipe", () => {
       const ingot = buildObtainTree("minecraft:iron_ingot", graph);
-      const fromBlock = ingot.root.producers.find((p) =>
+
+      const fromBlock = ingot.root.producers.findIndex((p) =>
         p.inputs.some((i) => i.item === "minecraft:iron_block"),
       );
-      expect(fromBlock).toBeUndefined();
-
-      // Nine nuggets into an ingot is a real thing a player makes, and stays.
-      const fromNuggets = ingot.root.producers.find((p) =>
+      const fromNuggets = ingot.root.producers.findIndex((p) =>
         p.inputs.some((i) => i.item === "minecraft:iron_nugget"),
       );
-      expect(fromNuggets).toBeDefined();
 
-      // And the packing direction is exactly what the block's own page shows.
+      expect(fromBlock).toBeGreaterThanOrEqual(0);
+      expect(fromNuggets).toBeGreaterThanOrEqual(0);
+      // The nugget recipe is the default page; the block is an option after it.
+      expect(fromNuggets).toBeLessThan(fromBlock);
+    });
+
+    // Nine nuggets from one ingot has the same arithmetic as unpacking a block,
+    // but it is the only recipe there is for a nugget, so it carries no
+    // restriction: it leads its own page and it may lead a branch.
+    it("keeps crafting nuggets from an ingot, unrestricted", () => {
+      const producer = (graph.producers["minecraft:iron_nugget"] ?? []).find(
+        (p) => p.m === "crafting",
+      );
+      expect(producer).toBeDefined();
+      if (producer) {
+        expect(isStorageRoundTrip(graph, "minecraft:iron_nugget", producer)).toBe(false);
+      }
+
+      const nugget = buildObtainTree("minecraft:iron_nugget", graph);
+      const fromIngot = nugget.root.producers.findIndex((p) =>
+        p.inputs.some((i) => i.item === "minecraft:iron_ingot"),
+      );
+      // Crafting leads; the smelt of scrap iron gear is the option after it.
+      expect(fromIngot).toBe(0);
+    });
+
+    it("marks storage blocks and nothing else", () => {
+      const ironBlock = (graph.producers["minecraft:iron_ingot"] ?? []).find((p) =>
+        p.in?.some((i) => i.i === "minecraft:iron_block"),
+      );
+      expect(ironBlock).toBeDefined();
+      if (ironBlock) {
+        expect(isStorageRoundTrip(graph, "minecraft:iron_ingot", ironBlock)).toBe(true);
+      }
+
+      // Packing is never marked, in either direction of the ladder.
+      const packBlock = (graph.producers["minecraft:iron_block"] ?? []).find(
+        (p) => p.m === "crafting",
+      );
+      if (packBlock) {
+        expect(isStorageRoundTrip(graph, "minecraft:iron_block", packBlock)).toBe(false);
+      }
+    });
+
+    it("does not lead a branch with unpacking below the root", () => {
+      // Under any item that needs iron, the ingot branch must not open with
+      // "first obtain a Block of Iron".
+      const pickaxe = buildObtainTree("minecraft:iron_pickaxe", graph);
+      const ironInput = pickaxe.root.producers[0]?.inputs.find(
+        (i) => i.item === "minecraft:iron_ingot",
+      );
+      const sub = ironInput?.node?.producers ?? [];
+      for (const producer of sub) {
+        expect(producer.inputs.some((i) => i.item === "minecraft:iron_block")).toBe(false);
+      }
+    });
+
+    // And the packing direction is exactly what the block's own page shows.
+    it("keeps packing on the block's page", () => {
       const block = buildObtainTree("minecraft:iron_block", graph);
       const packed = block.root.producers.find((p) =>
         p.inputs.some((i) => i.item === "minecraft:iron_ingot"),

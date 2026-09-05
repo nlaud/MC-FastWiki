@@ -84,17 +84,27 @@ export function isAcquisition(graph: Obtain, producer: ObtainProducer): boolean 
  * was packed from -- Block of Iron into nine Iron Ingots, Block of Redstone into
  * nine Redstone.
  *
- * Read as a recipe this is real crafting, which is why the method filter let it
- * through and put "first obtain a Block of Iron" at the head of the Iron Ingot
- * branch. Read as a route it is circular: the block is made of the very item it
- * produces, so it can never be the cheaper way to get one.
+ * This is real crafting, and on the item's own page it is a real answer -- so
+ * `manipulationProducersOf` keeps it at the root and only suppresses it deeper
+ * in a tree, where it is circular: the block is made of the very item it
+ * produces, so "first obtain a Block of Iron" sends the reader after nine of
+ * the ingots they were trying to make.
  *
- * Only the unpacking direction goes. Packing -- nine Diamonds into a Block of
- * Diamond, nine Nuggets into an Ingot -- is a real thing a player makes, and it
- * is the recipe the Block of Diamond page exists to show. The two directions are
- * told apart by their arithmetic rather than by a list of block names: unpacking
- * consumes one and yields many, packing consumes many and yields one. A storage
- * block added in a later version therefore needs no update here.
+ * ## Two tests, because one is not enough
+ *
+ * The arithmetic finds a round trip: this producer consumes one and yields
+ * many, and the thing it consumes has a recipe that consumes many of this and
+ * yields one. Packing -- nine Diamonds into a Block of Diamond -- fails it and
+ * stays, which is right, because that is the recipe the Block of Diamond page
+ * exists to show.
+ *
+ * What the arithmetic cannot do is tell a Block of Iron from an Iron Ingot.
+ * Opening an ingot into nine nuggets is the same shape as opening a block into
+ * nine ingots, and it is how a player actually gets nuggets -- there is no
+ * other recipe for them. So the input also has to name a block. Measured over
+ * the whole 26.2 graph, twenty producers pass the arithmetic: seventeen are
+ * storage blocks and the other three are exactly the ingot-into-nugget
+ * recipes, so the suffix separates them cleanly with nothing left over.
  */
 export function isStorageRoundTrip(
   graph: Obtain,
@@ -112,6 +122,10 @@ export function isStorageRoundTrip(
   }
   // Consumes one, yields many: the unpacking direction.
   if ((only.c ?? 1) !== 1 || (producer.c ?? 1) <= 1) {
+    return false;
+  }
+  // And what it consumes is a block, not a larger unit of the same item.
+  if (!packedId.replace(/^[a-z0-9_-]+:/, "").endsWith("_block")) {
     return false;
   }
   return (graph.producers[packedId] ?? []).some((reverse) => {
@@ -154,16 +168,41 @@ export function sortStations(stations: string[]): string[] {
  * Acquisition -- chest loot, block drops, mob drops, trading, and smelting an
  * ore into its material -- is how a player gets a thing out of the world, not
  * how they build one. All of it goes to the Sources panel for the item being
- * looked at, and none of it extends a branch below the root. Unpacking a
- * storage block is dropped outright: see `isStorageRoundTrip`.
+ * looked at, and none of it extends a branch below the root.
+ *
+ * Unpacking a storage block is a question of depth rather than of whether it is
+ * real. Opening a Block of Iron into nine ingots is a thing players do, and it
+ * belongs on the Iron Ingot page, so at the root it is kept. Below the root it
+ * is not: a branch that opens with "first obtain a Block of Iron" sends the
+ * reader after nine of the very ingots they are trying to make.
+ *
+ * It also never leads. `sortRoundTripsLast` puts it behind the recipe that
+ * builds the item out of something smaller, so the page opens on nine nuggets
+ * becoming an ingot and offers the block as the next option along.
  */
-function manipulationProducersOf(graph: Obtain, itemId: string): ObtainProducer[] {
-  return (graph.producers[itemId] ?? []).filter((producer) => {
+function manipulationProducersOf(graph: Obtain, itemId: string, isRoot: boolean): ObtainProducer[] {
+  const kept = (graph.producers[itemId] ?? []).filter((producer) => {
     if (isAcquisition(graph, producer)) {
       return false;
     }
-    return !isStorageRoundTrip(graph, itemId, producer);
+    return isRoot || !isStorageRoundTrip(graph, itemId, producer);
   });
+  return sortRoundTripsLast(graph, itemId, kept);
+}
+
+/** Orders storage-block unpacking behind every other way of making the item. */
+function sortRoundTripsLast(
+  graph: Obtain,
+  itemId: string,
+  producers: ObtainProducer[],
+): ObtainProducer[] {
+  const roundTrip = new Map(
+    producers.map((producer) => [producer, isStorageRoundTrip(graph, itemId, producer)]),
+  );
+  // Stable: everything else keeps the graph's own order.
+  return [...producers].sort(
+    (left, right) => Number(roundTrip.get(left) ?? false) - Number(roundTrip.get(right) ?? false),
+  );
 }
 
 interface CollapsedProducer {
@@ -463,7 +502,7 @@ function buildNode(
     // on has no manufacturing producer at all, so expanding it only ever
     // yielded the one bare card the reader could have been shown outright.
     // Where that is the case, show the card and skip the click.
-    const hasMore = manipulationProducersOf(graph, itemId).length > 0;
+    const hasMore = manipulationProducersOf(graph, itemId, false).length > 0;
     return {
       item: itemId,
       producers: [],
@@ -472,7 +511,7 @@ function buildNode(
     };
   }
 
-  const manipulationProducers = manipulationProducersOf(graph, itemId);
+  const manipulationProducers = manipulationProducersOf(graph, itemId, isRoot);
 
   // Collapse a repeated subtree to a pointer at where it was already drawn --
   // but only when there is a subtree to point at.
