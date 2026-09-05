@@ -6,15 +6,29 @@ let tickCount = 0;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<TickListener>();
 
+/**
+ * Whether the shared cycle may advance.
+ *
+ * `prefers-reduced-motion` used to stop it, and that was the wrong call. The
+ * cycle is not decoration: it is the only thing on screen that says a torch
+ * takes coal *or* charcoal, and that a plank slot accepts any of twelve woods.
+ * Freezing it does not reduce motion so much as delete the information, and
+ * Windows sets that preference whenever "Show animations" is off -- which is
+ * how a feature that works reports as simply not working.
+ *
+ * What the preference does still get is the static path: every cycling slot
+ * carries the full alternative list on its `title` and is focusable, so the
+ * same facts are reachable without waiting for the animation.
+ *
+ * An unfocused window still holds. That gate is about not moving things in the
+ * corner of the reader's eye while they are reading a different window, which
+ * costs them nothing.
+ */
 function shouldTick(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    return false;
-  }
   if (typeof document !== "undefined" && typeof document.hasFocus === "function") {
-    // Only check hasFocus if defined and not running in headless test where document.hasFocus is mockable
     if (!document.hasFocus()) {
       return false;
     }

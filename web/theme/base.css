@@ -1654,11 +1654,16 @@ canvas,
 .obtaining-sources-pane {
   /*
    * Wide enough for the villager trade table, which is a four-column table
-   * built for a full-width section and lays out at 488px. At 280px it clipped
-   * its GIVEN column. 520px covers that plus this pane's own padding.
+   * built for a full-width section and does not go below about 490px without
+   * breaking words inside its cells. At 280px it clipped its GIVEN column; at
+   * 520px the Fishing Rod's trades came to 492px against 490px of content box
+   * and grew a scrollbar over two pixels. The pane is sized from the table's
+   * own content instead of from a number guessed to clear it, and capped so a
+   * long trade list cannot push the tree out of the window.
    */
-  width: 520px;
-  max-width: 100%;
+  width: max-content;
+  min-width: 320px;
+  max-width: min(560px, 100%);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

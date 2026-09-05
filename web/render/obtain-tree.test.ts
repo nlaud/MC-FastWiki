@@ -3,7 +3,15 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { Obtain } from "../types/obtain.js";
-import { buildObtainTree, expandStub, isOreSmelt } from "./obtain-tree.js";
+import type { ObtainNode } from "./obtain-tree.js";
+import {
+  buildObtainTree,
+  expandStub,
+  isOreSmelt,
+  nodeDepth,
+  preferPlainMembers,
+  truncateNode,
+} from "./obtain-tree.js";
 
 describe("obtain-tree workstation tree rules", () => {
   let graph: Obtain;
@@ -176,6 +184,122 @@ describe("obtain-tree workstation tree rules", () => {
       expect(only?.inputs[0]?.members).toEqual(["minecraft:test_a", "minecraft:test_b"]);
       expect(only?.stations).toContain("furnace");
       expect(only?.stations).toContain("blast_furnace");
+    });
+  });
+
+  describe("repeated-subtree collapse", () => {
+    /** Every node of a tree, root first. */
+    function walk(node: ObtainNode): ObtainNode[] {
+      const out = [node];
+      for (const producer of node.producers) {
+        for (const input of producer.inputs) {
+          if (input.node) {
+            out.push(...walk(input.node));
+          }
+        }
+      }
+      return out;
+    }
+
+    // "(shown above)" replaces a repeated subtree with a pointer at where it
+    // was already drawn. A raw material has no subtree: it is one card, so the
+    // pointer costs the icon and the name and saves nothing.
+    it("never collapses an item that has no recipe of its own", () => {
+      for (const id of [
+        "minecraft:crafter",
+        "minecraft:iron_pickaxe",
+        "minecraft:crafting_table",
+      ]) {
+        for (const node of walk(buildObtainTree(id, graph).root)) {
+          if (node.back_reference !== null) {
+            expect(manipulationCount(node.item)).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    // Only one of a node's alternative recipes is on screen at a time, so a
+    // pointer into a sibling recipe's subtree names something never rendered.
+    it("only points at a node inside the same recipe", () => {
+      for (const id of [
+        "minecraft:crafter",
+        "minecraft:iron_ingot",
+        "minecraft:stone_brick_stairs",
+      ]) {
+        const root = buildObtainTree(id, graph).root;
+        const drawn = new Set(
+          walk(root)
+            .filter((n) => n.back_reference === null)
+            .map((n) => n.item),
+        );
+        for (const node of walk(root)) {
+          const ref = node.back_reference;
+          if (ref !== null) {
+            // The path it names has to sit on the branch that leads here, which
+            // for a same-recipe collapse means the item was drawn somewhere.
+            expect(drawn.has(node.item)).toBe(true);
+          }
+        }
+      }
+    });
+
+    function manipulationCount(itemId: string): number {
+      const tree = buildObtainTree(itemId, graph);
+      return tree.root.producers.length;
+    }
+  });
+
+  describe("cycling alternatives", () => {
+    // A log tag resolves to the log, the six-sided wood, and the stripped
+    // version of each. All four craft into planks, but only the log is the one
+    // a player has, and the wood carries a whole extra level under it.
+    it("keeps only the plain form of a material tag", () => {
+      expect(
+        preferPlainMembers([
+          "minecraft:oak_log",
+          "minecraft:oak_wood",
+          "minecraft:stripped_oak_log",
+          "minecraft:stripped_oak_wood",
+        ]),
+      ).toEqual(["minecraft:oak_log"]);
+
+      expect(
+        preferPlainMembers([
+          "minecraft:crimson_hyphae",
+          "minecraft:crimson_stem",
+          "minecraft:stripped_crimson_hyphae",
+          "minecraft:stripped_crimson_stem",
+        ]),
+      ).toEqual(["minecraft:crimson_stem"]);
+
+      // Nothing survives the filter, so nothing is filtered.
+      expect(preferPlainMembers(["minecraft:oak_wood"])).toEqual(["minecraft:oak_wood"]);
+      // A tag with no wood in it is untouched.
+      expect(preferPlainMembers(["minecraft:coal", "minecraft:charcoal"])).toEqual([
+        "minecraft:coal",
+        "minecraft:charcoal",
+      ]);
+    });
+
+    it("truncates a subtree to a fixed number of levels", () => {
+      const tree = buildObtainTree("minecraft:crafting_table", graph);
+      const deep = tree.root;
+      expect(nodeDepth(deep)).toBeGreaterThan(0);
+      expect(nodeDepth(truncateNode(deep, 0))).toBe(0);
+      expect(truncateNode(deep, 0).producers).toHaveLength(0);
+      expect(nodeDepth(truncateNode(deep, 1))).toBeLessThanOrEqual(1);
+    });
+
+    // The tree must not gain and lose a level as a slot cycles, so the
+    // shallowest alternative decides the shape for all of them.
+    it("has a shallowest alternative to hold the shape to", () => {
+      const recipe = (graph.producers["minecraft:crafting_table"] ?? []).find(
+        (p) => p.m === "crafting",
+      );
+      const planks = preferPlainMembers(recipe?.in?.[0]?.mb ?? []);
+      expect(planks.length).toBeGreaterThan(1);
+      const depths = planks.map((id) => nodeDepth(expandStub(id, graph, [])));
+      expect(Math.min(...depths)).toBeLessThanOrEqual(Math.max(...depths));
     });
   });
 

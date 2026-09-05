@@ -8,7 +8,9 @@ import {
   type TreeInput,
   expandStub,
   isOreSmelt,
+  nodeDepth,
   sortStations,
+  truncateNode,
 } from "../obtain-tree.js";
 import { subscribeTicker } from "../station/ticker.js";
 import { renderLeafCard, renderStationCard } from "../station/index.js";
@@ -286,6 +288,16 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
 }
 
 /**
+ * How many alternatives are worth walking to find the shallowest shape.
+ *
+ * Past this, every alternative is drawn as a bare card instead. A tag that
+ * large is a list of interchangeable materials rather than a branch worth
+ * following, and walking all of them on first paint would cost more than the
+ * shape it buys.
+ */
+const EAGER_MEMBER_LIMIT = 16;
+
+/**
  * Draws one child branch, and keeps it in step with its parent slot's cycle.
  *
  * A tag ingredient such as `#minecraft:planks` is drawn as one slot that cycles
@@ -296,10 +308,24 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
  * notices first.
  *
  * Both sides now advance off the same shared ticker with the same modulo over
- * the same member list, so they cannot drift apart. Subtrees are built on the
- * tick that first needs them and cached from then on, so cycling a twelve-member
- * tag costs twelve walks spread over twelve seconds rather than twelve walks up
- * front, and a member nobody ever sees is never walked at all.
+ * the same member list, so they cannot drift apart.
+ *
+ * ## One shape for every alternative
+ *
+ * The alternatives on a slot rarely have subtrees of matching depth. A Golden
+ * Helmet is a leaf, because the walk has already passed Gold Ingot and will not
+ * loop back through it, while a Golden Axe still carries a stick branch. Drawn
+ * as they come, the tree gained and lost a whole level roughly once a second
+ * and everything below it jumped.
+ *
+ * So the alternatives are walked up front, the shallowest one decides the
+ * shape, and the rest are truncated to match -- a deeper alternative gives up
+ * the levels the shallowest was never going to show anyway. That is why these
+ * subtrees are built eagerly rather than on the tick that needs them: the
+ * shallowest cannot be known without seeing all of them. The walks are bounded
+ * by the same depth cap as the rest of the tree, and past `EAGER_MEMBER_LIMIT`
+ * members the shape is flattened to a leaf outright rather than walking a very
+ * large tag.
  */
 function renderBranch(
   branchEl: HTMLElement,
@@ -324,21 +350,36 @@ function renderBranch(
     return;
   }
 
-  const cache = new Map<string, ObtainNode>();
-  if (input.item) {
-    cache.set(input.item, baseNode);
+  const built = new Map<string, ObtainNode>();
+  for (const memberId of members) {
+    if (members.length > EAGER_MEMBER_LIMIT) {
+      break;
+    }
+    if (memberId === input.item) {
+      built.set(memberId, baseNode);
+      continue;
+    }
+    try {
+      built.set(memberId, expandStub(memberId, graph, ancestors));
+    } catch {
+      // A member the graph cannot walk simply has no subtree to show.
+    }
+  }
+
+  // The shallowest alternative sets the shape the whole cycle holds.
+  const shape =
+    built.size > 0 ? Math.min(...[...built.values()].map((node) => nodeDepth(node))) : 0;
+
+  const shaped = new Map<string, ObtainNode>();
+  for (const [memberId, node] of built) {
+    shaped.set(memberId, truncateNode(node, shape));
   }
 
   const showMember = (memberId: string): void => {
-    let childNode = cache.get(memberId);
-    if (!childNode) {
-      try {
-        childNode = expandStub(memberId, graph, ancestors);
-      } catch {
-        return;
-      }
-      cache.set(memberId, childNode);
-    }
+    const childNode = shaped.get(memberId) ??
+      // Past the eager limit every alternative is drawn as a bare card, which
+      // is the one shape they are all guaranteed to share.
+      { item: memberId, producers: [], expandable: false, back_reference: null };
     draw(childNode, memberId);
   };
 

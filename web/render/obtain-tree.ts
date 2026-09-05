@@ -166,6 +166,173 @@ function manipulationProducersOf(graph: Obtain, itemId: string): ObtainProducer[
   });
 }
 
+interface CollapsedProducer {
+  producer: ObtainProducer;
+  stations: string[];
+}
+
+/** A producer's identity with input `skip` blanked out, for near-match grouping. */
+function producerSignature(producer: ObtainProducer, skip: number): string {
+  const inputs = (producer.in ?? []).map((input, index) =>
+    index === skip ? "*" : `${input.i ?? ""}|${input.t ?? ""}|${(input.c ?? 1).toString()}`,
+  );
+  return [
+    producer.m,
+    producer.st ?? "",
+    (producer.c ?? 1).toString(),
+    (producer.gw ?? 0).toString(),
+    (producer.gh ?? 0).toString(),
+    JSON.stringify(producer.g ?? null),
+    inputs.join(";"),
+  ].join("#");
+}
+
+/**
+ * Folds recipes that differ in exactly one ingredient into a single card.
+ *
+ * The game writes "coal or charcoal" as one ingredient sometimes and as two
+ * whole recipes other times, and the difference is an encoding detail the
+ * reader should never see. Two cards that are pixel-identical apart from one
+ * slot read as two things to learn; one card whose slot cycles reads as the one
+ * fact it is.
+ *
+ * The match is exact everywhere else -- same method, station, yield, grid shape
+ * and every other ingredient -- so recipes that genuinely differ stay apart and
+ * keep their own page behind the dots. Alternatives already collected on a slot
+ * (an untagged alternatives list, or the smelting merge above) are carried
+ * across rather than dropped, so folding twice cannot lose a member.
+ */
+function mergeNearIdentical(collapsed: CollapsedProducer[]): CollapsedProducer[] {
+  const widest = collapsed.reduce(
+    (max, entry) => Math.max(max, (entry.producer.in ?? []).length),
+    0,
+  );
+
+  let current = collapsed;
+  for (let slot = 0; slot < widest; slot++) {
+    const buckets = new Map<string, CollapsedProducer[]>();
+    const order: string[] = [];
+
+    for (const entry of current) {
+      if ((entry.producer.in ?? []).length <= slot) {
+        // Cannot differ at a slot it does not have; keep it in a bucket of one.
+        const key = `keep:${order.length.toString()}`;
+        buckets.set(key, [entry]);
+        order.push(key);
+        continue;
+      }
+      const key = producerSignature(entry.producer, slot);
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(entry);
+      } else {
+        buckets.set(key, [entry]);
+        order.push(key);
+      }
+    }
+
+    current = order.map((key) => {
+      const bucket = buckets.get(key) ?? [];
+      const lead = bucket[0];
+      if (!lead || bucket.length === 1) {
+        return lead as CollapsedProducer;
+      }
+
+      const alternatives: string[] = [];
+      for (const entry of bucket) {
+        const input = entry.producer.in?.[slot];
+        if (!input) {
+          continue;
+        }
+        for (const member of input.mb?.length ? input.mb : input.i ? [input.i] : []) {
+          if (!alternatives.includes(member)) {
+            alternatives.push(member);
+          }
+        }
+      }
+
+      const leadInputs = [...(lead.producer.in ?? [])];
+      const leadInput = leadInputs[slot];
+      if (!leadInput || alternatives.length < 2) {
+        return lead;
+      }
+      const first = alternatives[0];
+      if (first === undefined) {
+        return lead;
+      }
+      leadInputs[slot] = { ...leadInput, i: first, mb: alternatives };
+
+      return {
+        producer: { ...lead.producer, in: leadInputs },
+        stations: lead.stations,
+      };
+    });
+  }
+
+  return current;
+}
+
+/**
+ * Narrows a tag's members to the plain form of each material.
+ *
+ * `#minecraft:oak_logs` resolves to four blocks -- the log, the six-sided wood,
+ * and the stripped version of each -- and all four really do craft into planks.
+ * Cycling all four says the same thing four times and, worse, changes what the
+ * branch underneath looks like as it goes: an oak log is a leaf, while oak wood
+ * is itself crafted from oak logs, so the tree gained and lost a level twice a
+ * second. The plain log is the one a player actually has, so it is the one
+ * shown; the others are the same material after a step that is not part of
+ * getting there.
+ *
+ * The filter only applies when something survives it, so a tag made entirely of
+ * stripped or six-sided blocks keeps all of its members.
+ */
+export function preferPlainMembers(members: readonly string[]): string[] {
+  const plain = members.filter((id) => {
+    const name = id.replace(/^[a-z0-9_-]+:/, "");
+    return !name.startsWith("stripped_") && !name.endsWith("_wood") && !name.endsWith("_hyphae");
+  });
+  return plain.length > 0 ? plain : [...members];
+}
+
+/** How many levels of producers hang below `node`. A leaf is 0. */
+export function nodeDepth(node: ObtainNode): number {
+  let deepest = 0;
+  for (const producer of node.producers) {
+    for (const input of producer.inputs) {
+      if (input.node) {
+        deepest = Math.max(deepest, 1 + nodeDepth(input.node));
+      }
+    }
+  }
+  return deepest;
+}
+
+/**
+ * Returns `node` with every branch below `limit` levels cut off.
+ *
+ * Used to hold one shape while a slot cycles. The alternatives on a cycling
+ * slot rarely have subtrees of the same depth -- a golden helmet bottoms out at
+ * once where a golden axe carries a stick branch under it -- so the tree grew
+ * and shrank under the reader with every tick. Truncating each alternative to
+ * the shallowest of them keeps the layout still, and what is cut is always the
+ * part the shallowest alternative was not going to show anyway.
+ */
+export function truncateNode(node: ObtainNode, limit: number): ObtainNode {
+  if (limit <= 0) {
+    return { ...node, producers: [], expandable: false, back_reference: null };
+  }
+  return {
+    ...node,
+    producers: node.producers.map((producer) => ({
+      ...producer,
+      inputs: producer.inputs.map((input) =>
+        input.node ? { ...input, node: truncateNode(input.node, limit - 1) } : input,
+      ),
+    })),
+  };
+}
+
 function buildTreeInput(
   inputSpec: ObtainProducerInput,
   graph: Obtain,
@@ -176,7 +343,7 @@ function buildTreeInput(
   nodePath: string,
 ): [TreeInput, boolean] {
   const count = inputSpec.c ?? 1;
-  const members = inputSpec.mb ?? [];
+  const members = preferPlainMembers(inputSpec.mb ?? []);
 
   if (inputSpec.t !== undefined) {
     const label = inputSpec.t;
@@ -305,9 +472,19 @@ function buildNode(
     };
   }
 
+  const manipulationProducers = manipulationProducersOf(graph, itemId);
+
+  // Collapse a repeated subtree to a pointer at where it was already drawn --
+  // but only when there is a subtree to point at.
+  //
+  // An item with no recipe of its own draws a single card and nothing under it.
+  // Replacing that card with "(shown above)" costs the reader the icon and the
+  // name and saves nothing, because the thing being deduplicated was one card.
+  // Raw materials repeat constantly across a tree, so this was most of the
+  // chips on screen.
   const key = `${itemId}:${remainingDepth.toString()}`;
   const earlierPath = firstOccurrence.get(key);
-  if (earlierPath !== undefined) {
+  if (earlierPath !== undefined && manipulationProducers.length > 0) {
     return {
       item: itemId,
       producers: [],
@@ -316,8 +493,6 @@ function buildNode(
     };
   }
   firstOccurrence.set(key, nodePath);
-
-  const manipulationProducers = manipulationProducersOf(graph, itemId);
 
   // 2. Smelting collapse, across both stations and ingredients.
   //
@@ -415,7 +590,7 @@ function buildNode(
 
   const treeProducers: TreeProducer[] = [];
 
-  for (const { producer, stations } of collapsedProducers) {
+  for (const { producer, stations } of mergeNearIdentical(collapsedProducers)) {
     const rawInputs = producer.in ?? [];
     const repeats = rawInputs.map(
       (inputSpec) => inputSpec.i !== undefined && path.has(inputSpec.i),
@@ -426,6 +601,21 @@ function buildNode(
 
     const producerIndex = treeProducers.length;
     const inputs: TreeInput[] = [];
+
+    // Each alternative recipe gets its own memo table.
+    //
+    // "(shown above)" is only honest when the reader can see the thing it
+    // points at. Only one of a node's producers is on screen at a time -- the
+    // others are behind the dots -- so a memo shared across them let a branch
+    // of recipe two collapse into a pointer at a node drawn inside recipe one,
+    // which is not above it, is not anywhere, and leaves the reader clicking
+    // through recipes hunting for a subtree that was never rendered.
+    //
+    // Scoping the table to the producer keeps the collapse within one visible
+    // subtree, where the pointer is true. The cost is bounded: the same item
+    // may now be walked once per alternative rather than once per node, under
+    // the same depth cap either way.
+    const producerOccurrence = new Map(firstOccurrence);
 
     for (let inputIndex = 0; inputIndex < rawInputs.length; inputIndex++) {
       const inputSpec = rawInputs[inputIndex];
@@ -438,7 +628,7 @@ function buildNode(
         maxDepth,
         remainingDepth,
         path,
-        firstOccurrence,
+        producerOccurrence,
         `${nodePath}.producers.${producerIndex.toString()}.inputs.${inputIndex.toString()}`,
       );
       inputs.push(treeInput);
