@@ -110,19 +110,19 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2120
+    assert snapshot.total == 2128
     assert snapshot.by_kind == {
         "block": 1195,
-        "item": 536,
+        "item": 540,
         "advancement": 126,
         "mob": 91,
         "biome": 66,
         "enchantment": 43,
         "effect": 39,
-        "entity": 24,
+        "entity": 28,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2120)
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2089, "blurb": 1963, "icon": 2027}
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2128)
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2097, "blurb": 1971, "icon": 2035}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -134,9 +134,10 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "StatBlock": 93,
         "DropTable": 65,
         "SpawnInfo": 53,
+        "BreedingInfo": 26,
     }
     assert snapshot.obtain_producer_count == 4002
-    assert snapshot.atlas_icon_count == 1903
+    assert snapshot.atlas_icon_count == 1910
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:

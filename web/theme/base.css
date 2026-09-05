@@ -82,6 +82,7 @@ body {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
 .window-title {
@@ -92,6 +93,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .window-close-btn {
@@ -134,6 +136,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #333333 transparent;
+}
+
+.window-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+
+.window-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.window-body::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 3px;
+}
+
+.window-body::-webkit-scrollbar-thumb:hover {
+  background: #5c85d6;
 }
 
 /* ==========================================================================
@@ -156,6 +179,7 @@ body {
   background: #333;
   color: #8ab4f8;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .entity-blurb {
@@ -531,7 +555,14 @@ canvas,
 }
 
 /* StatBlock */
-.stat-badges {
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-badges,
+.stat-tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -569,28 +600,69 @@ canvas,
   color: #fdd663;
 }
 
-.stat-health {
-  background: rgba(234, 67, 53, 0.12);
-  border-color: rgba(234, 67, 53, 0.3);
+.stat-mob-type {
+  background: #252525;
+  color: #aaa;
+}
+
+.stat-visuals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.stat-metric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stat-icons-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.stat-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.stat-icons-more {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
   color: #ff8a80;
 }
 
-.stat-armor {
-  background: rgba(138, 180, 248, 0.12);
-  border-color: rgba(138, 180, 248, 0.3);
+.stat-label-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #d0d0d0;
+}
+
+.stat-metric-health .stat-label-text {
+  color: #ff8a80;
+}
+
+.stat-metric-armor .stat-label-text {
   color: #8ab4f8;
 }
 
-.stat-damage {
-  background: rgba(255, 171, 64, 0.12);
-  border-color: rgba(255, 171, 64, 0.3);
+.stat-metric-damage .stat-label-text {
   color: #ffb74d;
 }
 
-.stat-mob-type,
-.stat-size {
-  background: #252525;
-  color: #aaa;
+.stat-metric-size .stat-label-text {
+  color: #b0bec5;
 }
 
 /* Tables (DropTable, TradeTable) */
@@ -599,6 +671,27 @@ canvas,
   border: 1px solid #333;
   border-radius: 6px;
   background: #1a1a1a;
+  scrollbar-width: thin;
+  scrollbar-color: #333333 transparent;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 3px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #5c85d6;
 }
 
 .data-table {
@@ -725,6 +818,54 @@ canvas,
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+/* BreedingInfo */
+.breeding-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breeding-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breeding-timing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.breeding-timing strong {
+  color: #ddd;
+}
+
+.breeding-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breeding-subtitle {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+.breeding-items,
+.taming-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Collapsing */

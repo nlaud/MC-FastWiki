@@ -141,6 +141,7 @@ from pipeline.emit.write import DEFAULT_DIST_PATH, EmitReport, emit_build
 from pipeline.emit.write import DEFAULT_REPORT_PATH as EMIT_REPORT_PATH
 from pipeline.emit.write import write_report as write_emit_report
 from pipeline.enrich.advancement import fetch_advancements
+from pipeline.enrich.breeding import fetch_breeding
 from pipeline.enrich.brewing import fetch_brewing
 from pipeline.enrich.droptable import fetch_drop_tables
 from pipeline.enrich.infobox import DEFAULT_REPORT_PATH as INFOBOX_REPORT_PATH
@@ -606,10 +607,14 @@ def run_build(
     )
     with_box, without_box = select_infobox_pages(wikitext.contents())
     infobox_report = parse_infoboxes(with_box)
+    breeding_index = fetch_breeding(
+        revision=version, cache=store, transport=network_transport
+    )
     report(
         f"tier B page text: {len(extract_report.extracts)} blurbs, "
         f"{len(mob_pages)} mob pages selected, {len(with_box)} infoboxes parsed, "
-        f"{len(without_box)} mob pages with no infobox template"
+        f"{len(without_box)} mob pages with no infobox template, "
+        f"{len(breeding_index.by_mob)} mobs with breeding data"
     )
     if without_box:
         report(f"  pages without an infobox: {', '.join(without_box)}")
@@ -638,6 +643,7 @@ def run_build(
         extract_report=extract_report,
         curated=curated,
         entity_classification=classification,
+        breeding_index=breeding_index,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 

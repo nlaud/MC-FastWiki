@@ -47,8 +47,9 @@ interface PreppedEntry {
  * depends on nothing the pipeline is free to reorder.
  */
 function phraseFormsOf(entityId: string): ReadonlySet<string> {
-  const path = entityId.slice(entityId.indexOf(":") + 1).toLowerCase();
-  return new Set([path, path.replaceAll("_", " ")]);
+  const rawPath = entityId.slice(entityId.indexOf(":") + 1).toLowerCase();
+  const path = rawPath.startsWith("entity_type/") ? rawPath.slice("entity_type/".length) : rawPath;
+  return new Set([rawPath, rawPath.replaceAll("_", " "), path, path.replaceAll("_", " ")]);
 }
 
 interface HaystackMapping {
@@ -240,6 +241,18 @@ export function search(corpus: Corpus, query: string, limit?: number): IndexEntr
 
   candidates.sort((a, b) => {
     if (a.tier !== b.tier) return a.tier - b.tier;
+
+    // When an item and a mob/entity share an exact concept at Tier 0 (one via name and one
+    // via whole-phrase alias, e.g. "chicken"), prefer the item so it ranks first and the
+    // mob/entity ranks directly second.
+    if (a.tier === 0 && b.tier === 0) {
+      const exactA = a.isName || a.isPhraseAlias;
+      const exactB = b.isName || b.isPhraseAlias;
+      if (exactA && exactB && a.isName !== b.isName) {
+        if (a.entry.k === "item" && (b.entry.k === "mob" || b.entry.k === "entity")) return -1;
+        if (b.entry.k === "item" && (a.entry.k === "mob" || a.entry.k === "entity")) return 1;
+      }
+    }
 
     // 1. Name match beats alias match
     const nameA = a.isName ? 1 : 0;

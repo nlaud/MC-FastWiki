@@ -153,6 +153,31 @@ describe("matcher", () => {
       expect(results[0]?.k).toBe("mob");
     });
 
+    it("ranks item above mob or entity when they share the exact concept", () => {
+      const corpus = makeIndex([
+        {
+          id: "minecraft:entity_type/chicken",
+          n: "Chicken",
+          k: "mob",
+          a: ["entity_type/chicken"],
+          s: "mob-0",
+        },
+        {
+          id: "minecraft:chicken",
+          n: "Raw Chicken",
+          k: "item",
+          a: ["chicken"],
+          s: "item-0",
+        },
+      ]);
+
+      const results = search(corpus, "chicken");
+      expect(results.map((r) => r.id)).toEqual([
+        "minecraft:chicken",
+        "minecraft:entity_type/chicken",
+      ]);
+    });
+
     it("Tiebreak 4: shorter display name beats longer display name", () => {
       const corpus = makeIndex([
         { id: "test:longer", n: "Iron Ingot", k: "item", a: ["metal"], s: "item-0" },

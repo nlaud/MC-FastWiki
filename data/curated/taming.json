@@ -1,0 +1,13 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Hand-maintained taming items for mobs that require taming before breeding. Wolves require bones and cats require raw cod or raw salmon. Horses, donkeys, llamas, and trader llamas are tamed by repeated mounting rather than an item, so their item lists are empty. Nautiluses require pufferfish.",
+  "entities": {
+    "minecraft:wolf": ["Bone"],
+    "minecraft:cat": ["Raw Cod", "Raw Salmon"],
+    "minecraft:horse": [],
+    "minecraft:donkey": [],
+    "minecraft:llama": [],
+    "minecraft:trader_llama": [],
+    "minecraft:nautilus": ["Pufferfish"]
+  }
+}

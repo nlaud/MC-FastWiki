@@ -270,6 +270,12 @@ def generate_aliases(
 
     proposals: list[tuple[str, AliasStrength]] = []
     proposals.extend((phrase, AliasStrength.FULL_PHRASE) for phrase in _phrase_aliases(path))
+    if path.startswith("entity_type/"):
+        raw_path = path.removeprefix("entity_type/")
+        proposals.extend(
+            (phrase, AliasStrength.FULL_PHRASE) for phrase in _phrase_aliases(raw_path)
+        )
+        proposals.extend((segment, AliasStrength.SEGMENT) for segment in _segments(raw_path))
     proposals.extend((value, AliasStrength.CURATED) for value in curated)
     if kind is EntityKind.EFFECT:
         proposals.append((f"potion of {path.replace('_', ' ')}", AliasStrength.CROSS_LINK))
