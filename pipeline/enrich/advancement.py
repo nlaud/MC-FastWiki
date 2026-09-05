@@ -57,6 +57,7 @@ from pipeline.enrich import (
     row_page_name,
     wiki_url,
 )
+from pipeline.enrich.markup import strip_markup
 from pipeline.fetch import Transport
 from pipeline.fetch.bucket import fetch_bucket_rows
 from pipeline.fetch.cache import ContentCache
@@ -320,11 +321,17 @@ def parse_advancements(
                 )
             )
         reward = optional_text(document, "reward")
+        wiki_desc = optional_text(document, "wiki_description")
+        cleaned_desc = (
+            strip_markup(wiki_desc, keep_links=True, flatten_lists=True)
+            if wiki_desc is not None
+            else None
+        )
         advancements.append(
             WikiAdvancement(
                 internal_id=internal_id,
                 title=title,
-                description=optional_text(document, "wiki_description"),
+                description=cleaned_desc if cleaned_desc else None,
                 game_description=optional_text(document, "game_description"),
                 parent_title=parent_title,
                 parent_id=parent_id,

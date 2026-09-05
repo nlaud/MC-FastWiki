@@ -250,6 +250,67 @@ def test_strip_markup_leaves_a_generic_template_in_place() -> None:
     assert strip_markup("{{ItemLink|Bow}}: ") == "{{ItemLink|Bow}}:"
 
 
+# --- strip_markup: the advancement-description options --------------------------
+
+
+def test_strip_markup_removes_a_sup_footnote_with_its_content() -> None:
+    """`Adventuring Time`: stripping only the tags leaves `55[until: ...]` on screen."""
+    text = 'Visit 55<sup class="nowrap Inline-Template">[<i>until: Third Drop</i>]</sup> biomes'
+    assert strip_markup(text) == "Visit 55 biomes"
+
+
+def test_strip_markup_removes_a_category_tag() -> None:
+    """The `Upcoming` marker template expands into one, and it is filing, not text."""
+    assert strip_markup("56 biomes[[Category:Upcoming]]") == "56 biomes"
+
+
+def test_strip_markup_removes_a_zero_width_space() -> None:
+    """`_WHITESPACE` matches real whitespace only, so this survives every other pass."""
+    assert strip_markup("55\u200b/56") == "55/56"
+
+
+def test_strip_markup_keeps_links_when_asked() -> None:
+    """Decision 13: the advancement renderer turns these into live entity links."""
+    text = "Visit [[Badlands|Badlands]]"
+    assert strip_markup(text, keep_links=True) == text
+
+
+def test_strip_markup_flattens_a_list_into_running_prose() -> None:
+    """`Adventuring Time`'s biome list, which the wiki writes as an `hlist`."""
+    text = "<div>Visit these biomes:</div><div>\n* Badlands\n* Beach\n* Desert</div>"
+    assert strip_markup(text, flatten_lists=True) == "Visit these biomes: Badlands, Beach, Desert"
+
+
+def test_strip_markup_breaks_a_sentence_that_follows_a_flattened_list() -> None:
+    """Without the break, `Adventuring Time` glues its last biome to the next sentence."""
+    text = "<div>\n* Badlands\n* Wooded Badlands</div><div>The advancement is Overworld only.</div>"
+    flattened = strip_markup(text, flatten_lists=True)
+    assert flattened == "Badlands, Wooded Badlands. The advancement is Overworld only."
+
+
+def test_strip_markup_does_not_break_a_mid_sentence_continuation() -> None:
+    """`Mine Stone` continues `in the inventory` after its list -- a period there is a fragment."""
+    text = (
+        "<div>Have one of these stones:</div><div>\n* Cobblestone</div>"
+        "<div>in the inventory</div>"
+    )
+    assert (
+        strip_markup(text, flatten_lists=True)
+        == "Have one of these stones: Cobblestone in the inventory"
+    )
+
+
+def test_strip_markup_keeps_a_sentence_period_the_wiki_wrote() -> None:
+    """The trailing-separator cleanup must not eat real punctuation."""
+    text = "Have a [[crafting table]]."
+    assert strip_markup(text, keep_links=True) == text
+
+
+def test_strip_markup_leaves_lists_alone_by_default() -> None:
+    """An infobox field's own lines are meaningful, so flattening is opt-in."""
+    assert strip_markup("* Badlands\n* Beach") == "* Badlands * Beach"
+
+
 # --- strip_edition_markers -----------------------------------------------------
 
 

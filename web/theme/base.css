@@ -227,12 +227,21 @@ body {
   max-height: 280px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* The list still scrolls; the bar itself is hidden. Under match pressure the
+     list is driven by arrow keys, which scroll the selected row into view, so
+     the bar is a permanent 8px of chrome nobody drags. `scrollbar-width` covers
+     Firefox and the `::-webkit-scrollbar` rule below covers Chrome and Safari. */
+  scrollbar-width: none;
   background: #1c1c1c;
   border: 1px solid #3a3a3a;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   padding: 4px;
   gap: 2px;
+}
+
+.search-suggestions-container::-webkit-scrollbar {
+  display: none;
 }
 
 .suggestion-item {

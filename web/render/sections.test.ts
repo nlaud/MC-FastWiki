@@ -354,14 +354,20 @@ describe("Section renderers with real committed build data", () => {
       );
       expect(parentLink.textContent).toContain("Adventure");
 
-      // Description is from gameDescription, not wikitext description
-      const desc = requireItem(el.querySelector(".advancement-description"), "description element");
-      expect(desc.textContent).toBe(
+      // Descriptions: both gameDescription and requirements description are rendered
+      const descs = el.querySelectorAll(".advancement-description");
+      expect(descs.length).toBe(2);
+
+      expect(descs[0]?.textContent).toBe(
         "Sneak near a Sculk Sensor or Warden to prevent it from detecting you",
       );
 
-      // Decision 1: Do not render wikitext description
-      expect(el.textContent).not.toContain("Sneak while causing a vibration");
+      // Requirements description renders with live entity links
+      expect(descs[1]?.textContent).toContain(
+        "Sneak while causing a vibration within 8 blocks of a",
+      );
+      const reqLinks = descs[1]?.querySelectorAll(".entity-link");
+      expect(reqLinks?.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

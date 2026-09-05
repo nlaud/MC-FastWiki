@@ -122,7 +122,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "entity": 24,
     }
     assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2120)
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2089, "blurb": 1963, "icon": 1901}
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2089, "blurb": 1963, "icon": 2027}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -136,7 +136,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "SpawnInfo": 53,
     }
     assert snapshot.obtain_producer_count == 4002
-    assert snapshot.atlas_icon_count == 1901
+    assert snapshot.atlas_icon_count == 1903
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:
