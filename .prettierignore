@@ -45,3 +45,7 @@ tests/fixtures/mcmeta_*_entity_class.json
 # The name carries no version, unlike the mcmeta rules above, because the wiki
 # has none. A refresh overwrites this file in place.
 tests/fixtures/wiki_bucket_rows.json
+
+# The obtain tree acceptance fixture, written by
+# `tests/fixtures/build_obtain_tree_acceptance.py` with `json.dumps(indent=2)`.
+tests/fixtures/obtain_tree_acceptance.json

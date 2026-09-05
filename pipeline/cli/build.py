@@ -154,6 +154,7 @@ from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
 from pipeline.extract.food import extract_food
+from pipeline.extract.harvest import extract_block_harvest
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
@@ -542,10 +543,12 @@ def run_build(
     )
     advancement_ids = extract_advancement_ids(files)
     classification = classify_entity_types(files, registries)
+    harvest_index = extract_block_harvest(files)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
-        f"{len(food_index)} items that can be eaten"
+        f"{len(food_index)} items that can be eaten, "
+        f"{len(harvest_index)} blocks with harvest requirements"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and block/chest loot ---
@@ -655,6 +658,7 @@ def run_build(
         entity_classification=classification,
         breeding_index=breeding_index,
         food_index=food_index,
+        harvest_index=harvest_index,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 

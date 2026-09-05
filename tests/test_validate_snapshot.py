@@ -140,6 +140,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         # is the third consumable-only item and is deliberately absent: its
         # whole consume behaviour is a sound, which a page cannot draw.
         "FoodInfo": 45,
+        "HarvestInfo": 861,
     }
     assert snapshot.obtain_producer_count == 4002
     # 1910 before the four HudSprite hunger shanks joined the atlas. They belong

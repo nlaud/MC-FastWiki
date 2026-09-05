@@ -35,6 +35,8 @@ const ignored = [
   // arrays; the rule exists so a refresh that selects a repeated column does
   // not turn the format gate red on a clean tree.
   "tests/fixtures/wiki_bucket_rows.json",
+  // Written by `tests/fixtures/build_obtain_tree_acceptance.py`.
+  "tests/fixtures/obtain_tree_acceptance.json",
   // The rest of the generated tree, already covered before this gate existed.
   "web/types/entity.ts",
   "data/dist/entities/mob-0.json",

@@ -111,6 +111,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from pipeline.extract.harvest import HarvestTier, HarvestTool
 from pipeline.normalize import NormalizeError
 
 __all__ = [
@@ -134,6 +135,9 @@ __all__ = [
     "FoodEffect",
     "FoodInfo",
     "GenerationInfo",
+    "HarvestInfo",
+    "HarvestTier",
+    "HarvestTool",
     "IntegerRange",
     "ItemAmount",
     "JavaProbability",
@@ -736,6 +740,20 @@ class FoodInfo(BaseModel, frozen=True, populate_by_name=True):
     teleports_randomly: bool = Field(default=False, alias="teleportsRandomly")
 
 
+class HarvestInfo(BaseModel, frozen=True, populate_by_name=True):
+    """What tool and tier are needed to harvest a block.
+
+    Carries the tool list in the order of `HarvestTool`, the material floor tier
+    from `HarvestTier`, and whether breaking the block without the right tool
+    still drops itself.
+    """
+
+    type: Literal["HarvestInfo"] = "HarvestInfo"
+    tools: tuple[HarvestTool, ...] = ()
+    tier: HarvestTier
+    drops_without_tool: bool = Field(default=False, alias="dropsWithoutTool")
+
+
 class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     """Every source of a status effect.
 
@@ -791,6 +809,7 @@ Section = Annotated[
     | ObtainList
     | BreedingInfo
     | FoodInfo
+    | HarvestInfo
     | EffectSources
     | AdvancementInfo
     | TradeTable
@@ -823,6 +842,7 @@ _SECTION_TYPES = frozenset(
         "ObtainList",
         "BreedingInfo",
         "FoodInfo",
+        "HarvestInfo",
         "EffectSources",
         "AdvancementInfo",
         "TradeTable",

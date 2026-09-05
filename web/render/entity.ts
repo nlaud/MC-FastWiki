@@ -1,7 +1,8 @@
-import { loadShard } from "../search/load.js";
-import type { Entity } from "../types/entity.js";
+import { loadObtain, loadShard } from "../search/load.js";
+import type { Entity, Section } from "../types/entity.js";
 import type { IndexEntry } from "../types/index.js";
 import type { RenderContext } from "./context.js";
+import { buildObtainTree } from "./obtain-tree.js";
 import { renderSection } from "./sections/index.js";
 
 /**
@@ -70,6 +71,38 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
         attribution.append(link, note);
         container.append(attribution);
       }
+
+      // Synthesise RecipeTree section from obtain graph if this entity has producers
+      void loadObtain()
+        .then((graph) => {
+          const producers = graph.producers[entity.id];
+          if (!producers || producers.length === 0) {
+            return;
+          }
+          const tree = buildObtainTree(entity.id, graph);
+          const recipeTreeSection = {
+            type: "RecipeTree",
+            root: tree.root,
+          } as unknown as Section;
+          const el = renderSection(recipeTreeSection, ctx, entity);
+          if (el) {
+            let sectionsEl = container.querySelector<HTMLElement>(".entity-sections");
+            if (!sectionsEl) {
+              sectionsEl = document.createElement("div");
+              sectionsEl.className = "entity-sections";
+              const attribution = container.querySelector<HTMLElement>(".entity-attribution");
+              if (attribution) {
+                container.insertBefore(sectionsEl, attribution);
+              } else {
+                container.append(sectionsEl);
+              }
+            }
+            sectionsEl.append(el);
+          }
+        })
+        .catch(() => {
+          // Failure to load obtain graph does not affect the rest of the entity page
+        });
     })
     .catch((err: unknown) => {
       container.replaceChildren();

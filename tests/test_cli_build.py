@@ -309,6 +309,13 @@ def _build_fixtures() -> dict[str, bytes]:
             "data/minecraft/loot_table/entities/creeper.json": b"{}",
             "data/minecraft/recipe/dummy.json": recipe_json,
             "data/minecraft/loot_table/blocks/dummy.json": block_loot_json,
+            "data/minecraft/tags/block/mineable/pickaxe.json": b'{"values":["minecraft:stone"]}',
+            "data/minecraft/tags/block/mineable/axe.json": b'{"values":[]}',
+            "data/minecraft/tags/block/mineable/shovel.json": b'{"values":[]}',
+            "data/minecraft/tags/block/mineable/hoe.json": b'{"values":[]}',
+            "data/minecraft/tags/block/needs_stone_tool.json": b'{"values":[]}',
+            "data/minecraft/tags/block/needs_iron_tool.json": b'{"values":[]}',
+            "data/minecraft/tags/block/needs_diamond_tool.json": b'{"values":[]}',
         },
         root=f"mcmeta-{DATA_SHA}",
     )

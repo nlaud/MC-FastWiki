@@ -214,6 +214,7 @@ from pipeline.enrich.resource_location import NAMESPACE, JoinTable, ResourceLoca
 from pipeline.enrich.sprite import SpriteIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
+from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.aliases import AliasStrength, generate_aliases
@@ -234,6 +235,7 @@ from pipeline.normalize.entity import (
     EntityRef,
     FoodEffect,
     FoodInfo,
+    HarvestInfo,
     IntegerRange,
     ItemAmount,
     JavaProbability,
@@ -1166,6 +1168,7 @@ def merge_entities(
     entity_classification: EntityClassification,
     breeding_index: enrich_breeding.BreedingIndex | None = None,
     food_index: Mapping[str, FoodFacts] | None = None,
+    harvest_index: Mapping[str, BlockHarvest] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1584,6 +1587,32 @@ def merge_entities(
             # mcmeta and no wiki page was read to build the section -- so it
             # incurs no D1 attribution requirement of its own.
             item_draft.add_section_first(food_section, SourceTier.A)
+
+    if harvest_index is not None:
+        for block_id, harvest_facts in harvest_index.items():
+            block_draft = drafts.get(block_id)
+            if block_draft is None:
+                unplaced.append(
+                    UnplacedRow(
+                        table="harvest",
+                        subject=block_id,
+                        reason=(
+                            "the block has a harvest requirement in the block tags and this "
+                            "build does not enumerate it as an entity"
+                        ),
+                    )
+                )
+                continue
+            drops_without_tool = (
+                HarvestTool.PICKAXE not in harvest_facts.tools
+                and harvest_facts.tier is HarvestTier.WOODEN
+            )
+            harvest_section = HarvestInfo(
+                tools=harvest_facts.tools,
+                tier=harvest_facts.tier,
+                drops_without_tool=drops_without_tool,
+            )
+            block_draft.add_section_first(harvest_section, SourceTier.A)
 
     # --- Curated overrides: the last field-level write before `.build()` ---
 

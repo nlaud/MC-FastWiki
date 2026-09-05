@@ -26,7 +26,7 @@ export type EntityKind =
  */
 export type SourceTier = "A" | "B" | "C";
 /**
- * One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` carry real, closed fields. The other six are still open payloads; each one's own description names the later phase that fills it in.
+ * One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` and `harvestInfo` carry real, closed fields. The other five are still open payloads; each one's own description names the later phase that fills it in.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "section".
@@ -39,6 +39,7 @@ export type Section =
   | ObtainList
   | BreedingInfo
   | FoodInfo
+  | HarvestInfo
   | EffectSources
   | AdvancementInfo
   | TradeTable
@@ -46,6 +47,20 @@ export type Section =
   | EnchantInfo
   | GenerationInfo
   | LinkList;
+/**
+ * The tool that breaks a block, from the mineable tags.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "harvestTool".
+ */
+export type HarvestTool = "pickaxe" | "axe" | "shovel" | "hoe";
+/**
+ * The material floor of the tool, from the needs_<material>_tool tags.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "harvestTier".
+ */
+export type HarvestTier = "wooden" | "stone" | "iron" | "diamond";
 
 /**
  * One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.
@@ -387,6 +402,21 @@ export interface FoodEffect {
 export interface EffectLink {
   name: string;
   ref?: EntityRef;
+}
+/**
+ * What tool and tier are needed to harvest a block, from the vanilla block tags. tools lists the mineable tools in HarvestTool order. tier is the material floor. dropsWithoutTool indicates whether the block drops itself when broken without the right tool.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "harvestInfo".
+ */
+export interface HarvestInfo {
+  type: "HarvestInfo";
+  tools: HarvestTool[];
+  tier: HarvestTier;
+  /**
+   * Whether the block drops itself when broken without the required tool.
+   */
+  dropsWithoutTool: boolean;
 }
 /**
  * Every source of a status effect. The payload of this section arrives in Phase 6.
