@@ -62,13 +62,25 @@ describe("obtain-tree workstation tree rules", () => {
       expect(isOreSmelt("minecraft:oak_log")).toBe(false);
     });
 
-    it("suppresses ore smelting for sub-items (depth >= 1)", () => {
-      // At root, iron_ingot DOES have smelting producers
-      const rootTree = buildObtainTree("minecraft:iron_ingot", graph);
-      const rootSmelts = rootTree.root.producers.filter((p) => p.method === "smelting");
-      expect(rootSmelts.length).toBeGreaterThan(0);
+    // Smelting an ore into its material is acquisition, not manufacture, so it
+    // is listed for the item being looked at and never extends a branch.
+    it("keeps ore smelting out of the tree and in rawProducers at the root", () => {
+      const rootTree = buildObtainTree("minecraft:diamond", graph);
+      const treeSmelts = rootTree.root.producers.filter((p) => p.method === "smelting");
+      expect(treeSmelts).toHaveLength(0);
 
-      // Under iron_pickaxe, iron_ingot as sub-item has ore-smelting suppressed
+      const listedSmelts =
+        rootTree.rawProducers?.filter(
+          (p) => p.m === "smelting" && isOreSmelt(p.in?.[0]?.i ?? ""),
+        ) ?? [];
+      expect(listedSmelts.length).toBeGreaterThan(0);
+      expect(listedSmelts.some((p) => p.in?.[0]?.i === "minecraft:diamond_ore")).toBe(true);
+      expect(listedSmelts.some((p) => p.in?.[0]?.i === "minecraft:deepslate_diamond_ore")).toBe(
+        true,
+      );
+    });
+
+    it("suppresses ore smelting for sub-items (depth >= 1)", () => {
       const pickaxeTree = buildObtainTree("minecraft:iron_pickaxe", graph);
       const ironInput = pickaxeTree.root.producers[0]?.inputs.find(
         (i) => i.item === "minecraft:iron_ingot",
@@ -81,18 +93,98 @@ describe("obtain-tree workstation tree rules", () => {
 
   describe("cooking station compression", () => {
     it("collapses multiple cooking stations with same inputs into one producer", () => {
-      const tree = buildObtainTree("minecraft:iron_ingot", graph);
-      const rawIronSmelt = tree.root.producers.find(
-        (p) => p.method === "smelting" && p.inputs.some((i) => i.item === "minecraft:raw_iron"),
-      );
-      expect(rawIronSmelt).toBeDefined();
-      // Should have both blast furnace and furnace in stations
-      expect(rawIronSmelt?.stations).toBeDefined();
-      expect(rawIronSmelt?.stations).toContain("furnace");
-      expect(rawIronSmelt?.stations).toContain("blast_furnace");
+      // Cooked beef is smelted from raw beef at a furnace, a smoker and a
+      // campfire. It is not an ore, so it stays in the tree, where the three
+      // stations have to collapse into one card.
+      const tree = buildObtainTree("minecraft:cooked_beef", graph);
+      const smelts = tree.root.producers.filter((p) => p.method === "smelting");
+      expect(smelts).toHaveLength(1);
+      const smelt = smelts[0];
+      expect(smelt?.stations).toContain("furnace");
+      expect(smelt?.stations).toContain("smoker");
+      expect(smelt?.stations).toContain("campfire");
       // Station chip order prioritises furnace, blast_furnace, smoker, campfire
-      expect(rawIronSmelt?.stations?.[0]).toBe("furnace");
-      expect(rawIronSmelt?.stations?.[1]).toBe("blast_furnace");
+      expect(smelt?.stations?.[0]).toBe("furnace");
+    });
+  });
+
+  describe("storage block round trips", () => {
+    it("drops unpacking a storage block but keeps packing one", () => {
+      const ingot = buildObtainTree("minecraft:iron_ingot", graph);
+      const fromBlock = ingot.root.producers.find((p) =>
+        p.inputs.some((i) => i.item === "minecraft:iron_block"),
+      );
+      expect(fromBlock).toBeUndefined();
+
+      // Nine nuggets into an ingot is a real thing a player makes, and stays.
+      const fromNuggets = ingot.root.producers.find((p) =>
+        p.inputs.some((i) => i.item === "minecraft:iron_nugget"),
+      );
+      expect(fromNuggets).toBeDefined();
+
+      // And the packing direction is exactly what the block's own page shows.
+      const block = buildObtainTree("minecraft:iron_block", graph);
+      const packed = block.root.producers.find((p) =>
+        p.inputs.some((i) => i.item === "minecraft:iron_ingot"),
+      );
+      expect(packed).toBeDefined();
+    });
+  });
+
+  describe("depth cap", () => {
+    // An "Expand..." control promises more tree behind it. Where the item the
+    // walk stopped on has no recipe at all, the promise is empty and the card
+    // should just be drawn.
+    it("does not offer to expand an item with nothing to expand into", () => {
+      const tree = buildObtainTree("minecraft:iron_pickaxe", graph, { maxDepth: 1 });
+      const stubs: string[] = [];
+      for (const producer of tree.root.producers) {
+        for (const input of producer.inputs) {
+          if (input.node?.expandable === true) {
+            stubs.push(input.node.item);
+          }
+        }
+      }
+      for (const itemId of stubs) {
+        const sub = buildObtainTree(itemId, graph);
+        expect(sub.root.producers.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe("smelting ingredient collapse", () => {
+    // Several items smelting into one result is one fact, and the input slot
+    // cycles them the way a tag slot cycles its members.
+    it("folds every ingredient of one smelt onto a single cycling input", () => {
+      const synthetic: Obtain = {
+        schemaVersion: 1,
+        producers: {
+          "minecraft:test_ingot": [
+            { m: "smelting", st: "furnace", src: "a", c: 1, in: [{ i: "minecraft:test_a" }] },
+            { m: "smelting", st: "blast_furnace", src: "b", c: 1, in: [{ i: "minecraft:test_b" }] },
+            { m: "smelting", st: "furnace", src: "c", c: 1, in: [{ i: "minecraft:test_b" }] },
+          ],
+        },
+      } as unknown as Obtain;
+
+      const tree = buildObtainTree("minecraft:test_ingot", synthetic);
+      const smelts = tree.root.producers.filter((p) => p.method === "smelting");
+      expect(smelts).toHaveLength(1);
+
+      const only = smelts[0];
+      expect(only?.inputs).toHaveLength(1);
+      expect(only?.inputs[0]?.members).toEqual(["minecraft:test_a", "minecraft:test_b"]);
+      expect(only?.stations).toContain("furnace");
+      expect(only?.stations).toContain("blast_furnace");
+    });
+  });
+
+  describe("items with no recipe", () => {
+    it("gives an acquisition-only item an empty tree", () => {
+      // Honeycomb comes out of chests and out of nothing else.
+      const tree = buildObtainTree("minecraft:honeycomb", graph);
+      expect(tree.root.producers).toHaveLength(0);
+      expect(tree.rawProducers?.length).toBeGreaterThan(0);
     });
   });
 

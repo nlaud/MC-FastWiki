@@ -132,7 +132,14 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px;
+  /*
+   * The search bar is `position: fixed` 20px off the bottom of the viewport and
+   * 44px tall, so it floats over whatever the bottom window is showing. The body
+   * scrolls perfectly well; it just had no room to scroll the last rows out from
+   * under the bar, which read as the content being cut off. The bottom padding
+   * is the bar's height plus its offset plus a gap.
+   */
+  padding: 16px 16px 80px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1083,8 +1090,14 @@ canvas,
  * which is also what gives the villager trade table room to lay out as a table
  * rather than as a scroller.
  */
+/*
+ * Each selector is qualified by the container element so these rules outrank
+ * the unqualified base rules no matter where they sit in the file. The base
+ * `.obtaining-sources-pane` is declared several hundred lines below this block,
+ * so relying on source order would silently lose half of them.
+ */
 @container obtaining (max-width: 900px) {
-  .obtaining-shell {
+  .recipe-tree-section .obtaining-shell {
     flex-direction: column;
   }
 
@@ -1094,21 +1107,30 @@ canvas,
    * collapsed to zero height here and the whole tree vanished, leaving a bare
    * Sources panel under the Obtaining heading.
    */
-  .obtaining-tree-pane {
+  .recipe-tree-section .obtaining-tree-pane {
     flex: 0 0 auto;
     width: 100%;
   }
 
-  .obtaining-sources-pane {
+  .recipe-tree-section .obtaining-sources-pane {
     width: 100%;
   }
 }
 
-/* Left Pane: Workstation Tree */
 .obtaining-tree-pane {
   flex: 1 1 0;
   min-width: 0;
-  overflow-x: auto;
+  /*
+   * No scroller of its own, in either axis.
+   *
+   * It used to be `overflow-x: auto`, which does not work for this content: the
+   * children row is centered, and a centered flex row that overflows puts its
+   * first child at a negative offset that no scrollbar can reach. The Crafter
+   * tree lost two of its four branches that way -- they were laid out, they were
+   * just unreachable. Rows wrap instead (see `.tree-children`), so the tree grows
+   * downward into a page that already scrolls rather than sideways into one that
+   * cannot.
+   */
   padding-bottom: 16px;
   container-type: inline-size;
 }
@@ -1118,6 +1140,7 @@ canvas,
   flex-direction: column;
   align-items: center;
   position: relative;
+  min-width: 0;
 }
 
 .tree-node-card {
@@ -1127,22 +1150,56 @@ canvas,
   z-index: 2;
 }
 
-/* Connectors: Centered tree when wide */
+/*
+ * A layer of children.
+ *
+ * `flex-wrap` is what keeps a wide layer inside the window: the Crafter needs
+ * four branches side by side and has room for two, so the other two continue on
+ * the next line. The page already scrolls down, and it cannot scroll sideways --
+ * a centered flex row that overflows puts its first child at a negative offset
+ * no scrollbar can reach, which is how the Crafter lost two of its four
+ * branches before this.
+ *
+ * Wrapping is also why there is no bar spanning sibling to sibling here. The
+ * usual org-chart connector cannot survive a row break: it would run through
+ * empty space toward a sibling that is no longer beside it, and it has to be as
+ * wide as the widest row, so a single wide branch on row two dragged a long
+ * rule across the whole window on row one. Each branch hangs from its parent on
+ * its own short stem instead, which stays true however the rows break.
+ */
 .tree-children {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: flex-start;
+  /*
+   * No column gap. The sibling bar is drawn as one segment per branch, each
+   * `width: 100%` of its own box, so any gap between boxes is a gap in the line.
+   * The branches are spaced by their own horizontal padding instead, which the
+   * segments span.
+   */
+  column-gap: 0;
+  row-gap: 20px;
   position: relative;
-  margin-top: 24px;
+  margin-top: 22px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
+.tree-children[hidden] {
+  display: none;
+}
+
+/* The stem from the parent card down into the layer. */
 .tree-children::before {
   content: "";
   position: absolute;
-  top: -24px;
+  top: -22px;
   left: 50%;
   width: 2px;
-  height: 24px;
+  height: 22px;
   background: #444;
   transform: translateX(-50%);
 }
@@ -1152,21 +1209,40 @@ canvas,
   flex-direction: column;
   align-items: center;
   position: relative;
-  padding: 24px 12px 0 12px;
+  min-width: 0;
+  padding: 16px 10px 0 10px;
 }
 
+/* Each branch hangs on its own stem, so a wrapped row stays readable. */
 .tree-branch::before {
   content: "";
   position: absolute;
   top: 0;
   left: 50%;
   width: 2px;
-  height: 24px;
+  height: 16px;
   background: #444;
   transform: translateX(-50%);
 }
 
-.tree-branch::after {
+/*
+ * The bar across the siblings, drawn as one segment per branch rather than as a
+ * single element spanning the row.
+ *
+ * That is what keeps it exactly as long as it needs to be with no measuring of
+ * widths: a branch at the start of its row draws only its right half and one at
+ * the end draws only its left, so the bar starts at the centre of the first
+ * card of the row and stops at the centre of the last. A single spanning
+ * element would instead have to be as wide as the widest row, which is how the
+ * Crafter ended up with a rule reaching far past the two cards under it.
+ *
+ * The row classes come from the renderer. `:first-child` and `:last-child` are
+ * per-container, not per-row, so once a layer wraps they mark one branch in the
+ * whole layer instead of one per line -- which drew a bar off both ends of every
+ * row after the first. `markRows` groups the branches by their offset and tags
+ * the real ends of each line.
+ */
+.tree-children > .tree-branch::after {
   content: "";
   position: absolute;
   top: 0;
@@ -1176,17 +1252,17 @@ canvas,
   background: #444;
 }
 
-.tree-branch:first-child::after {
+.tree-children > .tree-branch.is-row-start::after {
   left: 50%;
   width: 50%;
 }
 
-.tree-branch:last-child::after {
+.tree-children > .tree-branch.is-row-end::after {
   left: 0;
   width: 50%;
 }
 
-.tree-branch:only-child::after {
+.tree-children > .tree-branch.is-row-single::after {
   display: none;
 }
 
@@ -1198,11 +1274,17 @@ canvas,
 
   .tree-children {
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: flex-start;
     margin-top: 12px;
     margin-left: 20px;
+    padding-top: 0;
     padding-left: 20px;
+    border-top: none;
     border-left: 2px solid #444;
+    width: auto;
+    max-width: none;
+    margin-inline: 0 0;
   }
 
   .tree-children::before {
@@ -1376,6 +1458,8 @@ canvas,
   justify-content: center;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .slot-count {
@@ -1392,14 +1476,22 @@ canvas,
 }
 
 .slot-fallback-text {
-  font-size: 0.65rem;
-  line-height: 1;
-  text-align: center;
-  color: #ddd;
-  max-width: 32px;
+  /*
+   * The last resort when nothing in the atlas answers for an item. It has a
+   * 40px slot to work with, so it has to clip rather than spill: an unclipped
+   * fallback pushed its text straight through the slot border and across the
+   * neighbouring cells. The full name is always on the slot's `title`.
+   */
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.55rem;
+  line-height: 1.1;
+  text-align: center;
+  color: #b0b0b0;
+  padding: 0 2px;
 }
 
 /* Crafting Grid */
@@ -1479,16 +1571,15 @@ canvas,
   color: #8ab4f8;
 }
 
-.leaf-badge {
-  font-size: 0.7rem;
-  color: #888;
-  background: #222;
-  border: 1px solid #383838;
-  border-radius: 3px;
-  padding: 1px 5px;
+/* Station Pagination Dots */
+.station-card.is-steppable {
+  cursor: pointer;
 }
 
-/* Station Pagination Dots */
+.station-card.is-steppable:hover {
+  border-color: #5c85d6;
+}
+
 .station-pagination {
   display: flex;
   justify-content: center;
@@ -1611,6 +1702,17 @@ canvas,
   gap: 4px;
 }
 
+/*
+ * `display: flex` above beats the `hidden` attribute's UA `display: none`, so
+ * the collapsed overflow list stayed on screen and "Show 16 more chest loot"
+ * toggled nothing a reader could see. Any element carrying `hidden` means it,
+ * so the rule is written for both lists that use the attribute.
+ */
+.sources-list[hidden],
+.tree-children[hidden] {
+  display: none;
+}
+
 .sources-item {
   font-size: 0.85rem;
   color: #ccc;
@@ -1622,6 +1724,13 @@ canvas,
 .sources-chest-label {
   color: #e0e0e0;
   font-weight: 500;
+}
+
+.sources-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .sources-note-badge {

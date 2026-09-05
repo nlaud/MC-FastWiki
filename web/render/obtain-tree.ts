@@ -43,23 +43,6 @@ export interface ObtainNode {
   producers: TreeProducer[];
   expandable: boolean;
   back_reference: string | null;
-  /**
-   * Whether nothing in the graph *makes* this item -- it is only ever gathered.
-   *
-   * A node can end up with an empty `producers` list for two very different
-   * reasons: the item is genuinely raw, or every producer it does have was
-   * removed by the depth-1 method filter or by cycle detection. The renderer's
-   * "Raw material" badge is a claim about the first case only, and reading it
-   * off `producers.length === 0` asserted it for the second case too -- which
-   * is how Block of Iron, an item crafted from nine ingots, came to be
-   * labelled a raw material under Iron Ingot.
-   *
-   * "Raw" is the absence of a *manipulation* producer, not the absence of
-   * every producer. An oak log is mined and nothing crafts, smelts, brews or
-   * fills it into being, so its lone `block_drop` producer leaves it raw. A
-   * block of iron has a crafting recipe, so it never is.
-   */
-  is_raw: boolean;
 }
 
 export interface ObtainTree {
@@ -73,32 +56,88 @@ export interface BuildTreeOptions {
 }
 
 /**
- * Returns whether nothing in the graph makes `itemId` -- see `ObtainNode.is_raw`.
+ * Detects whether a producer is a way of *getting* an item rather than making one.
  *
- * Deliberately ignores the depth and cycle state of any particular walk: this
- * is a fact about the item, not about where it happened to land in one tree.
+ * The Sources panel renders exactly this set for the item being looked at, and
+ * the tree renders exactly its complement, so both read the same rule from one
+ * place instead of keeping two lists that could drift apart.
  */
-function isRawMaterial(graph: Obtain, itemId: string): boolean {
-  const producers = graph.producers[itemId] ?? [];
-  return !producers.some(
-    (producer) =>
-      producer.m === "crafting" ||
-      producer.m === "smelting" ||
-      producer.m === "brewing" ||
-      producer.m === "filling",
-  );
+export function isAcquisition(graph: Obtain, producer: ObtainProducer): boolean {
+  if (
+    producer.m === "trade" ||
+    producer.m === "chest_loot" ||
+    producer.m === "block_drop" ||
+    producer.m === "mob_loot"
+  ) {
+    return true;
+  }
+  if (producer.m === "smelting") {
+    const firstInput = producer.in?.[0];
+    const inputId = firstInput?.i ?? firstInput?.t;
+    return Boolean(inputId && isOreSmelt(inputId));
+  }
+  return false;
+}
+
+/**
+ * Detects whether a producer only unpacks a storage block back into the item it
+ * was packed from -- Block of Iron into nine Iron Ingots, Block of Redstone into
+ * nine Redstone.
+ *
+ * Read as a recipe this is real crafting, which is why the method filter let it
+ * through and put "first obtain a Block of Iron" at the head of the Iron Ingot
+ * branch. Read as a route it is circular: the block is made of the very item it
+ * produces, so it can never be the cheaper way to get one.
+ *
+ * Only the unpacking direction goes. Packing -- nine Diamonds into a Block of
+ * Diamond, nine Nuggets into an Ingot -- is a real thing a player makes, and it
+ * is the recipe the Block of Diamond page exists to show. The two directions are
+ * told apart by their arithmetic rather than by a list of block names: unpacking
+ * consumes one and yields many, packing consumes many and yields one. A storage
+ * block added in a later version therefore needs no update here.
+ */
+export function isStorageRoundTrip(
+  graph: Obtain,
+  outputId: string,
+  producer: ObtainProducer,
+): boolean {
+  if (producer.m !== "crafting") {
+    return false;
+  }
+  const inputs = producer.in ?? [];
+  const only = inputs.length === 1 ? inputs[0] : undefined;
+  const packedId = only?.i;
+  if (!packedId || only.t !== undefined) {
+    return false;
+  }
+  // Consumes one, yields many: the unpacking direction.
+  if ((only.c ?? 1) !== 1 || (producer.c ?? 1) <= 1) {
+    return false;
+  }
+  return (graph.producers[packedId] ?? []).some((reverse) => {
+    if (reverse.m !== "crafting") {
+      return false;
+    }
+    const reverseInputs = reverse.in ?? [];
+    const reverseOnly = reverseInputs.length === 1 ? reverseInputs[0] : undefined;
+    return reverseOnly?.i === outputId && (reverseOnly.c ?? 1) > 1;
+  });
 }
 
 /**
  * Detects whether a smelt input represents an ore block, raw metal, or ancient debris.
- * Used to suppress ore smelting below the root item in obtain trees.
+ *
+ * Smelting an ore into its material is how a player *gets* that material out of
+ * the world, which puts it with chest loot and block drops rather than with
+ * crafting: it belongs in the Sources panel for the item being looked at, and it
+ * ends a branch rather than extending one anywhere below the root.
  */
 export function isOreSmelt(inputId: string): boolean {
   const name = inputId.replace(/^[a-z0-9_-]+:/, "");
   return name.endsWith("_ore") || name.startsWith("raw_") || name === "ancient_debris";
 }
 
-function sortStations(stations: string[]): string[] {
+export function sortStations(stations: string[]): string[] {
   return [...stations].sort((a, b) => {
     const idxA = COOKING_STATION_ORDER.indexOf(a);
     const idxB = COOKING_STATION_ORDER.indexOf(b);
@@ -106,6 +145,24 @@ function sortStations(stations: string[]): string[] {
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
     return a.localeCompare(b);
+  });
+}
+
+/**
+ * Every producer of `itemId` that the tree draws: manufacturing only.
+ *
+ * Acquisition -- chest loot, block drops, mob drops, trading, and smelting an
+ * ore into its material -- is how a player gets a thing out of the world, not
+ * how they build one. All of it goes to the Sources panel for the item being
+ * looked at, and none of it extends a branch below the root. Unpacking a
+ * storage block is dropped outright: see `isStorageRoundTrip`.
+ */
+function manipulationProducersOf(graph: Obtain, itemId: string): ObtainProducer[] {
+  return (graph.producers[itemId] ?? []).filter((producer) => {
+    if (isAcquisition(graph, producer)) {
+      return false;
+    }
+    return !isStorageRoundTrip(graph, itemId, producer);
   });
 }
 
@@ -234,12 +291,17 @@ function buildNode(
   isRoot = false,
 ): ObtainNode {
   if (remainingDepth <= 0 && !isRoot) {
+    // An "Expand..." control is a promise that there is more tree behind it.
+    // At the depth cap that promise is often empty: the item the walk stopped
+    // on has no manufacturing producer at all, so expanding it only ever
+    // yielded the one bare card the reader could have been shown outright.
+    // Where that is the case, show the card and skip the click.
+    const hasMore = manipulationProducersOf(graph, itemId).length > 0;
     return {
       item: itemId,
       producers: [],
-      expandable: true,
+      expandable: hasMore,
       back_reference: null,
-      is_raw: isRawMaterial(graph, itemId),
     };
   }
 
@@ -251,50 +313,39 @@ function buildNode(
       producers: [],
       expandable: false,
       back_reference: earlierPath,
-      is_raw: isRawMaterial(graph, itemId),
     };
   }
   firstOccurrence.set(key, nodePath);
 
-  const rawProducers = graph.producers[itemId] ?? [];
+  const manipulationProducers = manipulationProducersOf(graph, itemId);
 
-  // 1. Depth-aware filtering:
-  // - Root shows manipulation methods (crafting, smelting, brewing, filling).
-  //   Acquisition methods (chest_loot, block_drop, mob_loot, trade) go to the Sources panel.
-  // - Sub-items (depth >= 1) keep manipulation methods, EXCEPT smelting where input is an ore/raw/ancient debris.
-  //   Acquisition methods are dropped so sub-items become leaves.
-  const manipulationProducers = rawProducers.filter((producer) => {
-    if (
-      producer.m === "trade" ||
-      producer.m === "chest_loot" ||
-      producer.m === "block_drop" ||
-      producer.m === "mob_loot"
-    ) {
-      return false;
-    }
-    if (producer.m === "smelting" && !isRoot) {
-      const firstInput = producer.in?.[0];
-      const inputId = firstInput?.i ?? firstInput?.t;
-      if (inputId && isOreSmelt(inputId)) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // 2. Cooking station collapse:
-  // Smelting producers with the same inputs collapse into one card carrying all applicable stations.
-  const smeltGroups = new Map<string, ObtainProducer[]>();
+  // 2. Smelting collapse, across both stations and ingredients.
+  //
+  // Every smelt that yields this item becomes one card. Two things get gathered
+  // onto it, for the same reason: a player reads "smelt something into this" as
+  // one fact, and splitting it produces near-identical cards that differ in a
+  // detail the card itself already shows.
+  //
+  //   Stations. Cooked beef comes off a furnace, a smoker and a campfire as
+  //   three producers of the same thing; they become three chips on one card.
+  //
+  //   Ingredients. Several different items can smelt into the same result, and
+  //   those become alternatives on the single input slot, which cycles them the
+  //   way a `#planks` tag slot cycles its twelve woods. This is the same reading
+  //   the graph already applies to an untagged alternatives list.
+  //
+  // The grouping key is the yield, so a recipe that produces a different number
+  // of the item stays a card of its own rather than being folded into one that
+  // does not.
+  const smeltGroups = new Map<number, ObtainProducer[]>();
   for (const producer of manipulationProducers) {
     if (producer.m === "smelting") {
-      const inputKey = (producer.in ?? [])
-        .map((i) => `${i.i ?? ""}:${i.t ?? ""}:${(i.c ?? 1).toString()}`)
-        .join(";");
-      const existing = smeltGroups.get(inputKey);
+      const yieldKey = producer.c ?? 1;
+      const existing = smeltGroups.get(yieldKey);
       if (existing) {
         existing.push(producer);
       } else {
-        smeltGroups.set(inputKey, [producer]);
+        smeltGroups.set(yieldKey, [producer]);
       }
     }
   }
@@ -304,22 +355,54 @@ function buildNode(
     stations: string[];
   }> = [];
 
-  const handledSmeltKeys = new Set<string>();
+  const handledSmeltYields = new Set<number>();
   for (const producer of manipulationProducers) {
     if (producer.m === "smelting") {
-      const inputKey = (producer.in ?? [])
-        .map((i) => `${i.i ?? ""}:${i.t ?? ""}:${(i.c ?? 1).toString()}`)
-        .join(";");
-      if (handledSmeltKeys.has(inputKey)) {
+      const yieldKey = producer.c ?? 1;
+      if (handledSmeltYields.has(yieldKey)) {
         continue;
       }
-      handledSmeltKeys.add(inputKey);
-      const group = smeltGroups.get(inputKey) ?? [producer];
+      handledSmeltYields.add(yieldKey);
+      const group = smeltGroups.get(yieldKey) ?? [producer];
+
       const stations = sortStations(
         Array.from(new Set(group.map((p) => p.st).filter((s): s is string => Boolean(s)))),
       );
+
+      // Every distinct ingredient across the group, in the graph's own order,
+      // folded onto the first producer's single input slot as its members.
+      const alternatives: string[] = [];
+      let tagged: ObtainProducerInput | null = null;
+      for (const member of group) {
+        const only = member.in?.[0];
+        if (!only) {
+          continue;
+        }
+        if (only.t !== undefined) {
+          // A tag ingredient already carries its own member list; it is the
+          // richer description, so it wins over a bare item alternative.
+          tagged ??= only;
+        } else if (only.i && !alternatives.includes(only.i)) {
+          alternatives.push(only.i);
+        }
+      }
+
+      let merged = producer;
+      if (tagged) {
+        merged = { ...producer, in: [tagged] };
+      } else if (alternatives.length > 1) {
+        const lead = alternatives[0];
+        if (lead) {
+          const first = producer.in?.[0];
+          merged = {
+            ...producer,
+            in: [{ ...first, i: lead, mb: alternatives }],
+          };
+        }
+      }
+
       collapsedProducers.push({
-        producer,
+        producer: merged,
         stations,
       });
     } else {
@@ -380,7 +463,6 @@ function buildNode(
     producers: treeProducers,
     expandable: false,
     back_reference: null,
-    is_raw: isRawMaterial(graph, itemId),
   };
 }
 

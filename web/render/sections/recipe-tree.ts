@@ -1,9 +1,16 @@
 import type { Entity, RecipeTree, TradeTable } from "../../types/entity.js";
-import type { ObtainProducer } from "../../types/obtain.js";
+import type { Obtain, ObtainProducer } from "../../types/obtain.js";
 import { loadObtain } from "../../search/load.js";
 import type { RenderContext } from "../context.js";
 import { entityLink } from "../link.js";
-import { type ObtainNode, type TreeInput, expandStub } from "../obtain-tree.js";
+import {
+  type ObtainNode,
+  type TreeInput,
+  expandStub,
+  isOreSmelt,
+  sortStations,
+} from "../obtain-tree.js";
+import { subscribeTicker } from "../station/ticker.js";
 import { renderLeafCard, renderStationCard } from "../station/index.js";
 import { renderTradeTable } from "./trade-table.js";
 
@@ -47,6 +54,7 @@ export function getChestSourceLabel(
 
 interface SourcesData {
   chestLoot: ObtainProducer[];
+  oreSmelts: ObtainProducer[];
   blockDrops: ObtainProducer[];
   mobDrops: ObtainProducer[];
   tradeProducers: ObtainProducer[];
@@ -57,11 +65,12 @@ interface SourcesData {
 
 function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement | null {
   const hasChest = data.chestLoot.length > 0;
+  const hasOreSmelts = data.oreSmelts.length > 0;
   const hasBlocks = data.blockDrops.length > 0;
   const hasMobs = data.mobDrops.length > 0;
   const hasTrades = Boolean(data.tradeTableSection) || data.tradeProducers.length > 0;
 
-  if (!hasChest && !hasBlocks && !hasMobs && !hasTrades) {
+  if (!hasChest && !hasOreSmelts && !hasBlocks && !hasMobs && !hasTrades) {
     return null;
   }
 
@@ -141,7 +150,48 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
     panelEl.append(renderGroup("Chest Loot", chestItems, "sources-chest-group"));
   }
 
-  // 2. Block Drops
+  // 2. Smelting an ore into this material.
+  //
+  // This is the one acquisition route that is also a recipe, so it earns a
+  // group of its own rather than a line of prose: a reader on the Diamond page
+  // wants to see that Diamond Ore smelts into it, next to the chests it turns
+  // up in. Below the root it never appears at all -- see `isAcquisition`.
+  if (hasOreSmelts) {
+    // One row per ore, not per station. Diamond is smelted from two ores at two
+    // stations, which arrives here as four producers and reads as four separate
+    // facts unless the stations are gathered back onto the ore they belong to.
+    const byOre = new Map<string, Set<string>>();
+    for (const p of data.oreSmelts) {
+      const inputId = p.in?.[0]?.i;
+      if (!inputId) {
+        continue;
+      }
+      const stations = byOre.get(inputId) ?? new Set<string>();
+      if (p.st) {
+        stations.add(p.st);
+      }
+      byOre.set(inputId, stations);
+    }
+
+    const smeltItems = [...byOre.entries()].map(([inputId, stations]) => {
+      const li = document.createElement("li");
+      li.className = "sources-item sources-smelt-item";
+
+      const entry = ctx.lookup(inputId);
+      li.append(entityLink({ id: inputId, name: entry?.n ?? humaniseId(inputId) }, ctx));
+
+      for (const station of sortStations([...stations])) {
+        const stationBadge = document.createElement("span");
+        stationBadge.className = "sources-note-badge";
+        stationBadge.textContent = humaniseId(station);
+        li.append(stationBadge);
+      }
+      return li;
+    });
+    panelEl.append(renderGroup("Smelting", smeltItems, "sources-smelt-group"));
+  }
+
+  // 3. Block Drops
   if (hasBlocks) {
     const blockItems = data.blockDrops.map((p) => {
       const li = document.createElement("li");
@@ -170,22 +220,40 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
     panelEl.append(renderGroup("Block Drops", blockItems, "sources-block-group"));
   }
 
-  // 3. Mob Drops
+  // 4. Mob Drops
   if (hasMobs) {
     const mobItems = data.mobDrops.map((p) => {
       const li = document.createElement("li");
       li.className = "sources-item sources-mob-item";
-      const text = p.nt ?? p.src.replace(/^droptable\//, "Dropped by ");
-      const span = document.createElement("span");
-      span.className = "sources-mob-label";
-      span.textContent = text;
-      li.append(span);
+
+      const lead = document.createElement("span");
+      lead.className = "sources-mob-label";
+      lead.textContent = "Dropped by";
+      li.append(lead);
+
+      // `src` is `droptable/<Mob display name>`, and `nt` repeats it as
+      // "dropped by <Mob>". The name is the only handle on the mob either field
+      // gives, so the id is rebuilt from it and only becomes a link once the
+      // index confirms it resolves -- a mob whose page does not exist stays as
+      // plain text rather than becoming a dead link.
+      const mobName = p.src.replace(/^droptable\//, "").trim();
+      const mobId = `minecraft:${mobName.toLowerCase().replace(/\s+/g, "_")}`;
+      const entry = mobName ? ctx.lookup(mobId) : null;
+
+      if (entry) {
+        li.append(entityLink({ id: mobId, name: entry.n }, ctx));
+      } else if (mobName) {
+        const plain = document.createElement("span");
+        plain.className = "sources-mob-name";
+        plain.textContent = mobName;
+        li.append(plain);
+      }
       return li;
     });
     panelEl.append(renderGroup("Mob Drops", mobItems, "sources-mob-group"));
   }
 
-  // 4. Trades
+  // 5. Trades
   if (hasTrades) {
     const tradeGroup = document.createElement("div");
     tradeGroup.className = "sources-group sources-trade-group";
@@ -217,7 +285,80 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
   return panelEl;
 }
 
-function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[]): HTMLElement {
+/**
+ * Draws one child branch, and keeps it in step with its parent slot's cycle.
+ *
+ * A tag ingredient such as `#minecraft:planks` is drawn as one slot that cycles
+ * through the twelve planks it resolves to, but the branch under that slot was
+ * built once, from the tag's representative member. So the slot advanced to
+ * Spruce Planks while the branch below it still read "Oak Planks, from Oak Log"
+ * -- the logs never changed with the planks, which is exactly what a reader
+ * notices first.
+ *
+ * Both sides now advance off the same shared ticker with the same modulo over
+ * the same member list, so they cannot drift apart. Subtrees are built on the
+ * tick that first needs them and cached from then on, so cycling a twelve-member
+ * tag costs twelve walks spread over twelve seconds rather than twelve walks up
+ * front, and a member nobody ever sees is never walked at all.
+ */
+function renderBranch(
+  branchEl: HTMLElement,
+  input: TreeInput,
+  ctx: RenderContext,
+  ancestors: string[],
+  graph: Obtain | null,
+): void {
+  const draw = (childNode: ObtainNode, itemId: string | null): void => {
+    const nextAncestors = itemId ? [...ancestors, itemId] : ancestors;
+    branchEl.replaceChildren(renderTreeNode(childNode, ctx, nextAncestors, graph));
+  };
+
+  const baseNode = input.node;
+  if (!baseNode) {
+    return;
+  }
+
+  const members = input.members;
+  if (!graph || members.length < 2) {
+    draw(baseNode, input.item);
+    return;
+  }
+
+  const cache = new Map<string, ObtainNode>();
+  if (input.item) {
+    cache.set(input.item, baseNode);
+  }
+
+  const showMember = (memberId: string): void => {
+    let childNode = cache.get(memberId);
+    if (!childNode) {
+      try {
+        childNode = expandStub(memberId, graph, ancestors);
+      } catch {
+        return;
+      }
+      cache.set(memberId, childNode);
+    }
+    draw(childNode, memberId);
+  };
+
+  const first = members[0];
+  showMember(first ?? input.item ?? "");
+
+  subscribeTicker((tick) => {
+    const memberId = members[tick % members.length];
+    if (memberId) {
+      showMember(memberId);
+    }
+  });
+}
+
+function renderTreeNode(
+  node: ObtainNode,
+  ctx: RenderContext,
+  ancestors: string[],
+  graph: Obtain | null,
+): HTMLElement {
   const nodeContainer = document.createElement("div");
   nodeContainer.className = "tree-node";
 
@@ -245,7 +386,7 @@ function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[
           const graph = await loadObtain();
           const targetId = node.item;
           const expanded = expandStub(targetId, graph, ancestors);
-          const expandedEl = renderTreeNode(expanded, ctx, [...ancestors, targetId]);
+          const expandedEl = renderTreeNode(expanded, ctx, [...ancestors, targetId], graph);
           nodeContainer.replaceWith(expandedEl);
         } catch {
           expandBtn.textContent = "Failed to expand";
@@ -269,7 +410,7 @@ function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[
 
   if (node.producers.length === 0) {
     // Leaf node: item with no manipulation producers
-    const leafCard = renderLeafCard(node.item, ctx, { isRaw: node.is_raw });
+    const leafCard = renderLeafCard(node.item, ctx);
     cardWrapper.append(leafCard);
     return nodeContainer;
   }
@@ -305,11 +446,10 @@ function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[
         if (!input.node) continue;
         const branchEl = document.createElement("div");
         branchEl.className = "tree-branch";
-        const nextAncestors = input.item ? [...ancestors, input.item] : ancestors;
-        const childNodeEl = renderTreeNode(input.node, ctx, nextAncestors);
-        branchEl.append(childNodeEl);
         childrenContainer.append(branchEl);
+        renderBranch(branchEl, input, ctx, ancestors, graph);
       }
+      markRows(childrenContainer);
     } else {
       childrenContainer.hidden = true;
     }
@@ -319,8 +459,59 @@ function renderTreeNode(node: ObtainNode, ctx: RenderContext, ancestors: string[
   return nodeContainer;
 }
 
+/**
+ * Marks the first and last branch on each line of a layer.
+ *
+ * The sibling bar is drawn in CSS as one segment per branch: the branch at the
+ * start of a line draws only its right half and the one at the end only its
+ * left, so the bar runs centre to centre and no further. That needs to know
+ * where each line begins and ends, and CSS has no selector for "first on its
+ * line" -- `:first-child` is per-container, so once a layer wrapped it marked
+ * one branch out of the whole layer and every line after the first got a bar
+ * running off both ends.
+ *
+ * Grouping by `offsetTop` is the whole measurement: one read per branch, redone
+ * only when the layer actually changes size. A line holding a single branch
+ * needs no bar at all.
+ */
+function markRows(container: HTMLElement): void {
+  const apply = (): void => {
+    const branches = [...container.children] as HTMLElement[];
+    if (branches.length === 0) {
+      return;
+    }
+
+    const rows = new Map<number, HTMLElement[]>();
+    for (const branch of branches) {
+      const row = rows.get(branch.offsetTop) ?? [];
+      row.push(branch);
+      rows.set(branch.offsetTop, row);
+    }
+
+    for (const row of rows.values()) {
+      const last = row.length - 1;
+      row.forEach((branch, index) => {
+        branch.classList.toggle("is-row-single", row.length === 1);
+        branch.classList.toggle("is-row-start", row.length > 1 && index === 0);
+        branch.classList.toggle("is-row-end", row.length > 1 && index === last);
+      });
+    }
+  };
+
+  apply();
+
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(apply).observe(container);
+  }
+}
+
 export interface RecipeTreeSectionData extends RecipeTree {
   rawProducers?: ObtainProducer[] | undefined;
+  /**
+   * The whole producer graph, so a cycling tag branch can walk a member the
+   * pre-built tree never visited. See `renderBranch`.
+   */
+  graph?: Obtain | undefined;
   sources?:
     Record<string, { s?: string; c?: string; structure?: string; container?: string }> | undefined;
 }
@@ -342,6 +533,13 @@ export function renderRecipeTree(
   // Collect raw acquisition producers for the root item
   const rawProducers = section.rawProducers ?? [];
   const chestLoot = rawProducers.filter((p) => p.m === "chest_loot");
+  const oreSmelts = rawProducers.filter((p) => {
+    if (p.m !== "smelting") {
+      return false;
+    }
+    const inputId = p.in?.[0]?.i ?? p.in?.[0]?.t;
+    return Boolean(inputId && isOreSmelt(inputId));
+  });
   const blockDrops = rawProducers.filter((p) => p.m === "block_drop");
   const mobDrops = rawProducers.filter((p) => p.m === "mob_loot");
   const tradeProducers = rawProducers.filter((p) => p.m === "trade");
@@ -351,6 +549,7 @@ export function renderRecipeTree(
   const hasTreeContent = rootNode.producers.length > 0;
   const hasSourcesContent =
     chestLoot.length > 0 ||
+    oreSmelts.length > 0 ||
     blockDrops.length > 0 ||
     mobDrops.length > 0 ||
     tradeProducers.length > 0 ||
@@ -372,20 +571,30 @@ export function renderRecipeTree(
   const shellEl = document.createElement("div");
   shellEl.className = "obtaining-shell";
 
-  // Left pane: Workstation Tree
-  const treePaneEl = document.createElement("div");
-  treePaneEl.className = "obtaining-tree-pane";
+  // Left pane: Workstation Tree.
+  //
+  // Only when there is a tree to draw. Honeycomb comes out of a chest and out
+  // of nothing else, so every producer it has is acquisition; drawing the pane
+  // anyway left a lone root card standing on its own with no branch under it,
+  // which reads as a broken tree rather than as "there is no recipe".
+  if (hasTreeContent) {
+    const treePaneEl = document.createElement("div");
+    treePaneEl.className = "obtaining-tree-pane";
 
-  const rootItemId = rootNode.item;
-  const treeRootEl = renderTreeNode(rootNode, ctx, [rootItemId]);
-  treePaneEl.append(treeRootEl);
-  shellEl.append(treePaneEl);
+    const rootItemId = rootNode.item;
+    const treeRootEl = renderTreeNode(rootNode, ctx, [rootItemId], section.graph ?? null);
+    treePaneEl.append(treeRootEl);
+    shellEl.append(treePaneEl);
+  } else {
+    shellEl.classList.add("is-sources-only");
+  }
 
   // Right pane: Sources panel
   if (hasSourcesContent) {
     const sourcesPaneEl = renderSourcesPanel(
       {
         chestLoot,
+        oreSmelts,
         blockDrops,
         mobDrops,
         tradeProducers,

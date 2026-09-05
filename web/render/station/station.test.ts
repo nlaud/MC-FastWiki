@@ -350,23 +350,20 @@ describe("BrewingCard", () => {
 });
 
 describe("LeafCard", () => {
-  it("renders raw material badge and links to item", () => {
+  it("names the item and links to it", () => {
     const ctx = createMockContext();
-    const card = renderLeafCard("minecraft:raw_iron", ctx, { isRaw: true });
+    const card = renderLeafCard("minecraft:raw_iron", ctx);
     expect(card.classList.contains("station-leaf")).toBe(true);
     expect(card.querySelector(".leaf-name")?.textContent).toBe("Raw Iron");
-    expect(card.querySelector(".leaf-badge")?.textContent).toBe("Raw material");
 
     card.click();
     expect(ctx.openRef).toHaveBeenCalledWith("minecraft:raw_iron");
   });
 
-  // Block of Iron is crafted from nine ingots. It only reaches a leaf under
-  // Iron Ingot because cycle detection removed its one producer, so the tree
-  // has not established that it is a raw material and must not say so.
-  it("omits the raw material badge for an item whose producers were filtered away", () => {
+  // A card with nothing under it already says the branch ends.
+  it("carries no badge", () => {
     const ctx = createMockContext();
-    const card = renderLeafCard("minecraft:iron_block", ctx, { isRaw: false });
+    const card = renderLeafCard("minecraft:iron_block", ctx);
     expect(card.querySelector(".leaf-name")?.textContent).toBe("Iron Block");
     expect(card.querySelector(".leaf-badge")).toBeNull();
   });

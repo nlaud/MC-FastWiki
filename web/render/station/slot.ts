@@ -1,6 +1,7 @@
 import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
 import type { TreeInput } from "../obtain-tree.js";
+import { potionIconKey, potionName } from "./potion-icon.js";
 import { subscribeTicker } from "./ticker.js";
 
 /**
@@ -74,10 +75,14 @@ export function renderSlot(
   const updateItemDisplay = (item: string): void => {
     contentContainer.replaceChildren();
     const entry = ctx.lookup(item);
-    const displayName = entry?.n ?? humaniseId(item);
+    // A brewed potion is in the index by name but carries no icon: the atlas has
+    // no frame for `minecraft:potion/regeneration`. So the fallback keys off the
+    // missing icon, not a missing entry, and the index's own name still wins.
+    const displayName = entry?.n ?? potionName(item) ?? humaniseId(item);
+    const iconKey = entry?.i ?? potionIconKey(item);
 
-    if (entry?.i) {
-      const icon = createIconElement(entry.i, { size: 16 });
+    if (iconKey) {
+      const icon = createIconElement(iconKey, { size: 16 });
       contentContainer.append(icon);
     } else {
       // Fallback for items with no sprite in the atlas

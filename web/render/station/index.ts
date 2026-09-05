@@ -80,6 +80,33 @@ export function renderStationCard(
     }
 
     cardEl.append(paginationEl);
+
+    // Clicking the card itself steps to the next recipe.
+    //
+    // The dots are a small target and they only say *that* there are more; the
+    // card is the thing the reader is already looking at. Capture phase, so a
+    // slot inside the grid steps the recipe too rather than opening the item it
+    // happens to be showing -- on a card with alternatives, "what else can this
+    // be made from" is the question the click is asking. Cards with a single
+    // recipe keep their slots as links, where there is no such ambiguity.
+    cardEl.classList.add("is-steppable");
+    cardEl.setAttribute(
+      "title",
+      `Recipe ${(activeIdx + 1).toString()} of ${total.toString()} -- click for the next`,
+    );
+    cardEl.addEventListener(
+      "click",
+      (e) => {
+        const target = e.target;
+        if (target instanceof Element && target.closest(".station-pagination")) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        onSelect((activeIdx + 1) % total);
+      },
+      true,
+    );
   }
 
   return cardEl;

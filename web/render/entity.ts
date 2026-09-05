@@ -89,6 +89,7 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
             root: tree.root,
             rawProducers: tree.rawProducers,
             sources: tree.sources,
+            graph,
           } as unknown as Section;
           const el = renderSection(recipeTreeSection, ctx, entity);
           if (el) {

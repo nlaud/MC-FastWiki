@@ -26,6 +26,7 @@ import { renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
 import { renderTradeTable } from "./sections/trade-table.js";
+import { advanceTickerForTesting, resetTickerForTesting } from "./station/ticker.js";
 
 function requireItem<T>(item: T | undefined | null, name: string): T {
   if (item === undefined || item === null) {
@@ -755,6 +756,41 @@ describe("Section renderers with real committed build data", () => {
       // Station cards should be present in the tree pane
       const cards = el.querySelectorAll(".obtaining-tree-pane .station-card");
       expect(cards.length).toBeGreaterThan(0);
+    });
+
+    // The Crafting Table is made from any four planks, so its plank slot cycles
+    // through twelve woods. The branch under that slot used to be built once,
+    // from the tag's representative member, so the slot advanced to Spruce while
+    // the log below it stayed Oak forever.
+    it("advances a tag branch in step with the slot above it", () => {
+      resetTickerForTesting();
+      const tree = buildObtainTree("minecraft:crafting_table", obtainGraph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+        graph: obtainGraph,
+      } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      const branchItems = (): (string | null)[] =>
+        Array.from(el.querySelectorAll(".tree-branch .leaf-name")).map((n) => n.textContent);
+
+      const before = branchItems();
+      expect(before.length).toBeGreaterThan(0);
+
+      // Enough ticks to pass every member of a twelve-wood tag.
+      const seen = new Set(before);
+      for (let i = 0; i < 12; i++) {
+        advanceTickerForTesting();
+        for (const name of branchItems()) {
+          seen.add(name);
+        }
+      }
+
+      expect(seen.size).toBeGreaterThan(before.length);
+      resetTickerForTesting();
     });
 
     it("renders chest loot sources in Title Case without links", () => {
