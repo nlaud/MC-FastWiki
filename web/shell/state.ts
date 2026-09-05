@@ -1,4 +1,5 @@
 import type { IndexEntry } from "../types/index.js";
+import { orderedSlots } from "./layout.js";
 
 export interface WindowState {
   slot: number;
@@ -134,7 +135,8 @@ export function focusNextWindow(state: ShellState): ShellState {
     return state;
   }
 
-  const occupiedSlots = state.windows.map((w) => w.slot).sort((a, b) => a - b);
+  // Reading order, not slot order: see `orderedSlots` for why the two differ.
+  const occupiedSlots = orderedSlots(state.windows.map((w) => w.slot));
   const currentSlot = state.focusOrder[0];
   const currentIndex = currentSlot !== undefined ? occupiedSlots.indexOf(currentSlot) : -1;
 

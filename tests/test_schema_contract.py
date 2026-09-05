@@ -37,6 +37,7 @@ from pipeline.normalize.entity import (
     EnchantInfo,
     Entity,
     EntityKind,
+    FoodInfo,
     GenerationInfo,
     LinkList,
     ObtainList,
@@ -60,6 +61,7 @@ SECTION_TYPES = {
     "RecipeTree",
     "ObtainList",
     "BreedingInfo",
+    "FoodInfo",
     "EffectSources",
     "AdvancementInfo",
     "TradeTable",
@@ -388,6 +390,7 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "recipeTree": RecipeTree,
     "obtainList": ObtainList,
     "breedingInfo": BreedingInfo,
+    "foodInfo": FoodInfo,
     "effectSources": EffectSources,
     "advancementInfo": AdvancementInfo,
     "tradeTable": TradeTable,
@@ -397,7 +400,7 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "linkList": LinkList,
 }
 
-# Decision D2's six sections: the schema closes these with
+# Decision D2's seven sections, plus `foodInfo`: the schema closes these with
 # `additionalProperties: false` and declares every field by name, so their
 # property sets can be compared to the Pydantic side exactly, field for field.
 REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
@@ -408,6 +411,7 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "tradeTable": TradeTable,
     "advancementInfo": AdvancementInfo,
     "breedingInfo": BreedingInfo,
+    "foodInfo": FoodInfo,
 }
 
 

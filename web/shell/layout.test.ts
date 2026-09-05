@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeLayout } from "./layout.js";
+import { computeLayout, orderedSlots } from "./layout.js";
 
 describe("layout", () => {
   it("computes empty layout when 0 slots are occupied", () => {
@@ -102,5 +102,57 @@ describe("layout", () => {
     expect(layout4.slots[0]?.row).toBe(layout3.slots[0]?.row);
     expect(layout4.slots[1]).toEqual(layout3.slots[1]);
     expect(layout4.slots[2]).toEqual(layout3.slots[2]);
+  });
+});
+
+describe("orderedSlots", () => {
+  const slotsFor = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
+
+  it("walks a 2x2 grid in reading order rather than round the ring", () => {
+    // The bug this function exists for. computeLayout puts slot 2 bottom-right
+    // and slot 3 bottom-left, so ascending slot order walked the four windows
+    // clockwise: top-left, top-right, bottom-right, bottom-left.
+    expect(orderedSlots([0, 1, 2, 3])).toEqual([0, 1, 3, 2]);
+  });
+
+  it("agrees with ascending slot order for one, two and three windows", () => {
+    // The layout has no cell where the two orders disagree below four windows,
+    // so this is a guard against 'fixing' the 2x2 by breaking the small cases.
+    expect(orderedSlots([0])).toEqual([0]);
+    expect(orderedSlots([0, 1])).toEqual([0, 1]);
+    expect(orderedSlots([0, 1, 2])).toEqual([0, 1, 2]);
+  });
+
+  it("returns every occupied slot exactly once, for every count 1 through 8", () => {
+    for (let n = 1; n <= 8; n++) {
+      const occupied = slotsFor(n);
+      const ordered = orderedSlots(occupied);
+      expect([...ordered].sort((a, b) => a - b)).toEqual(occupied);
+    }
+  });
+
+  it("never steps up a row, for every count 1 through 8", () => {
+    // The whole contract, stated as a property rather than as eight literals:
+    // reading order means the row index never decreases, and within one row
+    // the column never decreases either.
+    for (let n = 1; n <= 8; n++) {
+      const occupied = slotsFor(n);
+      const layout = computeLayout(occupied);
+      const ordered = orderedSlots(occupied);
+
+      for (let i = 1; i < ordered.length; i++) {
+        const previous = layout.slots[ordered[i - 1] as number];
+        const current = layout.slots[ordered[i] as number];
+        if (!previous || !current) throw new Error("missing cell");
+        expect(current.row).toBeGreaterThanOrEqual(previous.row);
+        if (current.row === previous.row) {
+          expect(current.col).toBeGreaterThan(previous.col);
+        }
+      }
+    }
+  });
+
+  it("does not care what order the caller passes the slots in", () => {
+    expect(orderedSlots([3, 1, 0, 2])).toEqual(orderedSlots([0, 1, 2, 3]));
   });
 });

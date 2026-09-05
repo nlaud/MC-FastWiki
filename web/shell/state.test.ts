@@ -187,7 +187,7 @@ describe("state", () => {
       expect(s.windows).toHaveLength(7);
     });
 
-    it("focusNextWindow cycles occupied slots in ascending order", () => {
+    it("focusNextWindow cycles the three-window layout in reading order", () => {
       let s = createInitialState();
       s = openWindow(s, e1); // slot 0
       s = openWindow(s, e2); // slot 1
@@ -203,6 +203,45 @@ describe("state", () => {
 
       s = focusNextWindow(s);
       expect(getFocusedSlot(s)).toBe(2);
+    });
+
+    it("focusNextWindow walks four windows in reading order, not round the ring", () => {
+      // computeLayout puts slot 2 in the bottom-right cell and slot 3 in the
+      // bottom-left, so the old ascending-slot cycle visited them clockwise.
+      // Reading order is top-left, top-right, bottom-left, bottom-right, which
+      // is slots 0, 1, 3, 2.
+      let s = createInitialState();
+      s = openWindow(s, e1); // slot 0, top-left
+      s = openWindow(s, e2); // slot 1, top-right
+      s = openWindow(s, e3); // slot 2, bottom-right
+      s = openWindow(s, e4); // slot 3, bottom-left
+      expect(getFocusedSlot(s)).toBe(3);
+
+      s = focusNextWindow(s);
+      expect(getFocusedSlot(s)).toBe(2);
+
+      s = focusNextWindow(s);
+      expect(getFocusedSlot(s)).toBe(0);
+
+      s = focusNextWindow(s);
+      expect(getFocusedSlot(s)).toBe(1);
+
+      s = focusNextWindow(s);
+      expect(getFocusedSlot(s)).toBe(3);
+    });
+
+    it("focusNextWindow wraps from the last window in reading order to the first", () => {
+      let s = createInitialState();
+      s = openWindow(s, e1);
+      s = openWindow(s, e2);
+      s = openWindow(s, e3);
+      s = openWindow(s, e4);
+
+      // Bottom-right (slot 2) is last in reading order; the next step wraps to
+      // top-left (slot 0).
+      s = focusWindow(s, 2);
+      s = focusNextWindow(s);
+      expect(getFocusedSlot(s)).toBe(0);
     });
   });
 

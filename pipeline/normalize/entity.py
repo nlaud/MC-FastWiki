@@ -34,8 +34,8 @@ wiki-authored would have demanded a link with nothing to point at and made
 those seven impossible to build, which is the same failure the decision exists
 to prevent, one tier further in.
 
-**D2 -- six sections carry real fields.** `StatBlock`, `SpawnInfo`,
-`DropTable`, `TradeTable`, `AdvancementInfo`, and `RecipeTree` are closed
+**D2 -- seven sections carry real fields.** `StatBlock`, `SpawnInfo`,
+`DropTable`, `TradeTable`, `AdvancementInfo`, `RecipeTree`, and `FoodInfo` are closed
 models here, each mirroring one shape this pipeline already builds:
 `pipeline.enrich.infobox.EntityInfobox`, `pipeline.enrich.spawn_table.
 SpawnIndex.by_mob`, `pipeline.enrich.droptable.DropIndex.by_mob`, `pipeline.
@@ -45,7 +45,7 @@ exception to "this pipeline already builds": no build stage ever constructs
 one any more, only the shape it describes -- see `RecipeTree`'s own
 docstring below for why the field stays fully specified here regardless.
 `tests/test_schema_contract.py`'s `REAL_SECTION_MODELS` checks this module's
-field names against the schema for all six now, not five. The other seven
+field names against the schema for all seven now, not six. The other seven
 members of the `Section` union stay open bags (`model_config = ...
 extra="allow"`), because the phase that fills each one has not run yet;
 every one of their docstrings names the phase that will, matching the
@@ -54,7 +54,7 @@ schema's own updated descriptions.
 ## Why `Section` is `Annotated[..., Field(discriminator="type")]`
 
 A plain `Union` asks pydantic to try every member in order and keep the first
-one that validates, which is slow with thirteen members and, worse, ambiguous
+one that validates, which is slow with fourteen members and, worse, ambiguous
 for the eight open `extra="allow"` bags -- almost anything with a `type` field
 would validate against several of them if pydantic had to guess. A
 discriminated union reads `type` first and validates against exactly one
@@ -124,12 +124,15 @@ __all__ = [
     "DropEntry",
     "DropNote",
     "DropTable",
+    "EffectLink",
     "EffectSources",
     "EnchantInfo",
     "Entity",
     "EntityDraft",
     "EntityKind",
     "EntityRef",
+    "FoodEffect",
+    "FoodInfo",
     "GenerationInfo",
     "IntegerRange",
     "ItemAmount",
@@ -675,6 +678,64 @@ class BreedingInfo(BaseModel, frozen=True, populate_by_name=True):
     baby_growth_seconds: int = Field(default=1200, ge=0, alias="babyGrowthSeconds")
 
 
+class EffectLink(BaseModel, frozen=True, populate_by_name=True):
+    """One status effect a food section names, following the name/ref pattern."""
+
+    name: str = Field(min_length=1)
+    ref: EntityRef | None = None
+
+
+class FoodEffect(BaseModel, frozen=True, populate_by_name=True):
+    """One status effect that eating an item applies.
+
+    `duration_ticks` and `level` are carried raw rather than as display strings,
+    for the same reason `BreedingInfo` carries seconds: the renderer is the one
+    place that knows how a duration and a level should read on screen. `level`
+    is 1-based here even though `pipeline.extract.food.AppliedEffect.amplifier`
+    is 0-based, because the schema is what the web reads and "Regeneration II"
+    is level 2, not amplifier 1. The conversion happens once, in
+    `pipeline.normalize.merge`, rather than in every reader.
+
+    `probability` is the chance of the whole `apply_effects` group the source
+    put this effect in, copied onto each effect of that group. Three items in
+    26.2 carry one below 1.0.
+    """
+
+    name: str = Field(min_length=1)
+    ref: EntityRef | None = None
+    duration_ticks: int = Field(ge=0, alias="durationTicks")
+    level: int = Field(ge=1)
+    probability: float = Field(gt=0.0, le=1.0)
+
+
+class FoodInfo(BaseModel, frozen=True, populate_by_name=True):
+    """What eating an item restores, and what else it does.
+
+    Mirrors `pipeline.extract.food.FoodFacts`, flattened into the four things a
+    page shows. `nutrition` and `saturation` are `None` together for an item
+    that is consumable without being food -- the milk bucket restores nothing
+    and still clears every effect -- and a renderer reads that pair to decide
+    whether it is drawing a `Food` block or a `Consuming` one.
+
+    The three payload-free consume effects become two booleans and a list
+    rather than a fourth kind of row, because `clear_all_effects` and
+    `teleport_randomly` each say one whole thing and carry nothing else.
+    `play_sound` has no counterpart here at all: it is parsed by the extract so
+    that an unknown type still raises, and then dropped, because a sound is not
+    something an item page can show. The one item whose only consume effect is
+    a sound, `ominous_bottle`, therefore gets no section.
+    """
+
+    type: Literal["FoodInfo"] = "FoodInfo"
+    nutrition: int | None = None
+    saturation: float | None = None
+    can_always_eat: bool = Field(default=False, alias="canAlwaysEat")
+    effects: tuple[FoodEffect, ...] = ()
+    removes: tuple[EffectLink, ...] = ()
+    clears_all_effects: bool = Field(default=False, alias="clearsAllEffects")
+    teleports_randomly: bool = Field(default=False, alias="teleportsRandomly")
+
+
 class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     """Every source of a status effect.
 
@@ -729,6 +790,7 @@ Section = Annotated[
     | RecipeTree
     | ObtainList
     | BreedingInfo
+    | FoodInfo
     | EffectSources
     | AdvancementInfo
     | TradeTable
@@ -749,7 +811,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The thirteen `type` values a `sections.<Type>` provenance key may name,
+# The fourteen `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -760,6 +822,7 @@ _SECTION_TYPES = frozenset(
         "RecipeTree",
         "ObtainList",
         "BreedingInfo",
+        "FoodInfo",
         "EffectSources",
         "AdvancementInfo",
         "TradeTable",
@@ -1004,6 +1067,33 @@ class EntityDraft:
         """
         section_type = section.type
         self._sections[section_type] = section
+        self._provenance[f"sections.{section_type}"] = tier
+        return self
+
+    def add_section_first(self, section: Section, tier: SourceTier) -> "EntityDraft":
+        """Add one section at the front of the render order, and return `self` for chaining.
+
+        `Entity.sections` is a tuple in render order, and `web/render/entity.ts`
+        draws the blurb and then walks that tuple. So "this block belongs
+        directly under the blurb" is a statement about position in this dict,
+        and `add_section` alone cannot make it, because it appends in call
+        order and the merge's call order is the order the tiers happen to be
+        read in.
+
+        `FoodInfo` is the one section that needs it: `TODO.md`'s Phase 6 line
+        asks for hunger and saturation "right after the blurb at the top of the
+        page", and the food merge runs late, after the Tier B tables, because
+        it resolves effect names against the finished draft set. Rebuilding the
+        dict rather than mutating it in place keeps the "one section per type"
+        rule `add_section` established: a repeat call for a type already held
+        moves it to the front instead of duplicating it.
+        """
+        section_type = section.type
+        reordered: dict[str, Section] = {section_type: section}
+        for held_type, held in self._sections.items():
+            if held_type != section_type:
+                reordered[held_type] = held
+        self._sections = reordered
         self._provenance[f"sections.{section_type}"] = tier
         return self
 

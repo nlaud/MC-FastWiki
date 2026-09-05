@@ -34,7 +34,23 @@ const DISPLAY_SIZE = 16;
  * that really are invisible, and stretching one pixel over a whole box would
  * invent detail the sprite does not have.
  */
-export function createIconElement(iconKey?: string): HTMLElement {
+export interface IconOptions {
+  /** The box to fit the frame into, in CSS pixels. Defaults to `DISPLAY_SIZE`. */
+  size?: number;
+  /**
+   * Allow a frame smaller than the box to be scaled up, by a whole number only.
+   *
+   * Off by default, and deliberately so: the seven 1x1 frames draw things that
+   * really are invisible, and stretching one pixel over a whole box invents
+   * detail the sprite does not have. The HUD shanks are the case it exists for.
+   * They are 9x9, which is half the size of every other icon on the page, and
+   * doubling them is exactly what the game does at GUI scale 2 -- a whole-number
+   * factor over `image-rendering: pixelated` adds no blur and invents nothing.
+   */
+  allowUpscale?: boolean;
+}
+
+export function createIconElement(iconKey?: string, options?: IconOptions): HTMLElement {
   const el = document.createElement("span");
   el.className = "entity-icon";
 
@@ -48,7 +64,9 @@ export function createIconElement(iconKey?: string): HTMLElement {
   const applyFrame = (frame: SpriteFrame, atlas: Atlas, imagePath: string): void => {
     // Scaling the frame means scaling the whole atlas behind it by the same
     // factor, because the frame is a window onto one shared image.
-    const scale = Math.min(1, DISPLAY_SIZE / Math.max(frame.w, frame.h));
+    const box = options?.size ?? DISPLAY_SIZE;
+    const fit = box / Math.max(frame.w, frame.h);
+    const scale = options?.allowUpscale ? Math.max(1, Math.floor(fit)) : Math.min(1, fit);
     const px = (value: number): string => `${(value * scale).toString()}px`;
 
     el.style.width = px(frame.w);

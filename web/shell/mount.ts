@@ -136,6 +136,11 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
   const syncLayout = (): void => {
     syncWindowsLayout(windowsContainer, windowsMap, getFocusedSlot(state));
     updateSearchBarVisibility(searchBar, state.windows.length);
+    // A hidden bar owns nothing. Without this the ring would still be painted
+    // on the input the moment MAX_WINDOWS closed back down to one fewer.
+    if (!isBarVisible(state)) {
+      releaseBarFocus();
+    }
   };
 
   const openEntryInWindow = (entry: IndexEntry): void => {
@@ -182,7 +187,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
 
     // If bar is still visible, refocus input
     if (isBarVisible(state)) {
-      searchBar.input.focus();
+      focusSearchInput();
     }
   };
 
@@ -195,6 +200,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
     if (focusedSlot === null) {
       return;
     }
+    releaseBarFocus();
     windowsMap.get(focusedSlot)?.element.focus({ preventScroll: true });
   };
 
@@ -212,7 +218,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
 
     // If closed from MAX_WINDOWS to MAX_WINDOWS - 1, restore focus to search bar
     if (wasMax && isBarVisible(state)) {
-      searchBar.input.focus();
+      focusSearchInput();
     }
   };
 
@@ -235,8 +241,30 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
 
   searchContainer.append(searchBar.container);
 
+  // The search bar's focus ring is painted from this class, not from `:focus`.
+  //
+  // Pressing the mouse anywhere inside a window moves DOM focus onto that
+  // window's article -- `windows.ts` gives every one `tabIndex = 0` so that
+  // `element.focus()` works and assistive technology hears about Tab -- and the
+  // mouseup guard below moves focus straight back to the input. Bound to
+  // `:focus`, the ring animated out and back in on every click on the page.
+  //
+  // These two helpers record what the shell *intends* instead: the bar owns the
+  // keyboard until something deliberately takes it, which is Tab, Alt+1..4, or
+  // the bar being hidden at MAX_WINDOWS. An incidental click never calls
+  // `releaseBarFocus`, so the computed style never changes and there is no
+  // transition to run.
+  const focusSearchInput = (): void => {
+    searchBar.input.classList.add("is-bar-focused");
+    searchBar.input.focus();
+  };
+
+  const releaseBarFocus = (): void => {
+    searchBar.input.classList.remove("is-bar-focused");
+  };
+
   // Autofocus search bar on initial mount
-  searchBar.input.focus();
+  focusSearchInput();
 
   // Mouseup refocus rule (Guard 1):
   // Refocus on mouseup only when the resulting selection is collapsed
@@ -253,7 +281,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
     }
 
     if (isBarVisible(state)) {
-      searchBar.input.focus();
+      focusSearchInput();
     }
   });
 
@@ -285,7 +313,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
         state = closeHelp(state);
         updateHelpUI();
         if (isBarVisible(state)) {
-          searchBar.input.focus();
+          focusSearchInput();
         }
         break;
       }
@@ -375,7 +403,7 @@ export function mount(root: HTMLElement, corpusSource?: Promise<Corpus> | Corpus
         // insertion against the newly focused field and every character typed
         // from an unfocused bar arrives twice ("d" becomes "dd").
         e.preventDefault();
-        searchBar.input.focus();
+        focusSearchInput();
         if (action.char) {
           searchBar.input.value += action.char;
           performSearch(searchBar.input.value);

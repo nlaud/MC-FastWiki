@@ -286,7 +286,7 @@
       }
     },
     "section": {
-      "description": "One render block. The `type` field selects the renderer. Six members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo` -- carry real, closed fields. The other seven are still open payloads; each one's own description names the later phase that fills it in.",
+      "description": "One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` carry real, closed fields. The other six are still open payloads; each one's own description names the later phase that fills it in.",
       "oneOf": [
         {
           "$ref": "#/$defs/statBlock"
@@ -305,6 +305,9 @@
         },
         {
           "$ref": "#/$defs/breedingInfo"
+        },
+        {
+          "$ref": "#/$defs/foodInfo"
         },
         {
           "$ref": "#/$defs/effectSources"
@@ -709,6 +712,113 @@
           "type": "integer",
           "minimum": 0,
           "default": 1200
+        }
+      }
+    },
+    "effectLink": {
+      "title": "EffectLink",
+      "description": "One status effect a food section names, following the name/ref pattern. When ref is absent or unresolvable, the renderer prints name as plain text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        }
+      }
+    },
+    "foodEffect": {
+      "title": "FoodEffect",
+      "description": "One status effect that eating an item applies. durationTicks is raw game ticks and level is 1-based, so Regeneration II is level 2; the renderer formats both. probability is the chance of the whole apply_effects group the source put this effect in.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "durationTicks", "level", "probability"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "durationTicks": {
+          "description": "How long the effect lasts, in game ticks. 20 ticks is one second.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "level": {
+          "description": "The level shown on screen, counting from 1. One higher than the amplifier the vanilla component carries.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "probability": {
+          "description": "The chance the effect lands, from just above 0 to 1. Only three items in 26.2 carry one below 1.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "foodInfo": {
+      "title": "FoodInfo",
+      "description": "What eating an item restores, and what else it does, from the minecraft:food and minecraft:consumable components. nutrition and saturation are absent together for an item that is consumable without being food, such as the milk bucket; a renderer reads that pair to choose between a Food heading and a Consuming one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "canAlwaysEat",
+        "effects",
+        "removes",
+        "clearsAllEffects",
+        "teleportsRandomly"
+      ],
+      "properties": {
+        "type": {
+          "const": "FoodInfo"
+        },
+        "nutrition": {
+          "description": "Hunger points restored, out of a full bar of 20. Two points are one shank.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "saturation": {
+          "description": "Saturation restored, rounded to two decimal places by the extract because the source carries float32 noise.",
+          "type": "number",
+          "minimum": 0
+        },
+        "canAlwaysEat": {
+          "description": "Whether the item can be eaten on a full hunger bar.",
+          "type": "boolean",
+          "default": false
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/foodEffect"
+          },
+          "default": []
+        },
+        "removes": {
+          "description": "Status effects this item cures, from a remove_effects consume effect.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effectLink"
+          },
+          "default": []
+        },
+        "clearsAllEffects": {
+          "description": "Whether consuming this removes every active status effect, as the milk bucket does.",
+          "type": "boolean",
+          "default": false
+        },
+        "teleportsRandomly": {
+          "description": "Whether consuming this teleports the player, as the chorus fruit does.",
+          "type": "boolean",
+          "default": false
         }
       }
     },
