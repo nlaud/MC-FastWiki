@@ -142,7 +142,8 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "HarvestInfo": 861,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
-    assert snapshot.obtain_producer_count == 4001
+    # 4001 before 10 unread loot table families added 267 producers.
+    assert snapshot.obtain_producer_count == 4268
     # 1914 before Local Brewery (InvSprite:Potion) and Ominous Banner (BlockSprite:ominous-banner)
     # joined the atlas.
     assert snapshot.atlas_icon_count == 1916

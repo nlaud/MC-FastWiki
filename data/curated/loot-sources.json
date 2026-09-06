@@ -1,0 +1,262 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Hand-maintained structure and interaction attribution for non-chest loot tables in Java Edition 26.2. Structure names describe the location, mob, or block in Title Case, and container describes the specific interaction target, gift, or tool. `ref` is the registry id of the one entity or block a player interacts with, present only where the source is a single thing with a page of its own, so a renderer can draw the label as a link.",
+  "sources": {
+    "loot_table/archaeology/desert_pyramid.json": {
+      "structure": "Desert Pyramid",
+      "container": "Suspicious Sand"
+    },
+    "loot_table/archaeology/desert_well.json": {
+      "structure": "Desert Well",
+      "container": "Suspicious Sand"
+    },
+    "loot_table/archaeology/ocean_ruin_cold.json": {
+      "structure": "Ocean Ruins (Cold)",
+      "container": "Suspicious Gravel"
+    },
+    "loot_table/archaeology/ocean_ruin_warm.json": {
+      "structure": "Ocean Ruins (Warm)",
+      "container": "Suspicious Sand"
+    },
+    "loot_table/archaeology/trail_ruins_common.json": {
+      "structure": "Trail Ruins",
+      "container": "Suspicious Gravel (Common)"
+    },
+    "loot_table/archaeology/trail_ruins_rare.json": {
+      "structure": "Trail Ruins",
+      "container": "Suspicious Gravel (Rare)"
+    },
+    "loot_table/brush/armadillo.json": {
+      "structure": "Armadillo",
+      "container": "Armadillo",
+      "ref": "minecraft:armadillo"
+    },
+    "loot_table/carve/pumpkin.json": {
+      "structure": "Carved Pumpkin",
+      "container": "Shears",
+      "ref": "minecraft:pumpkin"
+    },
+    "loot_table/gameplay/armadillo_shed.json": {
+      "structure": "Armadillo",
+      "container": "Shedding",
+      "ref": "minecraft:armadillo"
+    },
+    "loot_table/gameplay/cat_morning_gift.json": {
+      "structure": "Cat",
+      "container": "Morning Gift",
+      "ref": "minecraft:cat"
+    },
+    "loot_table/gameplay/chicken_lay.json": {
+      "structure": "Chicken",
+      "container": "Laid Egg",
+      "ref": "minecraft:chicken"
+    },
+    "loot_table/gameplay/fishing/fish.json": {
+      "structure": "Fishing",
+      "container": "Fish"
+    },
+    "loot_table/gameplay/fishing/junk.json": {
+      "structure": "Fishing",
+      "container": "Junk"
+    },
+    "loot_table/gameplay/fishing/treasure.json": {
+      "structure": "Fishing",
+      "container": "Treasure"
+    },
+    "loot_table/gameplay/hero_of_the_village/armorer_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Armorer"
+    },
+    "loot_table/gameplay/hero_of_the_village/baby_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Baby Villager"
+    },
+    "loot_table/gameplay/hero_of_the_village/butcher_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Butcher"
+    },
+    "loot_table/gameplay/hero_of_the_village/cartographer_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Cartographer"
+    },
+    "loot_table/gameplay/hero_of_the_village/cleric_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Cleric"
+    },
+    "loot_table/gameplay/hero_of_the_village/farmer_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Farmer"
+    },
+    "loot_table/gameplay/hero_of_the_village/fisherman_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Fisherman"
+    },
+    "loot_table/gameplay/hero_of_the_village/fletcher_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Fletcher"
+    },
+    "loot_table/gameplay/hero_of_the_village/leatherworker_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Leatherworker"
+    },
+    "loot_table/gameplay/hero_of_the_village/librarian_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Librarian"
+    },
+    "loot_table/gameplay/hero_of_the_village/mason_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Mason"
+    },
+    "loot_table/gameplay/hero_of_the_village/shepherd_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Shepherd"
+    },
+    "loot_table/gameplay/hero_of_the_village/toolsmith_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Toolsmith"
+    },
+    "loot_table/gameplay/hero_of_the_village/unemployed_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Unemployed"
+    },
+    "loot_table/gameplay/hero_of_the_village/weaponsmith_gift.json": {
+      "structure": "Hero of the Village",
+      "container": "Weaponsmith"
+    },
+    "loot_table/gameplay/panda_sneeze.json": {
+      "structure": "Panda",
+      "container": "Sneeze",
+      "ref": "minecraft:panda"
+    },
+    "loot_table/gameplay/piglin_bartering.json": {
+      "structure": "Piglin",
+      "container": "Piglin",
+      "ref": "minecraft:piglin"
+    },
+    "loot_table/gameplay/sniffer_digging.json": {
+      "structure": "Sniffer",
+      "container": "Digging",
+      "ref": "minecraft:sniffer"
+    },
+    "loot_table/gameplay/turtle_grow.json": {
+      "structure": "Turtle",
+      "container": "Growth",
+      "ref": "minecraft:turtle"
+    },
+    "loot_table/harvest/beehive.json": {
+      "structure": "Beehive",
+      "container": "Shears",
+      "ref": "minecraft:beehive"
+    },
+    "loot_table/harvest/cave_vine.json": {
+      "structure": "Cave Vines",
+      "container": "Harvest",
+      "ref": "minecraft:cave_vines"
+    },
+    "loot_table/harvest/sweet_berry_bush.json": {
+      "structure": "Sweet Berry Bush",
+      "container": "Harvest",
+      "ref": "minecraft:sweet_berry_bush"
+    },
+    "loot_table/shearing/bogged.json": {
+      "structure": "Bogged",
+      "container": "Shears",
+      "ref": "minecraft:bogged"
+    },
+    "loot_table/shearing/mooshroom/brown.json": {
+      "structure": "Brown Mooshroom",
+      "container": "Brown Mooshroom",
+      "ref": "minecraft:mooshroom"
+    },
+    "loot_table/shearing/mooshroom/red.json": {
+      "structure": "Red Mooshroom",
+      "container": "Red Mooshroom",
+      "ref": "minecraft:mooshroom"
+    },
+    "loot_table/shearing/sheep/black.json": {
+      "structure": "Black Sheep",
+      "container": "Black Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/blue.json": {
+      "structure": "Blue Sheep",
+      "container": "Blue Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/brown.json": {
+      "structure": "Brown Sheep",
+      "container": "Brown Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/cyan.json": {
+      "structure": "Cyan Sheep",
+      "container": "Cyan Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/gray.json": {
+      "structure": "Gray Sheep",
+      "container": "Gray Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/green.json": {
+      "structure": "Green Sheep",
+      "container": "Green Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/light_blue.json": {
+      "structure": "Light Blue Sheep",
+      "container": "Light Blue Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/light_gray.json": {
+      "structure": "Light Gray Sheep",
+      "container": "Light Gray Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/lime.json": {
+      "structure": "Lime Sheep",
+      "container": "Lime Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/magenta.json": {
+      "structure": "Magenta Sheep",
+      "container": "Magenta Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/orange.json": {
+      "structure": "Orange Sheep",
+      "container": "Orange Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/pink.json": {
+      "structure": "Pink Sheep",
+      "container": "Pink Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/purple.json": {
+      "structure": "Purple Sheep",
+      "container": "Purple Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/red.json": {
+      "structure": "Red Sheep",
+      "container": "Red Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/white.json": {
+      "structure": "White Sheep",
+      "container": "White Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/sheep/yellow.json": {
+      "structure": "Yellow Sheep",
+      "container": "Yellow Sheep",
+      "ref": "minecraft:sheep"
+    },
+    "loot_table/shearing/snow_golem.json": {
+      "structure": "Snow Golem",
+      "container": "Snow Golem",
+      "ref": "minecraft:snow_golem"
+    }
+  }
+}

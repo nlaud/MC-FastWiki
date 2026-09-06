@@ -83,11 +83,12 @@ expected, ordinary event, not a shape fault.
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from pipeline.enrich.droptable import DropIndex
+from pipeline.enrich.droptable import DropIndex, LootingDrop
 from pipeline.enrich.resource_location import (
     JoinTable,
     ResourceLocation,
@@ -96,24 +97,72 @@ from pipeline.enrich.resource_location import (
 )
 from pipeline.enrich.trade import TradeIndex
 from pipeline.obtain import ObtainError
+from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
 
 __all__ = [
     "BLOCK_LOOT_DIRECTORY",
     "CHEST_LOOT_DIRECTORY",
+    "DEFAULT_LOOT_SOURCES_PATH",
+    "LOOT_SOURCES_FILENAME",
+    "READ_FAMILIES",
     "SILK_TOUCH_ENCHANTMENT",
     "SILK_TOUCH_NOTE",
+    "SKIPPED_FAMILIES",
+    "TYPE_TO_METHOD",
     "LootExtractionResult",
+    "LootLeaf",
     "SkippedLootEntry",
     "UnresolvedTradeOrDrop",
     "extract_block_and_chest_loot",
+    "extract_loot",
+    "load_loot_sources",
     "producers_from_drop_index",
     "producers_from_trade_index",
+    "verify_loot_sources",
 ]
 
 BLOCK_LOOT_DIRECTORY = "loot_table/blocks"
 CHEST_LOOT_DIRECTORY = "loot_table/chests"
+LOOT_SOURCES_FILENAME = "loot-sources.json"
+DEFAULT_LOOT_SOURCES_PATH = Path("data/curated") / LOOT_SOURCES_FILENAME
 NAMESPACE = "minecraft"
+
+READ_FAMILIES = frozenset(
+    {
+        "archaeology",
+        "blocks",
+        "brush",
+        "carve",
+        "chests",
+        "dispensers",
+        "gameplay",
+        "harvest",
+        "pots",
+        "shearing",
+        "spawners",
+    }
+)
+
+SKIPPED_FAMILIES = frozenset(
+    {
+        "charged_creeper",
+        "entities",
+        "equipment",
+    }
+)
+
+TYPE_TO_METHOD: Mapping[str, ObtainMethod] = {
+    "minecraft:block": ObtainMethod.BLOCK_DROP,
+    "minecraft:chest": ObtainMethod.CHEST_LOOT,
+    "minecraft:archaeology": ObtainMethod.BRUSHING,
+    "minecraft:entity_interact": ObtainMethod.BRUSHING,
+    "minecraft:block_interact": ObtainMethod.HARVESTING,
+    "minecraft:shearing": ObtainMethod.SHEARING,
+    "minecraft:fishing": ObtainMethod.FISHING,
+    "minecraft:barter": ObtainMethod.BARTERING,
+    "minecraft:gift": ObtainMethod.GIFT,
+}
 
 # The container entry types that hold more entries, verified live on
 # `diamond_ore.json`. `minecraft:group` and `minecraft:sequence` were not
@@ -150,6 +199,35 @@ class SkippedLootEntry(BaseModel, frozen=True):
     reason: str
 
 
+class LootLeaf(BaseModel, frozen=True):
+    """One `minecraft:item` entry the walk reached, with its odds where they exist.
+
+    `chance` and `rolls` are set together, and only for a leaf whose odds the
+    weighted-pool model actually describes -- see `_walk_entries` for the two
+    shapes that forfeit them. `count_min` and `count_max` are always both set,
+    and are equal for a fixed drop.
+    """
+
+    item: str
+    count_min: int
+    count_max: int
+    silk_touch: bool
+    chance: float | None = None
+    rolls: float | None = None
+
+    @property
+    def per_attempt(self) -> float | None:
+        """Return the expected number of items one attempt yields, or `None`.
+
+        The loot-table half of the argument in `Producer`'s docstring: a pool
+        rolled `rolls` times, each roll won with probability `chance`, each win
+        paying the mean of the stack range.
+        """
+        if self.chance is None or self.rolls is None:
+            return None
+        return self.chance * self.rolls * (self.count_min + self.count_max) / 2.0
+
+
 class UnresolvedTradeOrDrop(BaseModel, frozen=True):
     """One Tier B row whose display name did not resolve to exactly one registry ID."""
 
@@ -159,42 +237,128 @@ class UnresolvedTradeOrDrop(BaseModel, frozen=True):
 
 
 class LootExtractionResult(BaseModel, frozen=True):
-    """Every producer `extract_block_and_chest_loot` built, and what it skipped."""
+    """Every producer `extract_loot` built, and what it skipped."""
 
     producers: tuple[Producer, ...]
     skipped: tuple[SkippedLootEntry, ...]
+    tables_by_family: Mapping[str, int] = Field(default_factory=dict)
+
+
+def load_loot_sources(path: Path = DEFAULT_LOOT_SOURCES_PATH) -> dict[str, ChestSource]:
+    """Read and validate `loot-sources.json`, returning table paths to ChestSource."""
+    if not path.is_file():
+        raise ObtainError(f"curated loot sources file not found at {path}")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        raise ObtainError(f"could not parse curated loot sources at {path}: {error}") from error
+
+    if not isinstance(data, dict):
+        raise ObtainError(f"{path} does not hold a JSON object.")
+
+    sources_dict = data.get("sources")
+    if not isinstance(sources_dict, dict):
+        raise ObtainError(f"{path} does not declare a 'sources' mapping.")
+
+    result: dict[str, ChestSource] = {}
+    for table_id, entry in sources_dict.items():
+        if not isinstance(entry, dict) or "structure" not in entry or "container" not in entry:
+            raise ObtainError(
+                f"{path} entry for {table_id!r} must be an object declaring 'structure' "
+                f"and 'container'."
+            )
+        result[table_id] = ChestSource(
+            structure=entry["structure"],
+            container=entry["container"],
+            ref=entry.get("ref"),
+        )
+    return result
+
+
+def verify_loot_sources(
+    found_tables: Iterable[str],
+    curated: Mapping[str, ChestSource],
+) -> None:
+    """Raise ObtainError if any found loot table is missing from curated sources."""
+    missing = [table for table in sorted(found_tables) if table not in curated]
+    if missing:
+        raise ObtainError(
+            f"found {len(missing)} loot tables with no curated entry in "
+            f"{LOOT_SOURCES_FILENAME}: {', '.join(missing)}"
+        )
 
 
 def _namespaced(value: str) -> str:
     return value if ":" in value else f"{NAMESPACE}:{value}"
 
 
-def _entry_count(entry: Mapping[str, Any]) -> int:
-    """Return the minimum count a `minecraft:item` leaf entry declares.
+def _entry_count(entry: Mapping[str, Any]) -> tuple[int, int]:
+    """Return the `(minimum, maximum)` count a `minecraft:item` leaf entry declares.
 
     Reads `functions[]` for a `minecraft:set_count` function -- see the
     module docstring's first correction for its real shape. `count` there is
     either a bare integer or a `{"type": "minecraft:uniform", "min", "max"}`
-    object; this returns the floor of it, because a `Producer.output.count`
-    is one integer and the minimum is the guaranteed amount, never an
-    overstatement. No `set_count` function at all means the game's own
-    default of one.
+    object. A bare integer is a fixed drop, so both ends of the range are it.
+    No `set_count` function at all means the game's own default of one.
+
+    This used to return the floor alone, because `ProducerOutput.count` is one
+    integer and the minimum is the guaranteed amount. The ceiling is now read
+    as well, and travels beside it in `Producer.count_max`, because "10 to 36
+    iron nuggets" is a materially different answer from "10" for a player
+    deciding whether a barter is worth the gold -- and the ceiling was sitting
+    unread in the same object the floor was taken from.
     """
     functions = entry.get("functions")
     if not isinstance(functions, list):
-        return 1
+        return 1, 1
     for function in functions:
         if not isinstance(function, Mapping) or function.get("function") != "minecraft:set_count":
             continue
         count = function.get("count", 1)
-        if isinstance(count, int):
-            return max(count, 1)
+        if isinstance(count, int | float):
+            fixed = max(int(count), 1)
+            return fixed, fixed
         if isinstance(count, Mapping):
             minimum = count.get("min", 1)
-            if isinstance(minimum, int | float):
-                return max(int(minimum), 1)
-        return 1
+            maximum = count.get("max", minimum)
+            low = max(int(minimum), 1) if isinstance(minimum, int | float) else 1
+            high = max(int(maximum), low) if isinstance(maximum, int | float) else low
+            return low, high
+        return 1, 1
+    return 1, 1
+
+
+def _entry_weight(entry: Mapping[str, Any]) -> int:
+    """Return the draw weight of one direct pool entry.
+
+    Absent means one, which is the game's own default and the reason every
+    entry of `loot_table/gameplay/fishing/treasure.json` is equally likely
+    despite that table naming no weight at all.
+    """
+    weight = entry.get("weight", 1)
+    if isinstance(weight, int | float) and weight > 0:
+        return int(weight)
     return 1
+
+
+def _numeric_average(value: Any) -> float | None:
+    """Return the mean of a loot number provider that states a plain range.
+
+    `rolls` is either a bare number or a `{"type": "minecraft:uniform", "min",
+    "max"}` object, the same two shapes `set_count` uses. Any other provider
+    -- binomial, or a score-driven one -- returns `None`, so the caller drops
+    the odds rather than averaging a distribution this function does not model.
+    """
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, Mapping):
+        if value.get("type") not in (None, "minecraft:uniform"):
+            return None
+        minimum = value.get("min")
+        maximum = value.get("max")
+        if isinstance(minimum, int | float) and isinstance(maximum, int | float):
+            return (float(minimum) + float(maximum)) / 2.0
+    return None
 
 
 def _condition_is_silk_touch(condition: Mapping[str, Any]) -> bool:
@@ -244,20 +408,31 @@ def _walk_entries(
     silk_touch: bool,
     source: str,
     skipped: list[SkippedLootEntry],
-) -> list[tuple[str, int, bool]]:
-    """Return every `(item id, count, silk_touch)` leaf reachable from `entries`.
+    pool_weight: int | None = None,
+    rolls: float | None = None,
+) -> list[LootLeaf]:
+    """Return every item leaf reachable from `entries`.
 
     `silk_touch` carries whether an ancestor container already gated this
     branch on silk touch, so a leaf under `minecraft:alternatives` inherits
     its parent's gate rather than each recursion re-deriving it.
+
+    `pool_weight` and `rolls` describe the pool these entries are the *direct*
+    children of, and both are `None` on every recursive call. That is what
+    makes a leaf's odds available exactly where they are meaningful: a direct
+    child of a plain weighted pool competes by weight, so its chance is its
+    own weight over the pool's total, while a leaf found underneath a
+    container is chosen by condition rather than by weight and gets no odds at
+    all. `Producer`'s own docstring argues that refusal at more length.
     """
-    found: list[tuple[str, int, bool]] = []
+    found: list[LootLeaf] = []
     for entry in entries:
         if not isinstance(entry, Mapping):
             raise ObtainError(f"{source} holds a loot entry of {entry!r}, not an object.")
         entry_type = entry.get("type")
         if not isinstance(entry_type, str):
             raise ObtainError(f"{source} holds a loot entry with no 'type'.")
+        conditioned = isinstance(entry.get("conditions"), list) and bool(entry["conditions"])
         gated = silk_touch or _entry_has_silk_touch_condition(entry)
         if entry_type in _CONTAINER_TYPES:
             children = entry.get("children")
@@ -268,7 +443,23 @@ def _walk_entries(
             name = entry.get("name")
             if not isinstance(name, str) or not name:
                 raise ObtainError(f"{source} holds an item entry with no 'name'.")
-            found.append((_namespaced(name), _entry_count(entry), gated))
+            count_min, count_max = _entry_count(entry)
+            # Odds only where the weighted-pool model actually describes the
+            # outcome: a direct child of a pool, carrying no condition of its
+            # own whose probability no loot table states.
+            chance: float | None = None
+            if pool_weight is not None and rolls is not None and not conditioned:
+                chance = _entry_weight(entry) / pool_weight
+            found.append(
+                LootLeaf(
+                    item=_namespaced(name),
+                    count_min=count_min,
+                    count_max=count_max,
+                    silk_touch=gated,
+                    chance=chance,
+                    rolls=rolls if chance is not None else None,
+                )
+            )
         else:
             skipped.append(
                 SkippedLootEntry(
@@ -280,7 +471,9 @@ def _walk_entries(
     return found
 
 
-def _table_entries(document: Mapping[str, Any], *, source: str) -> list[Any]:
+def _table_leaves(
+    document: Mapping[str, Any], *, source: str, skipped: list[SkippedLootEntry]
+) -> list[LootLeaf]:
     # A loot table with no `pools` key at all is a table that drops nothing,
     # not a broken file. `loot_table/blocks/budding_amethyst.json` is the
     # canonical case: it carries a `type` and a `random_sequence` and stops
@@ -300,35 +493,55 @@ def _table_entries(document: Mapping[str, Any], *, source: str) -> list[Any]:
     pools = document["pools"]
     if not isinstance(pools, list):
         raise ObtainError(f"{source} carries a 'pools' of {pools!r}, not a list.")
-    entries: list[Any] = []
+    leaves: list[LootLeaf] = []
     for pool in pools:
         if not isinstance(pool, Mapping):
             raise ObtainError(f"{source} holds a pool of {pool!r}, not an object.")
         pool_entries = pool.get("entries")
         if not isinstance(pool_entries, list):
             raise ObtainError(f"{source} holds a pool with no 'entries' list.")
-        entries.extend(pool_entries)
-    return entries
+
+        # The denominator counts *every* direct entry, not only the item ones.
+        # A `minecraft:loot_table` or `minecraft:tag` sibling still competes for
+        # the same draw, so leaving it out would inflate every percentage in
+        # the pool. `loot_table/gameplay/fishing.json` is the table that proves
+        # it: junk 10, treasure 5 and fish 85 sum to 100, and dropping the two
+        # this walk cannot name would turn the third into a certainty.
+        total_weight = sum(
+            _entry_weight(entry) for entry in pool_entries if isinstance(entry, Mapping)
+        )
+        # `bonus_rolls` is deliberately unread. It is scaled by the opener's
+        # luck attribute, which is zero for an ordinary player and which no
+        # table states, so the base roll count is what an unluck-ed attempt
+        # actually gets -- and that is the number this tool's reader wants.
+        rolls = _numeric_average(pool.get("rolls", 1))
+        leaves.extend(
+            _walk_entries(
+                pool_entries,
+                silk_touch=False,
+                source=source,
+                skipped=skipped,
+                pool_weight=total_weight if total_weight > 0 else None,
+                rolls=rolls,
+            )
+        )
+    return leaves
 
 
-def extract_block_and_chest_loot(files: Mapping[str, bytes]) -> LootExtractionResult:
-    """Return every `BLOCK_DROP` and `CHEST_LOOT` producer of `files`.
+def extract_loot(files: Mapping[str, bytes]) -> LootExtractionResult:
+    """Return every loot-table producer across the supported mcmeta families.
 
-    `files` is the answer of `pipeline.fetch.mcmeta.fetch_data_files`. A
-    `BLOCK_DROP` producer's one input is the block itself, named from the
-    file path -- breaking `diamond_ore.json` needs the block `minecraft:
-    diamond_ore`, and the tree walker expands that block's own producers (or
-    reports it a leaf) exactly as it would any other item. A `CHEST_LOOT`
-    producer carries no inputs: nothing is spent to open a naturally
-    generated chest, so it is a leaf of the tree by construction, matching
-    `pipeline.obtain.tree`'s own reading of a zero-input producer.
+    `files` is the answer of `pipeline.fetch.mcmeta.fetch_data_files`.
+    Walks all tables under `loot_table/` matching `READ_FAMILIES`. Reads each table's
+    declared `type` field to determine the `ObtainMethod`. Raises `ObtainError` if
+    an unknown family or unknown `type` is encountered. Deliberately skips
+    `SKIPPED_FAMILIES` (`entities`, `charged_creeper`, `equipment`), which are sourced
+    from wiki drop tables or trial chamber mob spawn equipment.
 
-    Raises `ObtainError` on a malformed table of either directory, and when
-    neither directory holds a file at all.
+    Raises `ObtainError` on malformed tables and when no loot tables are found.
     """
-    block_entries = {k: v for k, v in files.items() if k.startswith(f"{BLOCK_LOOT_DIRECTORY}/")}
-    chest_entries = {k: v for k, v in files.items() if k.startswith(f"{CHEST_LOOT_DIRECTORY}/")}
-    if not block_entries and not chest_entries:
+    loot_entries = {k: v for k, v in files.items() if k.startswith("loot_table/")}
+    if not loot_entries:
         raise ObtainError(
             f"no file under {BLOCK_LOOT_DIRECTORY!r} or {CHEST_LOOT_DIRECTORY!r} was found. "
             f"An empty read is a broken scrape, not a version of Minecraft with no loot."
@@ -336,39 +549,62 @@ def extract_block_and_chest_loot(files: Mapping[str, bytes]) -> LootExtractionRe
 
     producers: list[Producer] = []
     skipped: list[SkippedLootEntry] = []
+    tables_by_family: dict[str, int] = {}
 
-    for key in sorted(block_entries):
-        block_path = key[len(BLOCK_LOOT_DIRECTORY) + 1 : -len(".json")]
-        block_id = _namespaced(block_path)
-        document = _decoded(block_entries[key], source=key)
-        for item_id, count, silk_touch in _walk_entries(
-            _table_entries(document, source=key), silk_touch=False, source=key, skipped=skipped
-        ):
+    for key in sorted(loot_entries):
+        parts = key.split("/")
+        if len(parts) < 2:
+            continue
+        family = parts[1]
+        if family in SKIPPED_FAMILIES:
+            continue
+        if family not in READ_FAMILIES:
+            raise ObtainError(f"unknown loot table family {family!r} in {key}")
+
+        document = _decoded(loot_entries[key], source=key)
+        declared_type = document.get("type")
+        if not isinstance(declared_type, str) or declared_type not in TYPE_TO_METHOD:
+            raise ObtainError(
+                f"{key} declares unknown or missing loot table type {declared_type!r}"
+            )
+
+        method = TYPE_TO_METHOD[declared_type]
+        tables_by_family[family] = tables_by_family.get(family, 0) + 1
+
+        leaves = _table_leaves(document, source=key, skipped=skipped)
+
+        # One shape for every family. A block drop is the only method whose
+        # producer names an input -- the block you break -- and every other
+        # family is a zero-input leaf. The odds ride along identically on all
+        # of them, because `_walk_entries` already decided per leaf whether the
+        # weighted-pool model describes it, and that decision does not depend
+        # on which family the table came from.
+        for leaf in leaves:
+            inputs: tuple[ProducerInput, ...] = ()
+            if method is ObtainMethod.BLOCK_DROP:
+                block_path = key[len(BLOCK_LOOT_DIRECTORY) + 1 : -len(".json")]
+                inputs = (ProducerInput(item=_namespaced(block_path)),)
             producers.append(
                 Producer(
-                    method=ObtainMethod.BLOCK_DROP,
-                    output=ProducerOutput(item=item_id, count=count),
-                    inputs=(ProducerInput(item=block_id),),
+                    method=method,
+                    output=ProducerOutput(item=leaf.item, count=leaf.count_min),
+                    inputs=inputs,
                     source_id=key,
-                    note=SILK_TOUCH_NOTE if silk_touch else None,
+                    note=SILK_TOUCH_NOTE if leaf.silk_touch else None,
+                    chance=leaf.chance,
+                    count_max=leaf.count_max if leaf.chance is not None else None,
+                    per_attempt=leaf.per_attempt,
                 )
             )
 
-    for key in sorted(chest_entries):
-        document = _decoded(chest_entries[key], source=key)
-        for item_id, count, _silk_touch in _walk_entries(
-            _table_entries(document, source=key), silk_touch=False, source=key, skipped=skipped
-        ):
-            producers.append(
-                Producer(
-                    method=ObtainMethod.CHEST_LOOT,
-                    output=ProducerOutput(item=item_id, count=count),
-                    inputs=(),
-                    source_id=key,
-                )
-            )
+    return LootExtractionResult(
+        producers=tuple(producers),
+        skipped=tuple(skipped),
+        tables_by_family=tables_by_family,
+    )
 
-    return LootExtractionResult(producers=tuple(producers), skipped=tuple(skipped))
+
+extract_block_and_chest_loot = extract_loot
 
 
 def _decoded(payload: bytes, *, source: str) -> Mapping[str, Any]:
@@ -488,16 +724,49 @@ def producers_from_drop_index(
                 )
             )
             continue
+        # Looting 0 is the unenchanted kill, which is the honest default for a
+        # panel that shows one number. The wiki records every level, and
+        # `MobDrop.at_looting` is how a later looting-tier display reads them.
+        count, odds = _drop_odds(drop.at_looting(0))
         producers.append(
             Producer(
                 method=ObtainMethod.MOB_LOOT,
-                output=ProducerOutput(item=item_id),
+                output=ProducerOutput(item=item_id, count=count),
                 inputs=(),
                 source_id=f"droptable/{drop.page}",
                 note=f"dropped by {drop.mob}",
+                chance=odds[0],
+                count_max=odds[1],
+                per_attempt=odds[2],
             )
         )
     return tuple(producers), tuple(unresolved)
+
+
+def _drop_odds(
+    base: LootingDrop | None,
+) -> tuple[int, tuple[float, int, float] | tuple[None, None, None]]:
+    """Return `(count, (chance, count_max, per_attempt))` for one looting-0 wiki row.
+
+    The three odds travel as one tuple because `Producer` refuses a partial
+    set, so every reason to distrust one of them has to drop all three. A wiki
+    row mid-edit is an ordinary event here, not a fault, and the reasons to
+    decline are: no looting-0 row at all, a probability outside `(0, 1]`, an
+    average of zero, or a range whose ends are crossed.
+
+    `per_attempt` is the wiki's own measured average and never `chance x
+    count`. See `Producer`'s docstring: a `0-2` drop already folds its own
+    failure into that range, so multiplying would count the failure twice.
+    """
+    none: tuple[None, None, None] = (None, None, None)
+    if base is None:
+        return 1, none
+    count = max(base.minimum, 1)
+    chance = base.drop_chance.value
+    average = base.average.value
+    if not 0.0 < chance <= 1.0 or average <= 0.0 or base.maximum < count:
+        return count, none
+    return count, (chance, base.maximum, average)
 
 
 def producers_from_trade_index(

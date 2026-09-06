@@ -162,8 +162,10 @@ def test_merge_of_no_indexes_is_empty() -> None:
 # --- ObtainMethod ------------------------------------------------------------
 
 
-def test_obtain_method_has_the_eight_named_members() -> None:
-    """`filling` is the eighth: the water bottle, which no recipe or loot table produces."""
+def test_obtain_method_has_the_fourteen_named_members() -> None:
+    """Fourteen methods: crafting, smelting, brewing, filling, mob_loot, chest_loot,
+    trade, block_drop, brushing, fishing, bartering, gift, shearing, harvesting.
+    """
     assert {member.value for member in ObtainMethod} == {
         "crafting",
         "smelting",
@@ -173,6 +175,12 @@ def test_obtain_method_has_the_eight_named_members() -> None:
         "chest_loot",
         "trade",
         "block_drop",
+        "brushing",
+        "fishing",
+        "bartering",
+        "gift",
+        "shearing",
+        "harvesting",
     }
 
 

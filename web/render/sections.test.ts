@@ -14,7 +14,7 @@ import type {
   TradeTable,
 } from "../types/entity.js";
 import type { Index, IndexEntry } from "../types/index.js";
-import type { Obtain } from "../types/obtain.js";
+import type { Obtain, ObtainProducer } from "../types/obtain.js";
 import type { RenderContext } from "./context.js";
 import { buildObtainTree } from "./obtain-tree.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
@@ -22,7 +22,7 @@ import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
 import { renderFoodInfo } from "./sections/food-info.js";
 import { renderHarvestInfo } from "./sections/harvest-info.js";
-import { renderRecipeTree } from "./sections/recipe-tree.js";
+import { formatOdds, renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
 import { renderTradeTable } from "./sections/trade-table.js";
@@ -941,6 +941,143 @@ describe("Section renderers with real committed build data", () => {
       expect(el.querySelector(".obtaining-tree-pane .trade-table")).toBeNull();
     });
 
+    it("renders brushing, fishing, bartering, gift, shearing, and harvesting source groups", () => {
+      // Brushing
+      const sherdTree = buildObtainTree("minecraft:angler_pottery_sherd", obtainGraph);
+      const sherdSection = {
+        type: "RecipeTree",
+        root: sherdTree.root,
+        rawProducers: sherdTree.rawProducers,
+        sources: sherdTree.sources,
+      } as unknown as RecipeTree;
+      const sherdEl = requireItem(renderRecipeTree(sherdSection, ctx), "Sherd RecipeTree element");
+      const brushingGroup = sherdEl.querySelector(".sources-brushing-group");
+      expect(brushingGroup).not.toBeNull();
+      expect(brushingGroup?.querySelector(".sources-group-title")?.textContent).toBe("Brushing");
+      expect(brushingGroup?.textContent).toContain("Ocean Ruins (Warm)");
+
+      // Fishing
+      const saddleTree = buildObtainTree("minecraft:saddle", obtainGraph);
+      const saddleSection = {
+        type: "RecipeTree",
+        root: saddleTree.root,
+        rawProducers: saddleTree.rawProducers,
+        sources: saddleTree.sources,
+      } as unknown as RecipeTree;
+      const saddleEl = requireItem(
+        renderRecipeTree(saddleSection, ctx),
+        "Saddle RecipeTree element",
+      );
+      const fishingGroup = saddleEl.querySelector(".sources-fishing-group");
+      expect(fishingGroup).not.toBeNull();
+      expect(fishingGroup?.querySelector(".sources-group-title")?.textContent).toBe("Fishing");
+      expect(fishingGroup?.textContent).toContain("Fishing - Treasure");
+
+      // Bartering
+      const pearlTree = buildObtainTree("minecraft:ender_pearl", obtainGraph);
+      const pearlSection = {
+        type: "RecipeTree",
+        root: pearlTree.root,
+        rawProducers: pearlTree.rawProducers,
+        sources: pearlTree.sources,
+      } as unknown as RecipeTree;
+      const pearlEl = requireItem(renderRecipeTree(pearlSection, ctx), "Pearl RecipeTree element");
+      const barteringGroup = pearlEl.querySelector(".sources-bartering-group");
+      expect(barteringGroup).not.toBeNull();
+      expect(barteringGroup?.textContent).toContain("Piglin");
+      // The old "bartered for gold ingot" note is gone: the odds say what a
+      // barter actually costs and yields, and the label links the piglin.
+      expect(barteringGroup?.textContent).not.toContain("bartered for gold ingot");
+      expect(barteringGroup?.querySelector(".sources-odds")).not.toBeNull();
+      expect(barteringGroup?.textContent).toContain("per gold");
+
+      // Gift & Growth
+      const turtleTree = buildObtainTree("minecraft:turtle_scute", obtainGraph);
+      const turtleSection = {
+        type: "RecipeTree",
+        root: turtleTree.root,
+        rawProducers: turtleTree.rawProducers,
+        sources: turtleTree.sources,
+      } as unknown as RecipeTree;
+      const turtleEl = requireItem(
+        renderRecipeTree(turtleSection, ctx),
+        "Turtle RecipeTree element",
+      );
+      const giftGroup = turtleEl.querySelector(".sources-gift-group");
+      expect(giftGroup).not.toBeNull();
+      expect(giftGroup?.querySelector(".sources-group-title")?.textContent).toBe("Gifts & Growth");
+      expect(turtleEl.querySelector(".sources-gift-label")?.textContent).toBe("Turtle - Growth");
+
+      // Shearing
+      const woolTree = buildObtainTree("minecraft:white_wool", obtainGraph);
+      const woolSection = {
+        type: "RecipeTree",
+        root: woolTree.root,
+        rawProducers: woolTree.rawProducers,
+        sources: woolTree.sources,
+      } as unknown as RecipeTree;
+      const woolEl = requireItem(renderRecipeTree(woolSection, ctx), "Wool RecipeTree element");
+      const shearingGroup = woolEl.querySelector(".sources-shearing-group");
+      expect(shearingGroup).not.toBeNull();
+      expect(shearingGroup?.querySelector(".sources-group-title")?.textContent).toBe("Shearing");
+      expect(woolEl.querySelector(".sources-shearing-label")?.textContent).toBe("White Sheep");
+
+      // Harvesting
+      const honeyTree = buildObtainTree("minecraft:honeycomb", obtainGraph);
+      const honeySection = {
+        type: "RecipeTree",
+        root: honeyTree.root,
+        rawProducers: honeyTree.rawProducers,
+        sources: honeyTree.sources,
+      } as unknown as RecipeTree;
+      const honeyEl = requireItem(
+        renderRecipeTree(honeySection, ctx),
+        "Honeycomb RecipeTree element",
+      );
+      const harvestGroup = honeyEl.querySelector(".sources-harvesting-group");
+      expect(harvestGroup).not.toBeNull();
+      expect(harvestGroup?.querySelector(".sources-group-title")?.textContent).toBe("Harvesting");
+      expect(honeyEl.querySelector(".sources-harvesting-label")?.textContent).toBe(
+        "Beehive - Shears",
+      );
+    });
+
+    it("orders source groups according to canonical SOURCE_GROUP_ORDER", () => {
+      const saddleTree = buildObtainTree("minecraft:saddle", obtainGraph);
+      const saddleSection = {
+        type: "RecipeTree",
+        root: saddleTree.root,
+        rawProducers: saddleTree.rawProducers,
+        sources: saddleTree.sources,
+      } as unknown as RecipeTree;
+      const saddleEl = requireItem(
+        renderRecipeTree(saddleSection, ctx),
+        "Saddle RecipeTree element",
+      );
+
+      const groups = Array.from(saddleEl.querySelectorAll(".sources-group"));
+      const titles = groups.map((g) => g.querySelector(".sources-group-title")?.textContent);
+
+      // Saddle has chest_loot, mob_loot, trade, and fishing
+      expect(titles).toEqual(["Chest Loot", "Fishing", "Mob Drops", "Villager Trades"]);
+    });
+
+    it("renders dispensers, pots, and spawners under Chest Loot", () => {
+      const keyTree = buildObtainTree("minecraft:ominous_trial_key", obtainGraph);
+      const keySection = {
+        type: "RecipeTree",
+        root: keyTree.root,
+        rawProducers: keyTree.rawProducers,
+        sources: keyTree.sources,
+      } as unknown as RecipeTree;
+      const keyEl = requireItem(renderRecipeTree(keySection, ctx), "Key RecipeTree element");
+
+      const chestGroup = keyEl.querySelector(".sources-chest-group");
+      expect(chestGroup).not.toBeNull();
+      expect(chestGroup?.querySelector(".sources-group-title")?.textContent).toBe("Chest Loot");
+      expect(chestGroup?.textContent).toContain("Trial Chambers - Ominous Trial Spawner");
+    });
+
     it("renders stub with expand button and clicking expands the subtree", async () => {
       const tree = buildObtainTree("minecraft:chiseled_resin_bricks", obtainGraph, {
         maxDepth: 1,
@@ -1037,5 +1174,62 @@ describe("Section renderers with real committed build data", () => {
       const section = { type: "RecipeTree", root: emptyTree } as unknown as RecipeTree;
       expect(renderRecipeTree(section, ctx)).toBeNull();
     });
+  });
+});
+
+describe("formatOdds", () => {
+  /** A producer carrying only the fields `formatOdds` reads. */
+  function producer(fields: Partial<ObtainProducer>): ObtainProducer {
+    return { m: "chest_loot", src: "loot_table/chests/test.json", ...fields };
+  }
+
+  it("returns null for a producer with no odds", () => {
+    expect(formatOdds(producer({ m: "crafting" }))).toBeNull();
+  });
+
+  it("returns null when the odds are only half present", () => {
+    // The pipeline refuses to emit this, so it can only arrive from a payload
+    // written by an older build. Reading it as "no odds" is the safe answer.
+    expect(formatOdds(producer({ ch: 0.5 }))).toBeNull();
+  });
+
+  it("states a chance, a count range, and a rate named after the method", () => {
+    const odds = formatOdds(producer({ m: "bartering", ch: 0.085, c: 8, cx: 16, pa: 1.02 }));
+    expect(odds).toEqual({ chance: "8.5%", count: "8-16", rate: "1.0 per gold" });
+  });
+
+  it("names the attempt from the method", () => {
+    expect(formatOdds(producer({ m: "fishing", ch: 0.167, c: 1, cx: 1, pa: 0.17 }))?.rate).toBe(
+      "0.2 per catch",
+    );
+    expect(formatOdds(producer({ m: "mob_loot", ch: 0.5, c: 1, cx: 1, pa: 0.5 }))?.rate).toBe(
+      "0.5 per kill",
+    );
+  });
+
+  it("drops a chance of exactly one rather than saying 100%", () => {
+    // A producer that always fires tells the reader nothing by saying so, but
+    // its quantity still carries information.
+    const odds = formatOdds(producer({ m: "block_drop", ch: 1, c: 2, cx: 5, pa: 3.5 }));
+    expect(odds?.chance).toBeNull();
+    expect(odds?.count).toBe("2-5");
+  });
+
+  it("shows a floor rather than rounding a rare drop to zero percent", () => {
+    // "0.0%" reads as impossible; the drop is rare, not absent.
+    expect(formatOdds(producer({ ch: 0.0004, c: 1, cx: 1, pa: 0.0004 }))?.chance).toBe("<0.1%");
+  });
+
+  it("uses one decimal place below ten percent and none above", () => {
+    expect(formatOdds(producer({ ch: 0.067, c: 1, cx: 1, pa: 0.07 }))?.chance).toBe("6.7%");
+    expect(formatOdds(producer({ ch: 0.17, c: 1, cx: 1, pa: 0.17 }))?.chance).toBe("17%");
+  });
+
+  it("omits the count when it is a single item", () => {
+    expect(formatOdds(producer({ ch: 0.5, c: 1, cx: 1, pa: 0.5 }))?.count).toBeNull();
+  });
+
+  it("renders the rate without a denominator for a method it has no noun for", () => {
+    expect(formatOdds(producer({ m: "brewing", ch: 0.5, c: 1, cx: 1, pa: 0.5 }))?.rate).toBe("0.5");
   });
 });

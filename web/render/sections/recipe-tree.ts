@@ -7,6 +7,7 @@ import {
   type ObtainNode,
   type TreeInput,
   expandStub,
+  isAcquisition,
   isOreSmelt,
   nodeDepth,
   sortStations,
@@ -32,6 +33,93 @@ function humaniseId(id: string): string {
 }
 
 /**
+ * What one attempt *is*, per method, for the "per attempt" half of the odds.
+ *
+ * The payload deliberately carries no noun for this -- `pa` is a bare
+ * expected-count and the method already says what was attempted, so the
+ * vocabulary lives here rather than being written once per producer into
+ * every shard. A method absent from this map renders its rate without a
+ * denominator instead of guessing a noun for it.
+ */
+const ATTEMPT_NOUN: Readonly<Record<string, string>> = {
+  chest_loot: "chest",
+  block_drop: "block",
+  mob_loot: "kill",
+  fishing: "catch",
+  bartering: "gold",
+  brushing: "brush",
+  shearing: "shear",
+  harvesting: "harvest",
+  gift: "gift",
+};
+
+/**
+ * Formats one producer's odds for display, or returns null when it has none.
+ *
+ * Three separate answers, because a player mid-match asks three different
+ * questions: how likely is it, how many do I get, and how many should I
+ * expect per try. The payload keeps them unrounded so this is the only place
+ * that decides precision.
+ *
+ * A chance of exactly 1 is dropped rather than rendered as "100%": a producer
+ * that always fires is telling the reader nothing by saying so, and the row's
+ * quantity still shows. The same producer keeps its `count` and `rate` when
+ * they carry information.
+ */
+export function formatOdds(
+  producer: ObtainProducer,
+): { chance: string | null; count: string | null; rate: string | null } | null {
+  const { ch, cx, pa } = producer;
+  if (ch === undefined || cx === undefined) {
+    return null;
+  }
+  const low = producer.c ?? 1;
+  // Below 0.1% would render as "0.0%", which reads as impossible rather than
+  // rare, so anything that small gets an explicit floor instead.
+  const chance = ch >= 1 ? null : ch < 0.001 ? "<0.1%" : `${(ch * 100).toFixed(ch < 0.1 ? 1 : 0)}%`;
+  const count = cx > low ? `${low.toString()}-${cx.toString()}` : low > 1 ? low.toString() : null;
+  const noun = ATTEMPT_NOUN[producer.m];
+  const rate =
+    pa === undefined
+      ? null
+      : `${pa < 0.1 ? pa.toFixed(2) : pa.toFixed(1)}${noun ? ` per ${noun}` : ""}`;
+  if (chance === null && count === null && rate === null) {
+    return null;
+  }
+  return { chance, count, rate };
+}
+
+/**
+ * Appends one producer's odds to a Sources row, when it has any.
+ *
+ * Every group in the panel builds its own row element -- block drops lead
+ * with a block link, mob drops with "Dropped by", the rest with a curated
+ * label -- so the odds attach through one function rather than being written
+ * into each branch, which is what keeps a chest, a kill, and a barter
+ * formatted identically.
+ */
+function appendOdds(li: HTMLElement, producer: ObtainProducer): void {
+  const odds = formatOdds(producer);
+  if (!odds) {
+    return;
+  }
+  const oddsEl = document.createElement("span");
+  oddsEl.className = "sources-odds";
+  for (const [part, partClass] of [
+    [odds.chance, "sources-odds-chance"],
+    [odds.count, "sources-odds-count"],
+    [odds.rate, "sources-odds-rate"],
+  ] as const) {
+    if (!part) continue;
+    const partEl = document.createElement("span");
+    partEl.className = partClass;
+    partEl.textContent = part;
+    oddsEl.append(partEl);
+  }
+  li.append(oddsEl);
+}
+
+/**
  * Returns a human-readable Title Case label for a chest loot source.
  * Uses curated structure/container mapping when available.
  */
@@ -49,30 +137,58 @@ export function getChestSourceLabel(
   }
 
   // Fallback: Title Case from path
-  const afterChests = sourceId.split("chests/").pop() ?? sourceId;
-  const cleaned = afterChests.replace(/\.json$/, "").replace(/[_/]+/g, " ");
+  const afterPrefix = sourceId.includes("loot_table/")
+    ? (sourceId.split("loot_table/")[1] ?? sourceId)
+    : sourceId;
+  const parts = afterPrefix.split("/");
+  const leaf = parts.length > 1 ? parts.slice(1).join(" ") : (parts[0] ?? afterPrefix);
+  const cleaned = leaf.replace(/\.json$/, "").replace(/[_/]+/g, " ");
   return titleCase(cleaned);
 }
 
+export const getSourceLabel = getChestSourceLabel;
+
+/**
+ * The documented display order of acquisition groups in the Sources panel.
+ */
+export const SOURCE_GROUP_ORDER: readonly {
+  method: string;
+  title: string;
+  groupClass: string;
+}[] = [
+  { method: "chest_loot", title: "Chest Loot", groupClass: "sources-chest-group" },
+  { method: "brushing", title: "Brushing", groupClass: "sources-brushing-group" },
+  { method: "fishing", title: "Fishing", groupClass: "sources-fishing-group" },
+  { method: "bartering", title: "Bartering", groupClass: "sources-bartering-group" },
+  { method: "gift", title: "Gifts & Growth", groupClass: "sources-gift-group" },
+  { method: "shearing", title: "Shearing", groupClass: "sources-shearing-group" },
+  { method: "harvesting", title: "Harvesting", groupClass: "sources-harvesting-group" },
+  { method: "smelting", title: "Smelting", groupClass: "sources-smelt-group" },
+  { method: "block_drop", title: "Block Drops", groupClass: "sources-block-group" },
+  { method: "mob_loot", title: "Mob Drops", groupClass: "sources-mob-group" },
+  { method: "trade", title: "Villager Trades", groupClass: "sources-trade-group" },
+];
+
 interface SourcesData {
-  chestLoot: ObtainProducer[];
+  producersByMethod: Map<string, ObtainProducer[]>;
   oreSmelts: ObtainProducer[];
-  blockDrops: ObtainProducer[];
-  mobDrops: ObtainProducer[];
-  tradeProducers: ObtainProducer[];
   tradeTableSection?: TradeTable | undefined;
   sourcesMap?:
-    Record<string, { s?: string; c?: string; structure?: string; container?: string }> | undefined;
+    | Record<
+        string,
+        { s?: string; c?: string; structure?: string; container?: string; ref?: string }
+      >
+    | undefined;
 }
 
 function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement | null {
-  const hasChest = data.chestLoot.length > 0;
-  const hasOreSmelts = data.oreSmelts.length > 0;
-  const hasBlocks = data.blockDrops.length > 0;
-  const hasMobs = data.mobDrops.length > 0;
-  const hasTrades = Boolean(data.tradeTableSection) || data.tradeProducers.length > 0;
+  const hasSmelts = data.oreSmelts.length > 0;
+  const hasTradeTable = Boolean(data.tradeTableSection);
+  const hasAnyProducer = Array.from(data.producersByMethod.values()).some(
+    (list) => list.length > 0,
+  );
 
-  if (!hasChest && !hasOreSmelts && !hasBlocks && !hasMobs && !hasTrades) {
+  if (!hasSmelts && !hasTradeTable && !hasAnyProducer) {
     return null;
   }
 
@@ -138,150 +254,172 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
     return groupEl;
   }
 
-  // 1. Chest Loot
-  if (hasChest) {
-    const chestItems = data.chestLoot.map((p) => {
-      const li = document.createElement("li");
-      li.className = "sources-item sources-chest-item";
-      const label = document.createElement("span");
-      label.className = "sources-chest-label";
-      label.textContent = getChestSourceLabel(p.src, data.sourcesMap);
-      li.append(label);
-      return li;
-    });
-    panelEl.append(renderGroup("Chest Loot", chestItems, "sources-chest-group"));
-  }
+  for (const groupConfig of SOURCE_GROUP_ORDER) {
+    if (groupConfig.method === "smelting") {
+      if (data.oreSmelts.length > 0) {
+        const byOre = new Map<string, Set<string>>();
+        for (const p of data.oreSmelts) {
+          const inputId = p.in?.[0]?.i;
+          if (!inputId) {
+            continue;
+          }
+          const stations = byOre.get(inputId) ?? new Set<string>();
+          if (p.st) {
+            stations.add(p.st);
+          }
+          byOre.set(inputId, stations);
+        }
 
-  // 2. Smelting an ore into this material.
-  //
-  // This is the one acquisition route that is also a recipe, so it earns a
-  // group of its own rather than a line of prose: a reader on the Diamond page
-  // wants to see that Diamond Ore smelts into it, next to the chests it turns
-  // up in. Below the root it never appears at all -- see `isAcquisition`.
-  if (hasOreSmelts) {
-    // One row per ore, not per station. Diamond is smelted from two ores at two
-    // stations, which arrives here as four producers and reads as four separate
-    // facts unless the stations are gathered back onto the ore they belong to.
-    const byOre = new Map<string, Set<string>>();
-    for (const p of data.oreSmelts) {
-      const inputId = p.in?.[0]?.i;
-      if (!inputId) {
-        continue;
+        const smeltItems = [...byOre.entries()].map(([inputId, stations]) => {
+          const li = document.createElement("li");
+          li.className = "sources-item sources-smelt-item";
+
+          const entry = ctx.lookup(inputId);
+          li.append(entityLink({ id: inputId, name: entry?.n ?? humaniseId(inputId) }, ctx));
+
+          for (const station of sortStations([...stations])) {
+            const stationBadge = document.createElement("span");
+            stationBadge.className = "sources-note-badge";
+            stationBadge.textContent = humaniseId(station);
+            li.append(stationBadge);
+          }
+          return li;
+        });
+
+        panelEl.append(renderGroup(groupConfig.title, smeltItems, groupConfig.groupClass));
       }
-      const stations = byOre.get(inputId) ?? new Set<string>();
-      if (p.st) {
-        stations.add(p.st);
+    } else if (groupConfig.method === "block_drop") {
+      const blockDrops = data.producersByMethod.get("block_drop") ?? [];
+      if (blockDrops.length > 0) {
+        const blockItems = blockDrops.map((p) => {
+          const li = document.createElement("li");
+          li.className = "sources-item sources-block-item";
+          const blockInput = p.in?.[0];
+          const blockId = blockInput?.i;
+          if (blockId) {
+            const entry = ctx.lookup(blockId);
+            const link = entityLink(
+              {
+                id: blockId,
+                name: entry?.n ?? humaniseId(blockId),
+              },
+              ctx,
+            );
+            li.append(link);
+          }
+          appendOdds(li, p);
+          if (p.nt) {
+            const noteBadge = document.createElement("span");
+            noteBadge.className = "sources-note-badge";
+            noteBadge.textContent = p.nt;
+            li.append(noteBadge);
+          }
+          return li;
+        });
+        panelEl.append(renderGroup(groupConfig.title, blockItems, groupConfig.groupClass));
       }
-      byOre.set(inputId, stations);
-    }
+    } else if (groupConfig.method === "mob_loot") {
+      const mobDrops = data.producersByMethod.get("mob_loot") ?? [];
+      if (mobDrops.length > 0) {
+        const mobItems = mobDrops.map((p) => {
+          const li = document.createElement("li");
+          li.className = "sources-item sources-mob-item";
 
-    const smeltItems = [...byOre.entries()].map(([inputId, stations]) => {
-      const li = document.createElement("li");
-      li.className = "sources-item sources-smelt-item";
+          const lead = document.createElement("span");
+          lead.className = "sources-mob-label";
+          lead.textContent = "Dropped by";
+          li.append(lead);
 
-      const entry = ctx.lookup(inputId);
-      li.append(entityLink({ id: inputId, name: entry?.n ?? humaniseId(inputId) }, ctx));
+          const mobName = p.src.replace(/^droptable\//, "").trim();
+          const mobId = `minecraft:${mobName.toLowerCase().replace(/\s+/g, "_")}`;
+          const entry = mobName ? ctx.lookup(mobId) : null;
 
-      for (const station of sortStations([...stations])) {
-        const stationBadge = document.createElement("span");
-        stationBadge.className = "sources-note-badge";
-        stationBadge.textContent = humaniseId(station);
-        li.append(stationBadge);
+          if (entry) {
+            li.append(entityLink({ id: mobId, name: entry.n }, ctx));
+          } else if (mobName) {
+            const plain = document.createElement("span");
+            plain.className = "sources-mob-name";
+            plain.textContent = mobName;
+            li.append(plain);
+          }
+          appendOdds(li, p);
+          return li;
+        });
+        panelEl.append(renderGroup(groupConfig.title, mobItems, groupConfig.groupClass));
       }
-      return li;
-    });
-    panelEl.append(renderGroup("Smelting", smeltItems, "sources-smelt-group"));
-  }
+    } else if (groupConfig.method === "trade") {
+      const tradeProducers = data.producersByMethod.get("trade") ?? [];
+      if (data.tradeTableSection || tradeProducers.length > 0) {
+        const tradeGroup = document.createElement("div");
+        tradeGroup.className = `sources-group ${groupConfig.groupClass}`;
 
-  // 3. Block Drops
-  if (hasBlocks) {
-    const blockItems = data.blockDrops.map((p) => {
-      const li = document.createElement("li");
-      li.className = "sources-item sources-block-item";
-      const blockInput = p.in?.[0];
-      const blockId = blockInput?.i;
-      if (blockId) {
-        const entry = ctx.lookup(blockId);
-        const link = entityLink(
-          {
-            id: blockId,
-            name: entry?.n ?? humaniseId(blockId),
-          },
-          ctx,
-        );
-        li.append(link);
-      }
-      if (p.nt) {
-        const noteBadge = document.createElement("span");
-        noteBadge.className = "sources-note-badge";
-        noteBadge.textContent = p.nt;
-        li.append(noteBadge);
-      }
-      return li;
-    });
-    panelEl.append(renderGroup("Block Drops", blockItems, "sources-block-group"));
-  }
+        const subtitle = document.createElement("h5");
+        subtitle.className = "sources-group-title";
+        subtitle.textContent = groupConfig.title;
+        tradeGroup.append(subtitle);
 
-  // 4. Mob Drops
-  if (hasMobs) {
-    const mobItems = data.mobDrops.map((p) => {
-      const li = document.createElement("li");
-      li.className = "sources-item sources-mob-item";
-
-      const lead = document.createElement("span");
-      lead.className = "sources-mob-label";
-      lead.textContent = "Dropped by";
-      li.append(lead);
-
-      // `src` is `droptable/<Mob display name>`, and `nt` repeats it as
-      // "dropped by <Mob>". The name is the only handle on the mob either field
-      // gives, so the id is rebuilt from it and only becomes a link once the
-      // index confirms it resolves -- a mob whose page does not exist stays as
-      // plain text rather than becoming a dead link.
-      const mobName = p.src.replace(/^droptable\//, "").trim();
-      const mobId = `minecraft:${mobName.toLowerCase().replace(/\s+/g, "_")}`;
-      const entry = mobName ? ctx.lookup(mobId) : null;
-
-      if (entry) {
-        li.append(entityLink({ id: mobId, name: entry.n }, ctx));
-      } else if (mobName) {
-        const plain = document.createElement("span");
-        plain.className = "sources-mob-name";
-        plain.textContent = mobName;
-        li.append(plain);
-      }
-      return li;
-    });
-    panelEl.append(renderGroup("Mob Drops", mobItems, "sources-mob-group"));
-  }
-
-  // 5. Trades
-  if (hasTrades) {
-    const tradeGroup = document.createElement("div");
-    tradeGroup.className = "sources-group sources-trade-group";
-
-    const subtitle = document.createElement("h5");
-    subtitle.className = "sources-group-title";
-    subtitle.textContent = "Villager Trades";
-    tradeGroup.append(subtitle);
-
-    if (data.tradeTableSection) {
-      const tradeEl = renderTradeTable(data.tradeTableSection, ctx, { withoutTitle: true });
-      if (tradeEl) {
-        tradeGroup.append(tradeEl);
+        if (data.tradeTableSection) {
+          const tradeEl = renderTradeTable(data.tradeTableSection, ctx, { withoutTitle: true });
+          if (tradeEl) {
+            tradeGroup.append(tradeEl);
+          }
+        } else {
+          const tradeList = document.createElement("ul");
+          tradeList.className = "sources-list";
+          for (const p of tradeProducers) {
+            const li = document.createElement("li");
+            li.className = "sources-item sources-trade-item";
+            li.textContent = p.nt ?? p.src;
+            tradeList.append(li);
+          }
+          tradeGroup.append(tradeList);
+        }
+        panelEl.append(tradeGroup);
       }
     } else {
-      const tradeList = document.createElement("ul");
-      tradeList.className = "sources-list";
-      for (const p of data.tradeProducers) {
-        const li = document.createElement("li");
-        li.className = "sources-item sources-trade-item";
-        li.textContent = p.nt ?? p.src;
-        tradeList.append(li);
+      const producers = data.producersByMethod.get(groupConfig.method) ?? [];
+      if (producers.length > 0) {
+        const items = producers.map((p) => {
+          const li = document.createElement("li");
+          const itemClass =
+            groupConfig.method === "chest_loot"
+              ? "sources-chest-item"
+              : `sources-${groupConfig.method}-item`;
+          li.className = `sources-item ${itemClass}`;
+          const label = document.createElement("span");
+          const labelClass =
+            groupConfig.method === "chest_loot"
+              ? "sources-chest-label"
+              : `sources-${groupConfig.method}-label`;
+          label.className = `sources-source-label ${labelClass}`;
+          const labelText = getChestSourceLabel(p.src, data.sourcesMap);
+
+          // Link the label when the curated row names one entity or block a
+          // page exists for -- the piglin you barter with, the sheep you
+          // shear. `entityLink` falls back to plain text when the id is not in
+          // the search index, so a ref naming something unshipped degrades to
+          // exactly what this rendered before rather than to a dead link.
+          const ref = data.sourcesMap?.[p.src]?.ref;
+          const refEntry = ref ? ctx.lookup(ref) : null;
+          if (ref && refEntry) {
+            label.append(entityLink({ id: ref, name: labelText }, ctx));
+          } else {
+            label.textContent = labelText;
+          }
+          li.append(label);
+          appendOdds(li, p);
+
+          if (p.nt) {
+            const noteBadge = document.createElement("span");
+            noteBadge.className = "sources-note-badge";
+            noteBadge.textContent = p.nt;
+            li.append(noteBadge);
+          }
+          return li;
+        });
+        panelEl.append(renderGroup(groupConfig.title, items, groupConfig.groupClass));
       }
-      tradeGroup.append(tradeList);
     }
-    panelEl.append(tradeGroup);
   }
 
   return panelEl;
@@ -573,28 +711,24 @@ export function renderRecipeTree(
 
   // Collect raw acquisition producers for the root item
   const rawProducers = section.rawProducers ?? [];
-  const chestLoot = rawProducers.filter((p) => p.m === "chest_loot");
-  const oreSmelts = rawProducers.filter((p) => {
-    if (p.m !== "smelting") {
-      return false;
-    }
+  const producersByMethod = new Map<string, ObtainProducer[]>();
+  for (const p of rawProducers) {
+    const list = producersByMethod.get(p.m) ?? [];
+    list.push(p);
+    producersByMethod.set(p.m, list);
+  }
+
+  const oreSmelts = (producersByMethod.get("smelting") ?? []).filter((p) => {
     const inputId = p.in?.[0]?.i ?? p.in?.[0]?.t;
     return Boolean(inputId && isOreSmelt(inputId));
   });
-  const blockDrops = rawProducers.filter((p) => p.m === "block_drop");
-  const mobDrops = rawProducers.filter((p) => p.m === "mob_loot");
-  const tradeProducers = rawProducers.filter((p) => p.m === "trade");
 
   const tradeTableSection = entity?.sections.find((s): s is TradeTable => s.type === "TradeTable");
 
   const hasTreeContent = rootNode.producers.length > 0;
+  const fallbackGraph = section.graph ?? { schemaVersion: 1, producers: {} };
   const hasSourcesContent =
-    chestLoot.length > 0 ||
-    oreSmelts.length > 0 ||
-    blockDrops.length > 0 ||
-    mobDrops.length > 0 ||
-    tradeProducers.length > 0 ||
-    Boolean(tradeTableSection);
+    rawProducers.some((p) => isAcquisition(fallbackGraph, p)) || Boolean(tradeTableSection);
 
   // If there's neither manipulation tree content nor acquisition sources:
   if (!hasTreeContent && !hasSourcesContent) {
@@ -634,11 +768,8 @@ export function renderRecipeTree(
   if (hasSourcesContent) {
     const sourcesPaneEl = renderSourcesPanel(
       {
-        chestLoot,
+        producersByMethod,
         oreSmelts,
-        blockDrops,
-        mobDrops,
-        tradeProducers,
         tradeTableSection,
         sourcesMap: section.sources,
       },

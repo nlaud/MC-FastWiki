@@ -57,7 +57,7 @@ __all__ = [
 class ObtainMethod(StrEnum):
     """How one `Producer` turns its inputs into its output.
 
-    Eight methods. There is no separate member for stonecutting or smithing:
+    Fourteen methods. There is no separate member for stonecutting or smithing:
     both are crafting-like -- a player stands at a station and trades items
     for one result, with no randomness -- and `Producer.station` already
     carries which station (`"stonecutter"`, `"smithing_table"`) without the
@@ -75,6 +75,15 @@ class ObtainMethod(StrEnum):
     bottle, and the glass and sand under it, unreachable from any potion,
     which is exactly the gap review caught. Only the water bottle uses it
     today; filling a bucket is the same shape and would fit here unchanged.
+
+    The six loot-table world interaction methods (`BRUSHING`, `FISHING`,
+    `BARTERING`, `GIFT`, `SHEARING`, `HARVESTING`) earn their own enum members
+    because each represents a fundamentally distinct player action and verb
+    rather than a station variant. Having distinct members allows the renderer
+    to name the verb directly without parsing unstructured note prose.
+    `BRUSHING` covers both suspicious blocks (`minecraft:archaeology`) and
+    entities (`minecraft:entity_interact`), mirroring how stonecutting and
+    smithing share `CRAFTING`.
     """
 
     CRAFTING = "crafting"
@@ -85,6 +94,13 @@ class ObtainMethod(StrEnum):
     CHEST_LOOT = "chest_loot"
     TRADE = "trade"
     BLOCK_DROP = "block_drop"
+    BRUSHING = "brushing"
+    FISHING = "fishing"
+    BARTERING = "bartering"
+    GIFT = "gift"
+    SHEARING = "shearing"
+    HARVESTING = "harvesting"
+
 
 
 class ProducerOutput(BaseModel, frozen=True):
@@ -139,6 +155,40 @@ class Producer(BaseModel, frozen=True):
     `"smithing_table"`, `"brewing_stand"`. `note` carries a qualifier a
     renderer should show but that changes no field's shape: `"requires silk
     touch"`, `"requires looting"`.
+
+    ## The three odds fields, and when they are absent
+
+    `chance`, `count_max` and `per_attempt` describe a producer whose outcome
+    is a draw rather than a certainty: opening a chest, reeling in a catch,
+    trading a gold ingot to a piglin, killing a mob. `chance` is the
+    probability the drop happens at all on one attempt, `count_max` is the top
+    of the stack size (`output.count` already carries the bottom), and
+    `per_attempt` is the expected number of items one attempt yields. What an
+    "attempt" *is* differs by method -- one chest, one catch, one barter, one
+    kill -- and the renderer names it from `method` rather than this model
+    carrying a noun.
+
+    `per_attempt` is stored rather than derived because the two adapters that
+    fill it know different things and `chance x average count` is only right
+    for one of them. `pipeline.obtain.loot` multiplies a pool weight by the
+    pool's roll count and the mean stack size, because that is exactly what a
+    loot table states. `pipeline.obtain.loot.producers_from_drop_index` instead
+    copies the wiki's own measured average, because a mob drop's quantity range
+    starts at zero when the drop can fail, and multiplying a chance by the mean
+    of a range that already includes the failure would count the failure twice.
+    Deriving in the renderer would force one formula onto both and quietly
+    misstate every `0-N` mob drop.
+
+    All three are `None` together, and that absence is meaningful rather than
+    missing. A weight only describes an outcome when the entry competes in a
+    plain weighted pool, so `pipeline.obtain.loot` declines to compute odds
+    for an entry that sits under `minecraft:alternatives`, `minecraft:group`
+    or `minecraft:sequence` -- where the game picks by condition rather than
+    by weight -- and for an entry carrying `conditions` of its own, whose real
+    probability is the weight times the odds of the condition holding, a
+    number no loot table states. Refusing there is the same rule this package
+    already applies to an unrecognized entry type: a number this data does not
+    support is not a number to invent.
     """
 
     method: ObtainMethod
@@ -147,9 +197,50 @@ class Producer(BaseModel, frozen=True):
     source_id: str
     station: str | None = None
     note: str | None = None
+    chance: float | None = None
+    count_max: int | None = None
+    per_attempt: float | None = None
     grid: tuple[int | None, ...] | None = None
     grid_width: int | None = None
     grid_height: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_odds(self) -> "Producer":
+        """Refuse a partial or out-of-range set of the three odds fields.
+
+        They are one fact in three parts, so a producer carrying some of them
+        describes a draw it cannot state the odds of, which is worse than one
+        carrying none: a renderer reading `chance` alone would print a
+        percentage with no quantity beside it.
+        """
+        present = (
+            self.chance is not None,
+            self.count_max is not None,
+            self.per_attempt is not None,
+        )
+        if any(present) and not all(present):
+            raise ObtainError(
+                f"chance, count_max and per_attempt are one fact in three parts and must be "
+                f"set together, and {self.source_id!r} sets chance={self.chance!r} "
+                f"count_max={self.count_max!r} per_attempt={self.per_attempt!r}."
+            )
+        if self.chance is not None and not (0.0 < self.chance <= 1.0):
+            raise ObtainError(
+                f"a producer chance is a probability in (0, 1], and {self.source_id!r} "
+                f"declares {self.chance!r}."
+            )
+        if self.per_attempt is not None and self.per_attempt <= 0.0:
+            raise ObtainError(
+                f"a producer that yields nothing on an average attempt is not a producer, "
+                f"and {self.source_id!r} declares per_attempt={self.per_attempt!r}."
+            )
+        if self.count_max is not None and self.count_max < self.output.count:
+            raise ObtainError(
+                f"a producer count_max is the top of the range whose bottom is output.count, "
+                f"and {self.source_id!r} declares count_max={self.count_max} against "
+                f"output.count={self.output.count}."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_grid(self) -> "Producer":

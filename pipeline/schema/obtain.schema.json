@@ -36,7 +36,7 @@
   "$defs": {
     "chestSource": {
       "title": "ChestSource",
-      "description": "Curated structure and container attribution for one chest loot table.",
+      "description": "Curated structure and container attribution for one loot table, chest or otherwise.",
       "type": "object",
       "additionalProperties": false,
       "required": ["structure", "container"],
@@ -48,6 +48,10 @@
         "container": {
           "description": "The human-readable container label in Title Case, e.g. 'Chest' or 'Intersection Barrel'.",
           "type": "string"
+        },
+        "ref": {
+          "description": "The registry id of the one entity or block a player interacts with to reach this loot, where the source is a single thing with a page of its own: the piglin you barter with, the sheep you shear, the beehive you harvest. Absent for a source that is not one such thing -- a chest in a structure, a fishing catch, a hero-of-the-village gift -- so a renderer draws a link only where one would answer the question the label asks.",
+          "$ref": "#/$defs/entityId"
         }
       }
     },
@@ -58,7 +62,7 @@
       "examples": ["minecraft:gunpowder", "minecraft:iron_ingot"]
     },
     "obtainMethod": {
-      "description": "How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle: no recipe or loot table produces one, and without it every potion tree stops one step above the glass bottle.",
+      "description": "How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle. The six loot-table world interaction methods (`brushing`, `fishing`, `bartering`, `gift`, `shearing`, `harvesting`) earn their own enum members because each represents a distinct player action.",
       "type": "string",
       "enum": [
         "crafting",
@@ -68,7 +72,13 @@
         "mob_loot",
         "chest_loot",
         "trade",
-        "block_drop"
+        "block_drop",
+        "brushing",
+        "fishing",
+        "bartering",
+        "gift",
+        "shearing",
+        "harvesting"
       ]
     },
     "obtainProducer": {
@@ -98,6 +108,22 @@
         "nt": {
           "description": "Long form: note. A qualifier a renderer should show but that changes no other field's shape: \"requires silk touch\", \"requires looting\".",
           "type": "string"
+        },
+        "ch": {
+          "description": "Long form: chance. The probability that this producer's drop happens at all on one attempt, as a fraction in (0, 1]. Present only with `cx` and `pa`; all three are absent together on a producer whose odds no upstream source states, which `pipeline.obtain.producer.Producer` documents in full. Not rounded -- the renderer decides how many decimal places to show.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "cx": {
+          "description": "Long form: countMax. The top of the stack size this producer yields; `c` (count) carries the bottom, and the two are equal for a fixed drop. Present only with `ch` and `pa`.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "pa": {
+          "description": "Long form: perAttempt. The expected number of items one attempt yields, where an attempt is one chest, catch, barter, shear, or kill depending on `m` (method). Stored rather than derived from `ch` and `cx`, because a mob drop's quantity range already folds its own failure in and multiplying would count that failure twice -- see `pipeline.obtain.producer.Producer`. Present only with `ch` and `cx`.",
+          "type": "number",
+          "exclusiveMinimum": 0
         },
         "in": {
           "description": "Long form: inputs. Every ingredient slot this producer consumes, in producer-declaration order.",

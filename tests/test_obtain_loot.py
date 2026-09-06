@@ -13,18 +13,22 @@ from typing import Any
 import pytest
 
 from pipeline.enrich import IntegerRange
-from pipeline.enrich.droptable import DropIndex, MobDrop
+from pipeline.enrich.droptable import DropIndex, LootingDrop, MobDrop, Ratio
 from pipeline.enrich.resource_location import JoinTable, ResourceLocation
 from pipeline.enrich.trade import TradeIndex, TradeItem, WikiTrade
 from pipeline.obtain import ObtainError
+from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.loot import (
     BLOCK_LOOT_DIRECTORY,
     CHEST_LOOT_DIRECTORY,
+    SKIPPED_FAMILIES,
     extract_block_and_chest_loot,
+    extract_loot,
     producers_from_drop_index,
     producers_from_trade_index,
+    verify_loot_sources,
 )
-from pipeline.obtain.producer import ObtainMethod
+from pipeline.obtain.producer import ObtainMethod, Producer, ProducerOutput
 
 
 def archive(*, blocks: Mapping[str, Any] = {}, chests: Mapping[str, Any] = {}) -> dict[str, bytes]:
@@ -252,6 +256,280 @@ def test_a_pools_that_is_present_but_not_a_list_still_raises() -> None:
         extract_block_and_chest_loot(files)
 
 
+# --- Tier A: new loot table families ------------------------------------------
+
+
+def test_archaeology_and_brush_emit_brushing_with_zero_inputs() -> None:
+    files = {
+        "loot_table/archaeology/desert_pyramid.json": json.dumps({
+            "type": "minecraft:archaeology",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:diamond"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/brush/armadillo.json": json.dumps({
+            "type": "minecraft:entity_interact",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:armadillo_scute"}],
+                }
+            ],
+        }).encode(),
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 2
+    for p in result.producers:
+        assert p.method is ObtainMethod.BRUSHING
+        assert p.inputs == ()
+    assert result.tables_by_family["archaeology"] == 1
+    assert result.tables_by_family["brush"] == 1
+
+
+def test_carve_and_harvest_emit_harvesting_with_zero_inputs() -> None:
+    files = {
+        "loot_table/carve/pumpkin.json": json.dumps({
+            "type": "minecraft:block_interact",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:pumpkin_seeds"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/harvest/beehive.json": json.dumps({
+            "type": "minecraft:block_interact",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:honeycomb"}],
+                }
+            ],
+        }).encode(),
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 2
+    for p in result.producers:
+        assert p.method is ObtainMethod.HARVESTING
+        assert p.inputs == ()
+
+
+def test_shearing_and_fishing_emit_respective_methods_with_zero_inputs() -> None:
+    files = {
+        "loot_table/shearing/sheep/white.json": json.dumps({
+            "type": "minecraft:shearing",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:white_wool"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/gameplay/fishing/treasure.json": json.dumps({
+            "type": "minecraft:fishing",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:saddle"}],
+                }
+            ],
+        }).encode(),
+    }
+    result = extract_loot(files)
+    by_item = {p.output.item: p for p in result.producers}
+    assert by_item["minecraft:white_wool"].method is ObtainMethod.SHEARING
+    assert by_item["minecraft:white_wool"].inputs == ()
+    assert by_item["minecraft:saddle"].method is ObtainMethod.FISHING
+    assert by_item["minecraft:saddle"].inputs == ()
+
+
+def test_barter_emits_bartering_with_zero_inputs_and_odds() -> None:
+    files = {
+        "loot_table/gameplay/piglin_bartering.json": json.dumps({
+            "type": "minecraft:barter",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:ender_pearl"}],
+                }
+            ],
+        }).encode()
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 1
+    p = result.producers[0]
+    assert p.method is ObtainMethod.BARTERING
+    assert p.inputs == ()
+    # No note. The gold ingot a barter costs is not stated by the loot table,
+    # and the panel now shows the odds in its place.
+    assert p.note is None
+    assert p.output.item == "minecraft:ender_pearl"
+    # A pool of one entry is won every time, so the chance is certainty and the
+    # yield is one item per gold ingot handed over.
+    assert p.chance == 1.0
+    assert p.count_max == 1
+    assert p.per_attempt == 1.0
+
+
+def test_gift_emits_gift_with_zero_inputs() -> None:
+    files = {
+        "loot_table/gameplay/chicken_lay.json": json.dumps({
+            "type": "minecraft:gift",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:egg"}],
+                }
+            ],
+        }).encode()
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 1
+    p = result.producers[0]
+    assert p.method is ObtainMethod.GIFT
+    assert p.inputs == ()
+    assert p.output.item == "minecraft:egg"
+
+
+def test_containers_dispensers_pots_spawners_emit_chest_loot() -> None:
+    files = {
+        "loot_table/dispensers/trial_chambers/chamber.json": json.dumps({
+            "type": "minecraft:chest",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:arrow"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/pots/trial_chambers/corridor.json": json.dumps({
+            "type": "minecraft:chest",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:diamond"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/spawners/trial_chamber/key.json": json.dumps({
+            "type": "minecraft:chest",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:trial_key"}],
+                }
+            ],
+        }).encode(),
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 3
+    for p in result.producers:
+        assert p.method is ObtainMethod.CHEST_LOOT
+        assert p.inputs == ()
+
+
+def test_skipped_families_are_deliberately_not_read() -> None:
+    files = {
+        "loot_table/entities/zombie.json": json.dumps({
+            "type": "minecraft:entity",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:rotten_flesh"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/charged_creeper/creeper.json": json.dumps({
+            "type": "minecraft:entity",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:creeper_head"}],
+                }
+            ],
+        }).encode(),
+        "loot_table/equipment/trial_chamber.json": json.dumps({
+            "type": "minecraft:equipment",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:iron_sword"}],
+                }
+            ],
+        }).encode(),
+        # One valid table so the archive is not empty:
+        "loot_table/brush/armadillo.json": json.dumps({
+            "type": "minecraft:entity_interact",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:armadillo_scute"}],
+                }
+            ],
+        }).encode(),
+    }
+    result = extract_loot(files)
+    assert len(result.producers) == 1
+    assert result.producers[0].output.item == "minecraft:armadillo_scute"
+    for skipped_family in SKIPPED_FAMILIES:
+        assert skipped_family not in result.tables_by_family
+
+
+def test_unknown_loot_table_family_raises_obtain_error() -> None:
+    files = {
+        "loot_table/unknown_family/foo.json": json.dumps({
+            "type": "minecraft:block",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:diamond"}],
+                }
+            ],
+        }).encode()
+    }
+    with pytest.raises(ObtainError, match="unknown loot table family 'unknown_family'"):
+        extract_loot(files)
+
+
+def test_unknown_declared_type_raises_obtain_error() -> None:
+    files = {
+        "loot_table/archaeology/bad.json": json.dumps({
+            "type": "minecraft:invalid_type",
+            "pools": [
+                {
+                    "rolls": 1.0,
+                    "entries": [{"type": "minecraft:item", "name": "minecraft:diamond"}],
+                }
+            ],
+        }).encode()
+    }
+    with pytest.raises(
+        ObtainError,
+        match="declares unknown or missing loot table type 'minecraft:invalid_type'",
+    ):
+        extract_loot(files)
+
+
+def test_verify_loot_sources_passes_and_fails_on_unmapped_table() -> None:
+    curated = {
+        "loot_table/brush/armadillo.json": ChestSource(
+            structure="Armadillo", container="Armadillo"
+        )
+    }
+    # Passes when all found tables are in curated
+    verify_loot_sources(["loot_table/brush/armadillo.json"], curated)
+
+    # Raises when a table is missing
+    with pytest.raises(ObtainError, match="found 1 loot tables with no curated entry"):
+        verify_loot_sources(
+            ["loot_table/brush/armadillo.json", "loot_table/archaeology/missing.json"],
+            curated,
+        )
+
+
 # --- Tier B inversion: mob loot -----------------------------------------------
 
 
@@ -450,3 +728,225 @@ def test_a_name_that_is_a_variant_group_is_still_reported_rather_than_guessed_at
 
     assert producers == ()
     assert [u.subject for u in unresolved] == ["Any color Wool"]
+
+
+# --- Odds: chance, count_max and per_attempt --------------------------------
+#
+# `Producer`'s docstring argues which shapes earn odds and which forfeit them.
+# These pin that argument down against the two adapters that fill the fields.
+
+
+def barter_table(entries: list[dict[str, Any]], rolls: Any = 1.0) -> dict[str, bytes]:
+    """Return a one-pool barter archive, the simplest table that carries odds."""
+    return {
+        "loot_table/gameplay/piglin_bartering.json": json.dumps({
+            "type": "minecraft:barter",
+            "pools": [{"rolls": rolls, "entries": entries}],
+        }).encode()
+    }
+
+
+def test_a_weighted_pool_divides_chance_by_the_total_weight() -> None:
+    files = barter_table([
+        {"type": "minecraft:item", "name": "minecraft:gravel", "weight": 20},
+        {"type": "minecraft:item", "name": "minecraft:string", "weight": 20},
+        {"type": "minecraft:item", "name": "minecraft:ender_pearl", "weight": 10},
+    ])
+    by_item = {p.output.item: p for p in extract_loot(files).producers}
+    assert by_item["minecraft:gravel"].chance == pytest.approx(0.4)
+    assert by_item["minecraft:string"].chance == pytest.approx(0.4)
+    assert by_item["minecraft:ender_pearl"].chance == pytest.approx(0.2)
+    assert sum(p.chance or 0.0 for p in by_item.values()) == pytest.approx(1.0)
+
+
+def test_an_entry_with_no_weight_counts_as_one() -> None:
+    """`fishing/treasure.json` names no weight at all, so its entries are even."""
+    files = barter_table([
+        {"type": "minecraft:item", "name": "minecraft:gravel"},
+        {"type": "minecraft:item", "name": "minecraft:string"},
+    ])
+    by_item = {p.output.item: p for p in extract_loot(files).producers}
+    assert by_item["minecraft:gravel"].chance == pytest.approx(0.5)
+    assert by_item["minecraft:string"].chance == pytest.approx(0.5)
+
+
+def test_the_denominator_counts_entries_this_walk_cannot_name() -> None:
+    """A `loot_table` sibling still competes for the draw, so it stays in the total.
+
+    Dropping it would turn the one item entry here into a certainty, which is
+    the bug the real `gameplay/fishing.json` would have caused: junk 10,
+    treasure 5 and fish 85 sum to 100, and none of the three is guaranteed.
+    """
+    files = barter_table([
+        {"type": "minecraft:item", "name": "minecraft:gravel", "weight": 25},
+        {"type": "minecraft:loot_table", "value": "minecraft:gameplay/fishing/fish", "weight": 75},
+    ])
+    producers = extract_loot(files).producers
+    assert len(producers) == 1
+    assert producers[0].chance == pytest.approx(0.25)
+
+
+def test_a_count_range_carries_both_ends_and_the_expected_yield() -> None:
+    """10-36 nuggets at one-in-four is a mean 23, a quarter of the time."""
+    files = barter_table([
+        {
+            "type": "minecraft:item",
+            "name": "minecraft:iron_nugget",
+            "weight": 25,
+            "functions": [
+                {
+                    "function": "minecraft:set_count",
+                    "count": {"type": "minecraft:uniform", "min": 10.0, "max": 36.0},
+                }
+            ],
+        },
+        {"type": "minecraft:item", "name": "minecraft:gravel", "weight": 75},
+    ])
+    nugget = next(
+        p for p in extract_loot(files).producers if p.output.item == "minecraft:iron_nugget"
+    )
+    assert nugget.output.count == 10
+    assert nugget.count_max == 36
+    assert nugget.per_attempt == pytest.approx(0.25 * 23.0)
+
+
+def test_more_rolls_multiply_the_expected_yield() -> None:
+    once = barter_table([{"type": "minecraft:item", "name": "minecraft:gravel"}], rolls=1.0)
+    thrice = barter_table([{"type": "minecraft:item", "name": "minecraft:gravel"}], rolls=3.0)
+    assert extract_loot(once).producers[0].per_attempt == pytest.approx(1.0)
+    assert extract_loot(thrice).producers[0].per_attempt == pytest.approx(3.0)
+
+
+def test_a_uniform_roll_range_averages_its_ends() -> None:
+    files = barter_table(
+        [{"type": "minecraft:item", "name": "minecraft:gravel"}],
+        rolls={"type": "minecraft:uniform", "min": 1.0, "max": 3.0},
+    )
+    assert extract_loot(files).producers[0].per_attempt == pytest.approx(2.0)
+
+
+def test_an_entry_under_a_container_forfeits_its_odds() -> None:
+    """The game picks an `alternatives` child by condition, not by weight."""
+    files = archive(
+        blocks={
+            "diamond_ore": {
+                "type": "minecraft:block",
+                "pools": [
+                    {
+                        "rolls": 1.0,
+                        "entries": [
+                            {
+                                "type": "minecraft:alternatives",
+                                "children": [
+                                    {"type": "minecraft:item", "name": "minecraft:diamond_ore"},
+                                    {"type": "minecraft:item", "name": "minecraft:diamond"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+    )
+    producers = extract_loot(files).producers
+    assert len(producers) == 2
+    for producer in producers:
+        assert producer.chance is None
+        assert producer.count_max is None
+        assert producer.per_attempt is None
+
+
+def test_a_conditioned_entry_forfeits_its_odds() -> None:
+    """Weight times the odds of the condition holding is a number no table states."""
+    files = barter_table([
+        {
+            "type": "minecraft:item",
+            "name": "minecraft:gravel",
+            "conditions": [{"condition": "minecraft:random_chance", "chance": 0.5}],
+        },
+        {"type": "minecraft:item", "name": "minecraft:string"},
+    ])
+    by_item = {p.output.item: p for p in extract_loot(files).producers}
+    assert by_item["minecraft:gravel"].chance is None
+    assert by_item["minecraft:gravel"].per_attempt is None
+    assert by_item["minecraft:string"].chance == pytest.approx(0.5)
+
+
+def looting_zero(
+    minimum: int, maximum: int, chance: tuple[int, int], average: tuple[int, int]
+) -> LootingDrop:
+    """Return one looting-0 wiki row, the only level the odds are taken from."""
+    return LootingDrop(
+        looting_level=0,
+        minimum=minimum,
+        maximum=maximum,
+        average=Ratio(numerator=average[0], denominator=average[1]),
+        drop_chance=Ratio(numerator=chance[0], denominator=chance[1]),
+        distribution={},
+        quantity_text=f"{minimum}-{maximum}",
+    )
+
+
+def drop_with(row: LootingDrop) -> MobDrop:
+    return MobDrop(
+        mob="Zombie",
+        item="Rotten Flesh",
+        page="Zombie",
+        wiki_url="https://minecraft.wiki/w/Zombie",
+        notes=(),
+        by_looting_level=(row,),
+    )
+
+
+def zombie_table() -> JoinTable:
+    return join_table(
+        resource("Zombie", "zombie", "entity"),
+        resource("Rotten Flesh", "rotten_flesh", "item"),
+    )
+
+
+def test_a_mob_drop_takes_the_wikis_own_average_not_chance_times_count() -> None:
+    """A `0-3` drop folds its own failure in, so multiplying would count it twice."""
+    row = looting_zero(minimum=0, maximum=3, chance=(1, 2), average=(1, 4))
+    producers, _ = producers_from_drop_index(
+        DropIndex.build([drop_with(row)]), join_table=zombie_table()
+    )
+    producer = producers[0]
+    assert producer.chance == pytest.approx(0.5)
+    assert producer.count_max == 3
+    # The wiki's own 1/4. Deriving it instead would give 0.5 * (1 + 3) / 2 = 1.0,
+    # four times too high, which is exactly the error this field exists to avoid.
+    assert producer.per_attempt == pytest.approx(0.25)
+    # A `0` minimum becomes `1`: `chance` already says the drop may not happen,
+    # and a range starting at zero would say it a second time.
+    assert producer.output.count == 1
+
+
+def test_a_mob_drop_with_no_looting_zero_row_carries_no_odds() -> None:
+    drops = DropIndex.build([mob_drop("Zombie", "Rotten Flesh")])
+    producers, _ = producers_from_drop_index(drops, join_table=zombie_table())
+    assert producers[0].chance is None
+    assert producers[0].count_max is None
+    assert producers[0].per_attempt is None
+
+
+def test_a_mob_drop_whose_average_is_zero_carries_no_odds() -> None:
+    """A drop that yields nothing on an average kill states no useful rate."""
+    row = looting_zero(minimum=0, maximum=0, chance=(1, 2), average=(0, 1))
+    producers, _ = producers_from_drop_index(
+        DropIndex.build([drop_with(row)]), join_table=zombie_table()
+    )
+    assert producers[0].chance is None
+    assert producers[0].per_attempt is None
+
+
+def test_the_three_odds_fields_cannot_be_set_apart() -> None:
+    """One fact in three parts: a partial set describes a draw it cannot state."""
+    with pytest.raises(ObtainError, match="one fact in three parts"):
+        Producer(
+            method=ObtainMethod.BARTERING,
+            output=ProducerOutput(item="minecraft:gravel"),
+            inputs=(),
+            source_id="test",
+            chance=0.5,
+        )

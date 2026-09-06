@@ -1760,6 +1760,41 @@ canvas,
   padding: 1px 5px;
 }
 
+/*
+ * The three odds a Sources row can carry: how likely, how many, how many per
+ * attempt. They sit in one inline group after the label so a row reads
+ * "Piglin  8% 2-8 0.4 per gold" left to right, and the group is `flex` with
+ * its own gap rather than three spaced spans so a row that wraps keeps the
+ * three together instead of orphaning the rate onto its own line.
+ *
+ * Tabular figures matter more here than anywhere else in the panel: the whole
+ * point of the column is comparing one row against the next at a glance, and
+ * proportional digits make 8% and 11% different widths.
+ */
+.sources-odds {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sources-odds-chance {
+  color: #adc8ff;
+  font-weight: 600;
+}
+
+.sources-odds-count {
+  color: #ccc;
+}
+
+.sources-odds-rate {
+  color: #8a8a8a;
+}
+
 .sources-mob-label {
   color: #ccc;
 }
