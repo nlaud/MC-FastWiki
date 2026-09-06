@@ -61,10 +61,16 @@ const ATTEMPT_NOUN: Readonly<Record<string, string>> = {
  * expect per try. The payload keeps them unrounded so this is the only place
  * that decides precision.
  *
- * A chance of exactly 1 is dropped rather than rendered as "100%": a producer
- * that always fires is telling the reader nothing by saying so, and the row's
- * quantity still shows. The same producer keeps its `count` and `rate` when
- * they carry information.
+ * Each of the three drops out on its own when it carries no information, and
+ * a producer whose three all drop out renders no odds at all.
+ *
+ * - A chance of exactly 1 never renders as "100%". A producer that always
+ *   fires says nothing by saying so.
+ * - A count renders only as a range, or as a fixed stack above one.
+ * - A rate drops out when the drop is both certain and fixed, because it can
+ *   only restate the count. Breaking one cobblestone gives one cobblestone,
+ *   and "1.0 per block" beside it is noise. A certain drop of a *range* keeps
+ *   its rate, because the mean of that range is a real answer.
  */
 export function formatOdds(
   producer: ObtainProducer,
@@ -74,13 +80,15 @@ export function formatOdds(
     return null;
   }
   const low = producer.c ?? 1;
+  const certain = ch >= 1;
+  const fixed = low === cx;
   // Below 0.1% would render as "0.0%", which reads as impossible rather than
   // rare, so anything that small gets an explicit floor instead.
-  const chance = ch >= 1 ? null : ch < 0.001 ? "<0.1%" : `${(ch * 100).toFixed(ch < 0.1 ? 1 : 0)}%`;
-  const count = cx > low ? `${low.toString()}-${cx.toString()}` : low > 1 ? low.toString() : null;
+  const chance = certain ? null : ch < 0.001 ? "<0.1%" : `${(ch * 100).toFixed(ch < 0.1 ? 1 : 0)}%`;
+  const count = !fixed ? `${low.toString()}-${cx.toString()}` : low > 1 ? low.toString() : null;
   const noun = ATTEMPT_NOUN[producer.m];
   const rate =
-    pa === undefined
+    pa === undefined || (certain && fixed)
       ? null
       : `${pa < 0.1 ? pa.toFixed(2) : pa.toFixed(1)}${noun ? ` per ${noun}` : ""}`;
   if (chance === null && count === null && rate === null) {

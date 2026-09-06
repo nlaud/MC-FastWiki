@@ -1209,10 +1209,24 @@ describe("formatOdds", () => {
 
   it("drops a chance of exactly one rather than saying 100%", () => {
     // A producer that always fires tells the reader nothing by saying so, but
-    // its quantity still carries information.
+    // its quantity and its mean still carry information.
     const odds = formatOdds(producer({ m: "block_drop", ch: 1, c: 2, cx: 5, pa: 3.5 }));
     expect(odds?.chance).toBeNull();
     expect(odds?.count).toBe("2-5");
+    expect(odds?.rate).toBe("3.5 per block");
+  });
+
+  it("renders nothing at all for a certain, fixed, single drop", () => {
+    // Breaking one cobblestone gives one cobblestone. "100% 1 1.0 per block"
+    // is three ways of saying nothing.
+    expect(formatOdds(producer({ m: "block_drop", ch: 1, c: 1, cx: 1, pa: 1 }))).toBeNull();
+  });
+
+  it("drops the rate when a certain drop is a fixed stack", () => {
+    // The rate could only restate the count, so the count says it once.
+    const odds = formatOdds(producer({ m: "block_drop", ch: 1, c: 4, cx: 4, pa: 4 }));
+    expect(odds?.count).toBe("4");
+    expect(odds?.rate).toBeNull();
   });
 
   it("shows a floor rather than rounding a rare drop to zero percent", () => {
