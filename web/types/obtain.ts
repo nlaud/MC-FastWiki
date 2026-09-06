@@ -33,6 +33,12 @@ export interface Obtain {
   producers: {
     [k: string]: ObtainProducer[];
   };
+  /**
+   * Curated structure and container attribution for chest loot tables, keyed by source_id.
+   */
+  sources?: {
+    [k: string]: ChestSource;
+  };
 }
 /**
  * One way to produce an item, mirroring `pipeline.obtain.producer.Producer`. Carries no field naming what it produces -- that is the item id it sits under in `producers` above.
@@ -65,6 +71,18 @@ export interface ObtainProducer {
    * Long form: inputs. Every ingredient slot this producer consumes, in producer-declaration order.
    */
   in?: ObtainProducerInput[];
+  /**
+   * Long form: grid. The pattern cells as an array of 0-based indices into `in` (inputs), or null for empty cells. Absent when no grid shape is defined (e.g. shapeless crafting, smelting).
+   */
+  g?: (number | null)[];
+  /**
+   * Long form: gridWidth. Number of columns in the pattern grid.
+   */
+  gw?: number;
+  /**
+   * Long form: gridHeight. Number of rows in the pattern grid.
+   */
+  gh?: number;
 }
 /**
  * One ingredient slot of an `obtainProducer`, mirroring `pipeline.obtain.producer.ProducerInput`. Exactly one of `i` (item) or `t` (tag) is present: a plain item names `i` and leaves `t` and `mb` (members) absent; a tag names `t` and `mb`, and leaves `i` absent; the untagged-alternatives-list shape `pipeline.obtain.recipes` produces sets `i` to the alphabetically-first alternative and still carries the full sorted list in `mb`.
@@ -89,4 +107,20 @@ export interface ObtainProducerInput {
    * Long form: members. What `t` resolved to, for a tag input, or the full sorted alternatives list, for an untagged alternatives-list input. Empty for a plain item input.
    */
   mb?: EntityId[];
+}
+/**
+ * Curated structure and container attribution for one chest loot table.
+ *
+ * This interface was referenced by `Obtain`'s JSON-Schema
+ * via the `definition` "chestSource".
+ */
+export interface ChestSource {
+  /**
+   * The human-readable name of the structure in Title Case, e.g. 'Mineshaft' or 'Trial Chambers'.
+   */
+  structure: string;
+  /**
+   * The human-readable container label in Title Case, e.g. 'Chest' or 'Intersection Barrel'.
+   */
+  container: string;
 }

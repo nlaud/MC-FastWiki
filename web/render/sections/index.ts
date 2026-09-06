@@ -9,7 +9,6 @@ import type {
   Section,
   SpawnInfo,
   StatBlock,
-  TradeTable,
 } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
 import { renderAdvancementInfo } from "./advancement-info.js";
@@ -20,7 +19,6 @@ import { renderHarvestInfo } from "./harvest-info.js";
 import { renderRecipeTree } from "./recipe-tree.js";
 import { renderSpawnInfo } from "./spawn-info.js";
 import { renderStatBlock } from "./stat-block.js";
-import { renderTradeTable } from "./trade-table.js";
 
 export type SectionRenderer = (
   section: Section,
@@ -32,12 +30,12 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   StatBlock: (s, ctx) => renderStatBlock(s as StatBlock, ctx),
   DropTable: (s, ctx) => renderDropTable(s as DropTable, ctx),
   SpawnInfo: (s, ctx) => renderSpawnInfo(s as SpawnInfo, ctx),
-  TradeTable: (s, ctx) => renderTradeTable(s as TradeTable, ctx),
+  TradeTable: () => null, // Standalone TradeTable removed; embedded in RecipeTree Sources
   AdvancementInfo: (s, ctx) => renderAdvancementInfo(s as AdvancementInfo, ctx),
   BreedingInfo: (s, ctx) => renderBreedingInfo(s as BreedingInfo, ctx),
   FoodInfo: (s, ctx) => renderFoodInfo(s as FoodInfo, ctx),
   HarvestInfo: (s, ctx) => renderHarvestInfo(s as HarvestInfo, ctx),
-  RecipeTree: (s, ctx) => renderRecipeTree(s as RecipeTree, ctx),
+  RecipeTree: (s, ctx, entity) => renderRecipeTree(s as RecipeTree, ctx, entity),
 };
 
 /**

@@ -142,7 +142,8 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "FoodInfo": 45,
         "HarvestInfo": 861,
     }
-    assert snapshot.obtain_producer_count == 4002
+    # 4002 before skipping the 4 dye_white_* bleaching recipes (bed, carpet, harness, wool).
+    assert snapshot.obtain_producer_count == 3998
     # 1910 before the four HudSprite hunger shanks joined the atlas. They belong
     # to no entity, so they arrive through `CuratedData.hud_sprites` rather than
     # through an `Entity.icon`; see `data/curated/hud-sprites.json`.

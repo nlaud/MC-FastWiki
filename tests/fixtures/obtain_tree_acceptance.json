@@ -14752,144 +14752,6 @@
                     "method": "crafting",
                     "station": null,
                     "note": null,
-                    "source_id": "minecraft:dye_white_wool",
-                    "inputs": [
-                      {
-                        "label": "minecraft:white_dye",
-                        "item": "minecraft:white_dye",
-                        "tag": null,
-                        "count": 1,
-                        "members": [],
-                        "node": {
-                          "item": "minecraft:white_dye",
-                          "producers": [],
-                          "expandable": false,
-                          "back_reference": "root.producers.87.inputs.0.producers.0.inputs.1"
-                        }
-                      },
-                      {
-                        "label": "minecraft:black_wool",
-                        "item": "minecraft:black_wool",
-                        "tag": null,
-                        "count": 1,
-                        "members": [
-                          "minecraft:black_wool",
-                          "minecraft:blue_wool",
-                          "minecraft:brown_wool",
-                          "minecraft:cyan_wool",
-                          "minecraft:gray_wool",
-                          "minecraft:green_wool",
-                          "minecraft:light_blue_wool",
-                          "minecraft:light_gray_wool",
-                          "minecraft:lime_wool",
-                          "minecraft:magenta_wool",
-                          "minecraft:orange_wool",
-                          "minecraft:pink_wool",
-                          "minecraft:purple_wool",
-                          "minecraft:red_wool",
-                          "minecraft:yellow_wool"
-                        ],
-                        "node": {
-                          "item": "minecraft:black_wool",
-                          "producers": [
-                            {
-                              "method": "chest_loot",
-                              "station": null,
-                              "note": null,
-                              "source_id": "loot_table/chests/village/village_shepherd.json",
-                              "inputs": []
-                            },
-                            {
-                              "method": "crafting",
-                              "station": null,
-                              "note": null,
-                              "source_id": "minecraft:dye_black_wool",
-                              "inputs": [
-                                {
-                                  "label": "minecraft:black_dye",
-                                  "item": "minecraft:black_dye",
-                                  "tag": null,
-                                  "count": 1,
-                                  "members": [],
-                                  "node": {
-                                    "item": "minecraft:black_dye",
-                                    "producers": [],
-                                    "expandable": false,
-                                    "back_reference": "root.producers.98.inputs.0.producers.2.inputs.0.producers.0.inputs.0"
-                                  }
-                                },
-                                {
-                                  "label": "minecraft:blue_wool",
-                                  "item": "minecraft:blue_wool",
-                                  "tag": null,
-                                  "count": 1,
-                                  "members": [
-                                    "minecraft:blue_wool",
-                                    "minecraft:brown_wool",
-                                    "minecraft:cyan_wool",
-                                    "minecraft:gray_wool",
-                                    "minecraft:green_wool",
-                                    "minecraft:light_blue_wool",
-                                    "minecraft:light_gray_wool",
-                                    "minecraft:lime_wool",
-                                    "minecraft:magenta_wool",
-                                    "minecraft:orange_wool",
-                                    "minecraft:pink_wool",
-                                    "minecraft:purple_wool",
-                                    "minecraft:red_wool",
-                                    "minecraft:white_wool",
-                                    "minecraft:yellow_wool"
-                                  ],
-                                  "node": {
-                                    "item": "minecraft:blue_wool",
-                                    "producers": [
-                                      {
-                                        "method": "crafting",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "minecraft:dye_blue_wool",
-                                        "inputs": [
-                                          {
-                                            "label": "minecraft:blue_dye",
-                                            "item": "minecraft:blue_dye",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": {
-                                              "item": "minecraft:blue_dye",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          },
-                                          {
-                                            "label": "minecraft:black_wool",
-                                            "item": "minecraft:black_wool",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": null
-                                          }
-                                        ]
-                                      }
-                                    ],
-                                    "expandable": false,
-                                    "back_reference": null
-                                  }
-                                }
-                              ]
-                            }
-                          ],
-                          "expandable": false,
-                          "back_reference": null
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "method": "crafting",
-                    "station": null,
-                    "note": null,
                     "source_id": "minecraft:white_wool_from_string",
                     "inputs": [
                       {
@@ -15120,32 +14982,165 @@
                         }
                       },
                       {
-                        "label": "minecraft:black_wool",
-                        "item": "minecraft:black_wool",
+                        "label": "minecraft:white_wool",
+                        "item": "minecraft:white_wool",
                         "tag": null,
                         "count": 1,
-                        "members": [
-                          "minecraft:black_wool",
-                          "minecraft:blue_wool",
-                          "minecraft:cyan_wool",
-                          "minecraft:gray_wool",
-                          "minecraft:green_wool",
-                          "minecraft:light_blue_wool",
-                          "minecraft:light_gray_wool",
-                          "minecraft:lime_wool",
-                          "minecraft:magenta_wool",
-                          "minecraft:orange_wool",
-                          "minecraft:pink_wool",
-                          "minecraft:purple_wool",
-                          "minecraft:red_wool",
-                          "minecraft:white_wool",
-                          "minecraft:yellow_wool"
-                        ],
+                        "members": [],
                         "node": {
-                          "item": "minecraft:black_wool",
-                          "producers": [],
+                          "item": "minecraft:white_wool",
+                          "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/village/village_shepherd.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "crafting",
+                              "station": null,
+                              "note": null,
+                              "source_id": "minecraft:white_wool_from_string",
+                              "inputs": [
+                                {
+                                  "label": "minecraft:string",
+                                  "item": "minecraft:string",
+                                  "tag": null,
+                                  "count": 4,
+                                  "members": [],
+                                  "node": {
+                                    "item": "minecraft:string",
+                                    "producers": [
+                                      {
+                                        "method": "block_drop",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/blocks/cobweb.json",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:cobweb",
+                                            "item": "minecraft:cobweb",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:cobweb",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "block_drop",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/blocks/tripwire.json",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:tripwire",
+                                            "item": "minecraft:tripwire",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:tripwire",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_bridge.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_hoglin_stable.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_other.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/desert_pyramid.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/pillager_outpost.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/simple_dungeon.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/woodland_mansion.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Cat",
+                                        "source_id": "droptable/Cat",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Cave Spider",
+                                        "source_id": "droptable/Cave Spider",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Spider",
+                                        "source_id": "droptable/Spider",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Strider",
+                                        "source_id": "droptable/Strider",
+                                        "inputs": []
+                                      }
+                                    ],
+                                    "expandable": false,
+                                    "back_reference": null
+                                  }
+                                }
+                              ]
+                            }
+                          ],
                           "expandable": false,
-                          "back_reference": "root.producers.102.inputs.0.producers.1.inputs.1"
+                          "back_reference": null
                         }
                       }
                     ]
@@ -15199,62 +15194,16 @@
                         }
                       },
                       {
-                        "label": "minecraft:blue_wool",
-                        "item": "minecraft:blue_wool",
+                        "label": "minecraft:white_wool",
+                        "item": "minecraft:white_wool",
                         "tag": null,
                         "count": 1,
-                        "members": [
-                          "minecraft:blue_wool",
-                          "minecraft:brown_wool",
-                          "minecraft:cyan_wool",
-                          "minecraft:gray_wool",
-                          "minecraft:green_wool",
-                          "minecraft:light_blue_wool",
-                          "minecraft:light_gray_wool",
-                          "minecraft:lime_wool",
-                          "minecraft:magenta_wool",
-                          "minecraft:orange_wool",
-                          "minecraft:pink_wool",
-                          "minecraft:purple_wool",
-                          "minecraft:red_wool",
-                          "minecraft:white_wool",
-                          "minecraft:yellow_wool"
-                        ],
+                        "members": [],
                         "node": {
-                          "item": "minecraft:blue_wool",
-                          "producers": [
-                            {
-                              "method": "crafting",
-                              "station": null,
-                              "note": null,
-                              "source_id": "minecraft:dye_blue_wool",
-                              "inputs": [
-                                {
-                                  "label": "minecraft:blue_dye",
-                                  "item": "minecraft:blue_dye",
-                                  "tag": null,
-                                  "count": 1,
-                                  "members": [],
-                                  "node": {
-                                    "item": "minecraft:blue_dye",
-                                    "producers": [],
-                                    "expandable": false,
-                                    "back_reference": "root.producers.95.inputs.0.producers.4.inputs.0.producers.0.inputs.0"
-                                  }
-                                },
-                                {
-                                  "label": "minecraft:black_wool",
-                                  "item": "minecraft:black_wool",
-                                  "tag": null,
-                                  "count": 1,
-                                  "members": [],
-                                  "node": null
-                                }
-                              ]
-                            }
-                          ],
+                          "item": "minecraft:white_wool",
+                          "producers": [],
                           "expandable": false,
-                          "back_reference": null
+                          "back_reference": "root.producers.103.inputs.0.producers.1.inputs.1"
                         }
                       }
                     ]
@@ -15308,32 +15257,16 @@
                         }
                       },
                       {
-                        "label": "minecraft:black_wool",
-                        "item": "minecraft:black_wool",
+                        "label": "minecraft:white_wool",
+                        "item": "minecraft:white_wool",
                         "tag": null,
                         "count": 1,
-                        "members": [
-                          "minecraft:black_wool",
-                          "minecraft:blue_wool",
-                          "minecraft:brown_wool",
-                          "minecraft:cyan_wool",
-                          "minecraft:green_wool",
-                          "minecraft:light_blue_wool",
-                          "minecraft:light_gray_wool",
-                          "minecraft:lime_wool",
-                          "minecraft:magenta_wool",
-                          "minecraft:orange_wool",
-                          "minecraft:pink_wool",
-                          "minecraft:purple_wool",
-                          "minecraft:red_wool",
-                          "minecraft:white_wool",
-                          "minecraft:yellow_wool"
-                        ],
+                        "members": [],
                         "node": {
-                          "item": "minecraft:black_wool",
+                          "item": "minecraft:white_wool",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.102.inputs.0.producers.1.inputs.1"
+                          "back_reference": "root.producers.103.inputs.0.producers.1.inputs.1"
                         }
                       }
                     ]
@@ -22721,56 +22654,6 @@
                                         "method": "crafting",
                                         "station": null,
                                         "note": null,
-                                        "source_id": "minecraft:dye_white_wool",
-                                        "inputs": [
-                                          {
-                                            "label": "minecraft:white_dye",
-                                            "item": "minecraft:white_dye",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": {
-                                              "item": "minecraft:white_dye",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          },
-                                          {
-                                            "label": "minecraft:black_wool",
-                                            "item": "minecraft:black_wool",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [
-                                              "minecraft:black_wool",
-                                              "minecraft:blue_wool",
-                                              "minecraft:brown_wool",
-                                              "minecraft:cyan_wool",
-                                              "minecraft:gray_wool",
-                                              "minecraft:green_wool",
-                                              "minecraft:light_blue_wool",
-                                              "minecraft:light_gray_wool",
-                                              "minecraft:lime_wool",
-                                              "minecraft:magenta_wool",
-                                              "minecraft:orange_wool",
-                                              "minecraft:pink_wool",
-                                              "minecraft:purple_wool",
-                                              "minecraft:red_wool",
-                                              "minecraft:yellow_wool"
-                                            ],
-                                            "node": {
-                                              "item": "minecraft:black_wool",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "method": "crafting",
-                                        "station": null,
-                                        "note": null,
                                         "source_id": "minecraft:white_wool_from_string",
                                         "inputs": [
                                           {
@@ -22837,29 +22720,13 @@
                                             }
                                           },
                                           {
-                                            "label": "minecraft:black_wool",
-                                            "item": "minecraft:black_wool",
+                                            "label": "minecraft:white_wool",
+                                            "item": "minecraft:white_wool",
                                             "tag": null,
                                             "count": 1,
-                                            "members": [
-                                              "minecraft:black_wool",
-                                              "minecraft:blue_wool",
-                                              "minecraft:cyan_wool",
-                                              "minecraft:gray_wool",
-                                              "minecraft:green_wool",
-                                              "minecraft:light_blue_wool",
-                                              "minecraft:light_gray_wool",
-                                              "minecraft:lime_wool",
-                                              "minecraft:magenta_wool",
-                                              "minecraft:orange_wool",
-                                              "minecraft:pink_wool",
-                                              "minecraft:purple_wool",
-                                              "minecraft:red_wool",
-                                              "minecraft:white_wool",
-                                              "minecraft:yellow_wool"
-                                            ],
+                                            "members": [],
                                             "node": {
-                                              "item": "minecraft:black_wool",
+                                              "item": "minecraft:white_wool",
                                               "producers": [],
                                               "expandable": true,
                                               "back_reference": null
@@ -22916,29 +22783,13 @@
                                             }
                                           },
                                           {
-                                            "label": "minecraft:blue_wool",
-                                            "item": "minecraft:blue_wool",
+                                            "label": "minecraft:white_wool",
+                                            "item": "minecraft:white_wool",
                                             "tag": null,
                                             "count": 1,
-                                            "members": [
-                                              "minecraft:blue_wool",
-                                              "minecraft:brown_wool",
-                                              "minecraft:cyan_wool",
-                                              "minecraft:gray_wool",
-                                              "minecraft:green_wool",
-                                              "minecraft:light_blue_wool",
-                                              "minecraft:light_gray_wool",
-                                              "minecraft:lime_wool",
-                                              "minecraft:magenta_wool",
-                                              "minecraft:orange_wool",
-                                              "minecraft:pink_wool",
-                                              "minecraft:purple_wool",
-                                              "minecraft:red_wool",
-                                              "minecraft:white_wool",
-                                              "minecraft:yellow_wool"
-                                            ],
+                                            "members": [],
                                             "node": {
-                                              "item": "minecraft:blue_wool",
+                                              "item": "minecraft:white_wool",
                                               "producers": [],
                                               "expandable": true,
                                               "back_reference": null
@@ -22995,29 +22846,13 @@
                                             }
                                           },
                                           {
-                                            "label": "minecraft:black_wool",
-                                            "item": "minecraft:black_wool",
+                                            "label": "minecraft:white_wool",
+                                            "item": "minecraft:white_wool",
                                             "tag": null,
                                             "count": 1,
-                                            "members": [
-                                              "minecraft:black_wool",
-                                              "minecraft:blue_wool",
-                                              "minecraft:brown_wool",
-                                              "minecraft:cyan_wool",
-                                              "minecraft:green_wool",
-                                              "minecraft:light_blue_wool",
-                                              "minecraft:light_gray_wool",
-                                              "minecraft:lime_wool",
-                                              "minecraft:magenta_wool",
-                                              "minecraft:orange_wool",
-                                              "minecraft:pink_wool",
-                                              "minecraft:purple_wool",
-                                              "minecraft:red_wool",
-                                              "minecraft:white_wool",
-                                              "minecraft:yellow_wool"
-                                            ],
+                                            "members": [],
                                             "node": {
-                                              "item": "minecraft:black_wool",
+                                              "item": "minecraft:white_wool",
                                               "producers": [],
                                               "expandable": true,
                                               "back_reference": null

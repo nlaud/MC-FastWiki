@@ -67,6 +67,9 @@ def test_crafting_shaped_reads_the_key_pattern_and_result() -> None:
     assert producer.output.count == 1
     inputs = {i.item: i.count for i in producer.inputs}
     assert inputs == {"minecraft:stick": 2, "minecraft:iron_ingot": 3}
+    assert producer.grid_width == 3
+    assert producer.grid_height == 3
+    assert producer.grid == (1, 1, 1, None, 0, None, None, 0, None)
 
 
 def test_crafting_shaped_resolves_a_tag_ingredient_through_the_item_registry() -> None:
@@ -130,6 +133,9 @@ def test_crafting_shapeless_reads_a_list_of_ingredients() -> None:
     alternatives = by_item["minecraft:charcoal"]
     assert alternatives.tag is None
     assert alternatives.members == ("minecraft:charcoal", "minecraft:coal")
+    assert producer.grid is None
+    assert producer.grid_width is None
+    assert producer.grid_height is None
 
 
 def test_crafting_shapeless_sums_the_count_of_a_repeated_ingredient() -> None:
@@ -316,3 +322,52 @@ def test_results_are_read_in_sorted_recipe_key_order() -> None:
         }
     )
     assert [p.source_id for p in result.producers] == ["minecraft:a_recipe", "minecraft:z_recipe"]
+
+
+def test_dyeing_recipe_picks_only_white_variant_without_cycling_members() -> None:
+    """Dyeing recipes take only the white item, without an alternatives list."""
+    result = extract(
+        {
+            "dye_red_bed": {
+                "type": "minecraft:crafting_shapeless",
+                "group": "bed_dye",
+                "ingredients": [
+                    "minecraft:red_dye",
+                    [
+                        "minecraft:white_bed",
+                        "minecraft:orange_bed",
+                        "minecraft:black_bed",
+                    ],
+                ],
+                "result": {"id": "minecraft:red_bed"},
+            }
+        }
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    by_item = {i.item: i for i in producer.inputs}
+    assert "minecraft:white_bed" in by_item
+    assert "minecraft:black_bed" not in by_item
+    bed_input = by_item["minecraft:white_bed"]
+    assert bed_input.members == ()
+
+
+def test_dye_white_recipes_are_skipped() -> None:
+    """White dyeing recipes bleach colored items; white items are crafted from base materials."""
+    result = extract(
+        {
+            "dye_white_bed": {
+                "type": "minecraft:crafting_shapeless",
+                "group": "bed_dye",
+                "ingredients": [
+                    "minecraft:white_dye",
+                    ["minecraft:red_bed", "minecraft:black_bed"],
+                ],
+                "result": {"id": "minecraft:white_bed"},
+            }
+        }
+    )
+    assert len(result.producers) == 0
+    assert len(result.skipped) == 1
+    assert result.skipped[0].recipe_id == "minecraft:dye_white_bed"
+    assert "bleach" in result.skipped[0].reason

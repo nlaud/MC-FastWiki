@@ -135,13 +135,19 @@ def _namespaced(value: str) -> str:
     return value if ":" in value else f"{NAMESPACE}:{value}"
 
 
-def _resolve_ingredient(value: Any, *, tags: TagIndex, source: str) -> ProducerInput:
-    """Return one ingredient slot as a `ProducerInput`, or raise `ObtainError`.
+def _resolve_ingredient(
+    value: Any, *, tags: TagIndex, source: str, is_dye: bool = False
+) -> ProducerInput:
+    """Return `value` as a `ProducerInput`, or raise `ObtainError`.
 
     `value` is one of the three shapes the module docstring names: a plain
     id, a `#tag`, or a list of either. A list that mixes a `#tag` reference
     with plain items is not a shape this module has ever observed live, and
     it raises rather than guessing which of the two rules should apply.
+
+    When `is_dye` is true, an untagged list of colored variants resolves
+    only to the white variant as a single non-cycling input, rather than
+    cycling through all colored alternatives.
     """
     if isinstance(value, str):
         if value.startswith("#"):
@@ -157,6 +163,13 @@ def _resolve_ingredient(value: Any, *, tags: TagIndex, source: str) -> ProducerI
                 f"how to resolve it."
             )
         namespaced = sorted({_namespaced(entry) for entry in value})
+        if is_dye:
+            white_item = next(
+                (entry for entry in namespaced if entry.split(":")[-1].startswith("white_")),
+                None,
+            )
+            if white_item is not None:
+                return ProducerInput(item=white_item)
         return ProducerInput(item=namespaced[0], members=tuple(namespaced))
     raise ObtainError(
         f"{source} names an ingredient of {value!r}, which is not a resolvable shape."
@@ -199,17 +212,35 @@ def _crafting_shaped(
                 )
             counts[symbol] = counts.get(symbol, 0) + 1
 
+    sorted_symbols = sorted(counts)
+    symbol_to_input_idx = {sym: idx for idx, sym in enumerate(sorted_symbols)}
+
     inputs = tuple(
         _resolve_ingredient(key[symbol], tags=tags, source=source).model_copy(
             update={"count": counts[symbol]}
         )
-        for symbol in sorted(counts)
+        for symbol in sorted_symbols
     )
+
+    grid_height = len(pattern)
+    grid_width = max(len(row) for row in pattern) if pattern else 0
+    grid_cells: list[int | None] = []
+    for row in pattern:
+        for col_idx in range(grid_width):
+            symbol = row[col_idx] if col_idx < len(row) else _EMPTY_CELL
+            if symbol == _EMPTY_CELL:
+                grid_cells.append(None)
+            else:
+                grid_cells.append(symbol_to_input_idx[symbol])
+
     return Producer(
         method=ObtainMethod.CRAFTING,
         output=_result(document, source=source),
         inputs=inputs,
         source_id=recipe_id,
+        grid=tuple(grid_cells),
+        grid_width=grid_width,
+        grid_height=grid_height,
     )
 
 
@@ -220,7 +251,11 @@ def _crafting_shapeless(
     if not isinstance(ingredients, list) or not ingredients:
         raise ObtainError(f"{source} carries ingredients of {ingredients!r}, not a non-empty list.")
 
-    resolved = [_resolve_ingredient(entry, tags=tags, source=source) for entry in ingredients]
+    is_dye = recipe_id.startswith("minecraft:dye_") or recipe_id.startswith("dye_")
+    resolved = [
+        _resolve_ingredient(entry, tags=tags, source=source, is_dye=is_dye)
+        for entry in ingredients
+    ]
     aggregated: dict[tuple[str | None, str | None], ProducerInput] = {}
     order: list[tuple[str | None, str | None]] = []
     for entry in resolved:
@@ -322,6 +357,19 @@ def extract_recipes(files: Mapping[str, bytes], *, tags: TagIndex) -> RecipeExtr
         recipe_type = document.get("type")
         if not isinstance(recipe_type, str):
             raise ObtainError(f"{source} carries no 'type'.")
+
+        if recipe_path.startswith("dye_white_") or recipe_id.startswith("minecraft:dye_white_"):
+            skipped.append(
+                SkippedRecipe(
+                    recipe_id=recipe_id,
+                    recipe_type=recipe_type,
+                    reason=(
+                        "white dyeing recipes bleach colored items; white items are crafted from "
+                        "base materials"
+                    ),
+                )
+            )
+            continue
 
         if recipe_type.startswith(_SPECIAL_CRAFTING_PREFIX):
             skipped.append(

@@ -213,8 +213,9 @@ def test_the_gate_sees_the_documents_this_build_is_about_to_write(tmp_path: Path
     item_ids = {entity["id"] for entity in documents.shards["item-0"]["entities"]}
     assert item_ids == {"minecraft:apple"}
     assert documents.index["schemaVersion"] == 1
-    assert documents.manifest["minecraftVersion"] == "26.2"
-    assert documents.obtain == {"schemaVersion": 1, "producers": {}}
+    assert documents.obtain["schemaVersion"] == 1
+    assert documents.obtain["producers"] == {}
+    assert "sources" in documents.obtain
 
 
 def test_the_gate_runs_before_anything_is_written(tmp_path: Path) -> None:

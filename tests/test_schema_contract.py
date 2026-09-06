@@ -487,3 +487,31 @@ def test_a_real_sections_declared_properties_match_its_pydantic_model(def_name: 
     """For each of decision D2's five sections, the schema and the model declare the same fields."""
     schema_properties = set(load_schema("entity")["$defs"][def_name]["properties"])
     assert schema_properties == _serialization_aliases(REAL_SECTION_MODELS[def_name])
+
+
+def test_curated_chest_sources_completeness() -> None:
+    from pipeline.obtain import ObtainError
+    from pipeline.obtain.chests import (
+        DEFAULT_CHEST_SOURCES_PATH,
+        load_chest_sources,
+        verify_chest_sources,
+    )
+
+    assert DEFAULT_CHEST_SOURCES_PATH.is_file()
+    chests = load_chest_sources(DEFAULT_CHEST_SOURCES_PATH)
+    assert len(chests) == 54
+
+    for path, entry in chests.items():
+        assert path.startswith("loot_table/chests/")
+        assert path.endswith(".json")
+        assert entry.structure
+        assert entry.structure[0].isupper()
+        assert entry.container
+        assert entry.container[0].isupper()
+
+    # Completeness check: verifying against its own keys succeeds
+    verify_chest_sources(chests.keys(), chests)
+
+    # Missing table check: raises ObtainError
+    with pytest.raises(ObtainError, match="found 1 chest loot tables with no curated entry"):
+        verify_chest_sources(["loot_table/chests/unknown_mystery_chest.json"], chests)

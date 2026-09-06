@@ -15,24 +15,36 @@ interface TradeItem {
   globalIndex: number;
 }
 
+export interface TradeTableOptions {
+  withoutTitle?: boolean;
+}
+
 /**
  * Renders a TradeTable section:
  * - Grouped by profession, then by level in game order (Novice through Master)
  * - Wanted and given items link through their ref
  * - Collapses past 6 rows with a "Show all N trades" button
  */
-export function renderTradeTable(section: TradeTable, ctx: RenderContext): HTMLElement | null {
+export function renderTradeTable(
+  section: TradeTable,
+  ctx: RenderContext,
+  options: TradeTableOptions = {},
+): HTMLElement | null {
   if (!section.trades || section.trades.length === 0) {
     return null;
   }
 
-  const container = document.createElement("section");
-  container.className = "entity-section trade-table-section";
+  const container = document.createElement(options.withoutTitle ? "div" : "section");
+  container.className = options.withoutTitle
+    ? "trade-table-embedded"
+    : "entity-section trade-table-section";
 
-  const title = document.createElement("h3");
-  title.className = "section-title";
-  title.textContent = "Trades";
-  container.append(title);
+  if (!options.withoutTitle) {
+    const title = document.createElement("h3");
+    title.className = "section-title";
+    title.textContent = "Trades";
+    container.append(title);
+  }
 
   // Group by profession, then sort by level
   const byProfession = new Map<string, TradeItem[]>();

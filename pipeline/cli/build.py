@@ -172,6 +172,11 @@ from pipeline.normalize.reconcile import DEFAULT_REPORT_PATH as RECONCILE_REPORT
 from pipeline.normalize.reconcile import ReconciliationReport, reconcile
 from pipeline.normalize.reconcile import write_report as write_reconcile_report
 from pipeline.obtain.brewing import BrewingExtractionResult, build_brewing_producers
+from pipeline.obtain.chests import (
+    CHEST_SOURCES_FILENAME,
+    load_chest_sources,
+    verify_chest_sources,
+)
 from pipeline.obtain.loot import (
     LootExtractionResult,
     UnresolvedTradeOrDrop,
@@ -179,7 +184,7 @@ from pipeline.obtain.loot import (
     producers_from_drop_index,
     producers_from_trade_index,
 )
-from pipeline.obtain.producer import ProducerIndex
+from pipeline.obtain.producer import ObtainMethod, ProducerIndex
 from pipeline.obtain.recipes import RecipeExtractionResult, SkippedRecipe, extract_recipes
 from pipeline.validate import ValidationError, ValidationReport, validate_build
 
@@ -555,6 +560,13 @@ def run_build(
     item_tags = TagIndex(files, registry="item")
     recipe_result: RecipeExtractionResult = extract_recipes(files, tags=item_tags)
     loot_result: LootExtractionResult = extract_block_and_chest_loot(files)
+    curated_chests = load_chest_sources(CURATED_DIRECTORY / CHEST_SOURCES_FILENAME)
+    chest_tables = {
+        producer.source_id
+        for producer in loot_result.producers
+        if producer.method is ObtainMethod.CHEST_LOOT
+    }
+    verify_chest_sources(chest_tables, curated_chests)
     report(
         f"obtain, tier A: {len(recipe_result.producers)} recipe producers "
         f"({len(recipe_result.skipped)} recipes skipped), "

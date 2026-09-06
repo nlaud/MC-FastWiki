@@ -24,9 +24,33 @@
           "$ref": "#/$defs/obtainProducer"
         }
       }
+    },
+    "sources": {
+      "description": "Curated structure and container attribution for chest loot tables, keyed by source_id.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/chestSource"
+      }
     }
   },
   "$defs": {
+    "chestSource": {
+      "title": "ChestSource",
+      "description": "Curated structure and container attribution for one chest loot table.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structure", "container"],
+      "properties": {
+        "structure": {
+          "description": "The human-readable name of the structure in Title Case, e.g. 'Mineshaft' or 'Trial Chambers'.",
+          "type": "string"
+        },
+        "container": {
+          "description": "The human-readable container label in Title Case, e.g. 'Chest' or 'Intersection Barrel'.",
+          "type": "string"
+        }
+      }
+    },
     "entityId": {
       "description": "A namespaced identifier. Vanilla content uses the `minecraft` namespace. Mirrors `entity.schema.json`'s `$defs.entityId` exactly; the definition is copied rather than referenced across files, per this directory's self-containment rule in `pipeline/schema/__init__.py`.",
       "type": "string",
@@ -82,6 +106,21 @@
             "$ref": "#/$defs/obtainProducerInput"
           },
           "default": []
+        },
+        "g": {
+          "description": "Long form: grid. The pattern cells as an array of 0-based indices into `in` (inputs), or null for empty cells. Absent when no grid shape is defined (e.g. shapeless crafting, smelting).",
+          "type": "array",
+          "items": {
+            "type": ["integer", "null"]
+          }
+        },
+        "gw": {
+          "description": "Long form: gridWidth. Number of columns in the pattern grid.",
+          "type": "integer"
+        },
+        "gh": {
+          "description": "Long form: gridHeight. Number of rows in the pattern grid.",
+          "type": "integer"
         }
       }
     },
