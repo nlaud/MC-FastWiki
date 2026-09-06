@@ -7,6 +7,7 @@ import type { ObtainNode } from "./obtain-tree.js";
 import {
   buildObtainTree,
   expandStub,
+  isIngotFromNuggets,
   isOreSmelt,
   isStorageRoundTrip,
   nodeDepth,
@@ -175,9 +176,9 @@ describe("obtain-tree workstation tree rules", () => {
       }
     });
 
-    it("does not lead a branch with unpacking below the root", () => {
+    it("does not lead a branch with unpacking or nuggets below the root", () => {
       // Under any item that needs iron, the ingot branch must not open with
-      // "first obtain a Block of Iron".
+      // "first obtain a Block of Iron" or "first obtain nine Iron Nuggets".
       const pickaxe = buildObtainTree("minecraft:iron_pickaxe", graph);
       const ironInput = pickaxe.root.producers[0]?.inputs.find(
         (i) => i.item === "minecraft:iron_ingot",
@@ -185,6 +186,26 @@ describe("obtain-tree workstation tree rules", () => {
       const sub = ironInput?.node?.producers ?? [];
       for (const producer of sub) {
         expect(producer.inputs.some((i) => i.item === "minecraft:iron_block")).toBe(false);
+        expect(producer.inputs.some((i) => i.item === "minecraft:iron_nugget")).toBe(false);
+      }
+      expect(sub).toHaveLength(0);
+    });
+
+    it("marks crafting ingots from nuggets with isIngotFromNuggets", () => {
+      const ironNuggets = (graph.producers["minecraft:iron_ingot"] ?? []).find((p) =>
+        p.in?.some((i) => i.i === "minecraft:iron_nugget"),
+      );
+      expect(ironNuggets).toBeDefined();
+      if (ironNuggets) {
+        expect(isIngotFromNuggets(graph, "minecraft:iron_ingot", ironNuggets)).toBe(true);
+      }
+
+      // Reverse (ingot to nuggets) is never marked
+      const nuggetProducer = (graph.producers["minecraft:iron_nugget"] ?? []).find(
+        (p) => p.m === "crafting",
+      );
+      if (nuggetProducer) {
+        expect(isIngotFromNuggets(graph, "minecraft:iron_nugget", nuggetProducer)).toBe(false);
       }
     });
 
@@ -424,6 +445,34 @@ describe("obtain-tree workstation tree rules", () => {
       const expandedNode = expandStub(stubItemId, graph, ["minecraft:chiseled_resin_bricks"]);
       expect(expandedNode.expandable).toBe(false);
       expect(expandedNode.producers.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("beds and dyeing recipes", () => {
+    it("sorts base crafting before dyeing recipes for colored beds", () => {
+      const tree = buildObtainTree("minecraft:red_bed", graph);
+      expect(tree.root.producers.length).toBe(2);
+      // Producer 0 must be base shaped crafting (wool + planks)
+      expect(tree.root.producers[0]?.source_id).toBe("minecraft:red_bed");
+      expect(tree.root.producers[0]?.grid).toBeDefined();
+      expect(tree.root.producers[0]?.inputs.some((i) => i.item === "minecraft:red_wool")).toBe(
+        true,
+      );
+
+      // Producer 1 must be dyeing
+      expect(tree.root.producers[1]?.source_id).toBe("minecraft:dye_red_bed");
+      // The bed input must be white_bed only, with NO cycling members
+      const bedInput = tree.root.producers[1]?.inputs.find((i) => i.item === "minecraft:white_bed");
+      expect(bedInput).toBeDefined();
+      expect(bedInput?.members).toEqual([]);
+    });
+
+    it("leaves white bed with only base crafting and no dyeing producer", () => {
+      const tree = buildObtainTree("minecraft:white_bed", graph);
+      expect(tree.root.producers.length).toBe(1);
+      expect(tree.root.producers[0]?.source_id).toBe("minecraft:white_bed");
+      expect(tree.root.producers[0]?.grid).toBeDefined();
+      expect(tree.root.producers.some((p) => p.source_id.includes("dye"))).toBe(false);
     });
   });
 });

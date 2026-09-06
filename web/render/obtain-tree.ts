@@ -139,6 +139,48 @@ export function isStorageRoundTrip(
 }
 
 /**
+ * Detects whether a producer crafts an ingot from nine nuggets of the same metal
+ * -- nine Iron Nuggets into an Iron Ingot, nine Gold Nuggets into a Gold Ingot,
+ * nine Copper Nuggets into a Copper Ingot.
+ *
+ * Like storage block unpacking, this is real crafting on the ingot's own page,
+ * but below the root it is circular: nuggets come from ingots, or from smelting
+ * tools/gear, so "first obtain nine Iron Nuggets" sends the reader down an
+ * absurd detour instead of obtaining ingots from ore smelting.
+ */
+export function isIngotFromNuggets(
+  graph: Obtain,
+  outputId: string,
+  producer: ObtainProducer,
+): boolean {
+  if (producer.m !== "crafting") {
+    return false;
+  }
+  const inputs = producer.in ?? [];
+  const only = inputs.length === 1 ? inputs[0] : undefined;
+  const nuggetId = only?.i;
+  if (!nuggetId || only.t !== undefined) {
+    return false;
+  }
+  // Consumes many nuggets, yields one ingot.
+  if ((only.c ?? 1) <= 1 || (producer.c ?? 1) !== 1) {
+    return false;
+  }
+  // What it consumes is a nugget.
+  if (!nuggetId.replace(/^[a-z0-9_-]+:/, "").endsWith("_nugget")) {
+    return false;
+  }
+  return (graph.producers[nuggetId] ?? []).some((reverse) => {
+    if (reverse.m !== "crafting") {
+      return false;
+    }
+    const reverseInputs = reverse.in ?? [];
+    const reverseOnly = reverseInputs.length === 1 ? reverseInputs[0] : undefined;
+    return reverseOnly?.i === outputId && (reverse.c ?? 1) > 1;
+  });
+}
+
+/**
  * Detects whether a smelt input represents an ore block, raw metal, or ancient debris.
  *
  * Smelting an ore into its material is how a player *gets* that material out of
@@ -170,24 +212,45 @@ export function sortStations(stations: string[]): string[] {
  * how they build one. All of it goes to the Sources panel for the item being
  * looked at, and none of it extends a branch below the root.
  *
- * Unpacking a storage block is a question of depth rather than of whether it is
- * real. Opening a Block of Iron into nine ingots is a thing players do, and it
- * belongs on the Iron Ingot page, so at the root it is kept. Below the root it
- * is not: a branch that opens with "first obtain a Block of Iron" sends the
- * reader after nine of the very ingots they are trying to make.
+ * Unpacking a storage block and crafting an ingot from nine nuggets are questions
+ * of depth rather than of whether they are real. Opening a Block of Iron into nine
+ * ingots, or packing nine nuggets into an ingot, are things players do, and they
+ * belong on the Iron Ingot page, so at the root they are kept. Below the root
+ * they are not: a branch that opens with "first obtain a Block of Iron" or "first
+ * obtain nine Iron Nuggets" sends the reader after circular recipes instead of
+ * smelting ore.
  *
- * It also never leads. `sortRoundTripsLast` puts it behind the recipe that
- * builds the item out of something smaller, so the page opens on nine nuggets
+ * It also never leads. `sortRoundTripsLast` puts storage-block unpacking behind
+ * every other way of making the item, so the page opens on nine nuggets
  * becoming an ingot and offers the block as the next option along.
  */
+export function isDyeRecipe(producer: ObtainProducer): boolean {
+  return producer.src.includes(":dye_") || producer.src.startsWith("dye_");
+}
+
+function sortDyeLast(producers: ObtainProducer[]): ObtainProducer[] {
+  const hasBaseCraft = producers.some((p) => p.m === "crafting" && !isDyeRecipe(p));
+  if (!hasBaseCraft) {
+    return producers;
+  }
+  return [...producers].sort((left, right) => {
+    const leftDye = isDyeRecipe(left) ? 1 : 0;
+    const rightDye = isDyeRecipe(right) ? 1 : 0;
+    return leftDye - rightDye;
+  });
+}
+
 function manipulationProducersOf(graph: Obtain, itemId: string, isRoot: boolean): ObtainProducer[] {
   const kept = (graph.producers[itemId] ?? []).filter((producer) => {
     if (isAcquisition(graph, producer)) {
       return false;
     }
-    return isRoot || !isStorageRoundTrip(graph, itemId, producer);
+    return (
+      isRoot ||
+      (!isStorageRoundTrip(graph, itemId, producer) && !isIngotFromNuggets(graph, itemId, producer))
+    );
   });
-  return sortRoundTripsLast(graph, itemId, kept);
+  return sortRoundTripsLast(graph, itemId, sortDyeLast(kept));
 }
 
 /** Orders storage-block unpacking behind every other way of making the item. */

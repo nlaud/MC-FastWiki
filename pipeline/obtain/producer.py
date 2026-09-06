@@ -175,9 +175,22 @@ class Producer(BaseModel, frozen=True):
         return self
 
 
-def _sort_key(producer: Producer) -> tuple[str, str, str]:
-    """Return the `(method, output item id, source_id)` sort key `TODO.md` names."""
-    return (producer.method.value, producer.output.item, producer.source_id)
+def _sort_key(producer: Producer) -> tuple[str, str, int, str]:
+    """Return the deterministic sort key for one producer.
+
+    Base crafting recipes sort before dyeing/recoloring recipes
+    (source_id starting with 'minecraft:dye_' or 'dye_'), so canonical
+    construction (e.g. wool + planks for beds) leads ahead of recoloring.
+    """
+    is_dye = (
+        1
+        if (
+            producer.source_id.startswith("minecraft:dye_")
+            or producer.source_id.startswith("dye_")
+        )
+        else 0
+    )
+    return (producer.method.value, producer.output.item, is_dye, producer.source_id)
 
 
 class ProducerIndex(BaseModel, frozen=True):

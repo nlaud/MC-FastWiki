@@ -110,6 +110,27 @@ def test_from_producers_sorts_each_output_groups_producers_by_method_then_source
     ]
 
 
+def test_from_producers_sorts_base_recipes_before_dye_recipes() -> None:
+    """Base crafting recipes sort before dyeing recipes for the same item."""
+    unsorted = [
+        producer(
+            method=ObtainMethod.CRAFTING,
+            output="minecraft:red_bed",
+            source_id="minecraft:dye_red_bed",
+        ),
+        producer(
+            method=ObtainMethod.CRAFTING,
+            output="minecraft:red_bed",
+            source_id="minecraft:red_bed",
+        ),
+    ]
+    index = ProducerIndex.from_producers(unsorted)
+    assert [p.source_id for p in index.producers_of("minecraft:red_bed")] == [
+        "minecraft:red_bed",
+        "minecraft:dye_red_bed",
+    ]
+
+
 def test_from_producers_is_deterministic_regardless_of_input_order() -> None:
     """The same producers, handed in two different orders, sort identically.
 
