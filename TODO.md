@@ -11,29 +11,12 @@ reasoning survives even after the choice is made.
 ## Phase 6 — Content renderers
 
 - [ ] **Block** — drops and natural generation.
-      Harvest tool and tier now ship as the `HarvestInfo` section, from
-      `pipeline/extract/harvest.py` through a new emit in `pipeline/normalize/merge.py`. 861
-      blocks carry it. Drops and natural generation are still open: block drops are visible
-      only through the obtain tree's `block_drop` producers, and no natural-generation data
-      reaches `data/dist` at all.
+      Harvest tool and tier ship as the `HarvestInfo` section from `pipeline/extract/harvest.py`.
+      Block drops ship in `HarvestInfo.drops` from mcmeta loot tables via `pipeline/normalize/merge.py`,
+      rendering interactively on web alongside tool and tier requirements.
+      Natural generation is still open: no natural-generation data reaches `data/dist` at all.
 - [ ] **Effect** — every source of the effect, and what it actually does.
       Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
-- [ ] Two advancement icons the display-name join resolves imprecisely, left as follow-ups
-      because both are data faults rather than route faults.
-      `Local Brewery` names `Uncraftable Potion`, which has no atlas frame under any sprite
-      family, so it is the one advancement of 126 still carrying `icon: None`; it is reported in
-      `data/reports/merge-report.json` rather than hidden.
-      `Hero of the Village` and `Voluntary Exile` name `Ominous Banner`, which the registry has
-      no separate item for — it is a white banner carrying a pattern — so the join answers
-      `minecraft:white_banner` truthfully and the window draws a plain white banner.
-      Both want a curated per-sprite override naming a verified `File:` title, the same
-      mechanism Decision 15 leaves open for the three oversized sprites.
-- [ ] Curated per-sprite overrides for the three oversized icons (`InvSprite:Sculk`,
-      `InvSprite:Sculk Shrieker`, `InvSprite:Zombie Horse Spawn Egg`), naming a verified `File:`
-      title in `/data/curated` per Decision 3.
-      This is now unblocked: the renderer ships, so an icon can be looked at beside a real 16x16
-      item sprite, which is what confirming a replacement needed.
-      See Decision 15 for why the fix is a curated override and not a packer-level resize.
 
 ## Phase 6b — Obtaining, scraped from the wiki
 
@@ -97,15 +80,19 @@ loot tables (see Decision 11).
 - [ ] Trade → the item traded; item → the professions that sell it
 - [ ] Enchantment → the items that accept it
 - [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
-      Two real cases already exist in the 26.2 build, found by rendering it: the `Potato` drop on
-      Zombie and the `Music Disc` trade carry no `itemRef`, yet both names resolve in `index.json`.
-      The renderer prints them as plain text, which is correct behaviour for a missing ref, so the
-      fix belongs in the name-to-ID resolution of `pipeline/normalize/merge.py`, not in `/web`.
-      Ten further names carry no ref and have no index entry either — `Boat`, `Wool`,
-      `Pufferfish (item)`, `Arrow of Poison` and similar. Those are wiki display names that name a
-      group rather than one registry entry, so the lint has to tell the two cases apart rather than
-      flagging every ref-less name.
-- [ ] This is more or less implemented already, but there are some links that should show up but dont. For example the elder guardian drops does not properly link to tide armor trim, and pig breeding does not properly link to potato. Root cause and fix ALL of these possible issues.
+      The named cases this bullet was written for are resolved: `Potato`, `Pufferfish (item)`,
+      `Arrow of Poison` and `Music Disc <Song>` all carry an `itemRef` now, through the rules
+      Decision 20 records. What is left is the general case, and it is still worth a lint, because
+      the rules were found by reading a rendered page rather than by any check that would have
+      reported them.
+      The remaining ref-less names are the ones a lint has to learn not to flag, and the 33 the
+      26.2 build still reports fall into three groups, none of them a fault: `Any color Wool`,
+      `Any color Bed` and the rest of that family name a variant group rather than one registry
+      entry; `Explorer Map`, `Ocean Explorer Map` and `Banner` name map or pattern data carried on
+      a stack; and `Cold Chicken`, `Pale Wolf` and the other mob-variant names are wiki names for
+      a texture variant that shares one `entity_type`.
+      `data/reports/merge-report.json` lists all 33 as `unplaced`, which is where such a lint
+      should read from rather than re-deriving the set.
 
 ## Phase 7 — Collections (the special search terms)
 
@@ -306,12 +293,11 @@ New collections the added data makes nearly free:
     perspective, not inventory icons, so no resampling makes them read correctly beside a flat
     16x16 item sprite, which makes this a data fault, not a packing one.
 
-    What remains open is a curated per-sprite override naming a verified `File:` title for
-    `InvSprite:Sculk`, `InvSprite:Sculk Shrieker`, and `InvSprite:Zombie Horse Spawn Egg`, tracked
-    under Phase 6 because it needs eyes on a rendered icon to confirm a replacement actually reads
-    correctly at icon size.
-    A curated override is compatible with this decision, because a human recording a checked
-    filename is not the pipeline guessing one.
+    The curated per-sprite overrides naming verified `File:` titles for `InvSprite:Sculk`
+    (`BlockSprite:sculk`), `InvSprite:Sculk Shrieker` (`BlockSprite:sculk-shrieker`), and
+    `InvSprite:Zombie Horse Spawn Egg` (`ItemSprite:zombie-horse-spawn-egg`) were added to
+    `/data/curated/overrides.json`, packing the atlas cleanly to 512x2228 without any packer-level
+    resizing.
     The seven 1x1 frames (`Cave Air`, `Void Air`, and the five marker and display entities) are
     correct and need nothing, because the thing they draw really is invisible.
 
@@ -390,6 +376,43 @@ New collections the added data makes nearly free:
     26 mobs carry a damage figure without a hostile behaviour, Enderman, Iron Golem, Bee and
     Cave Spider among them, and hiding what an iron golem hits for is the wrong answer to a
     question a match actually asks.
+
+20. **A display name the wiki writes but no registry carries is resolved by a named rule, or not at all.**
+    Four families of name reached no registry ID and so rendered as dead plain text: `<Pattern>
+    Armor Trim` (the elder guardian's `Tide Armor Trim` drop), `Arrow of <Effect>` (the Bogged,
+    Parched and Stray drops), `<item> (item)` (the `Pufferfish (item)` and `Tropical Fish (item)`
+    trades), and `Music Disc <Song>`. Each is a nickname for something that does have an ID -- an
+    enchantment, a potion component and a page-title disambiguator are all data on a stack or on a
+    page, not separate registry entries -- so each gets one rule that names the alternative, tried
+    only after the exact name has already failed.
+
+    The three rules both `pipeline.normalize.merge` and `pipeline.obtain.loot` need live in
+    `pipeline.enrich.resource_location`, which owns the join table they both read. A second copy
+    in the second module would have been the cheaper edit and is exactly the drift this repository
+    keeps paying for elsewhere.
+
+    Separately, a name matching several IDs is now disambiguated rather than dropped, but only on
+    evidence: an ID that never became an entity loses to one that did (which is the whole of the
+    `Potato` case -- the April Fools `snektato` shares the display name and reaches no page), then
+    a wiki page titled exactly the name wins, then a registry path matching the name's slug wins.
+    A name that survives all three with more than one candidate is still left unlinked, because
+    `Music Disc` really does name all 23 discs and guessing one would put a wrong ID on a wiki fact.
+
+    Measured against the committed build the change is strictly additive: 13 names newly resolve,
+    no name changes target, and none stops resolving.
+
+21. **An icon the join resolves imprecisely is corrected by a curated override, never by the packer.**
+    Three advancements named an icon the atlas could not serve honestly. `Local Brewery` names
+    `Uncraftable Potion`, which has no frame under any sprite family, and was the one advancement
+    of 126 carrying `icon: None`. `Hero of the Village` and `Voluntary Exile` name `Ominous
+    Banner`, which the registry has no separate item for -- it is a white banner carrying a
+    pattern -- so the join answered `minecraft:white_banner` truthfully and the window drew a
+    plain white banner.
+
+    Both are data faults rather than route faults, so both are fixed the way Decision 3 requires
+    and Decision 15 already applied to the three oversized sprites: a hand-recorded, verified
+    `File:` title in `/data/curated/overrides.json`. A human recording a checked filename is not
+    the pipeline guessing one.
 
 ## Still open
 

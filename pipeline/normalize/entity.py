@@ -135,6 +135,7 @@ __all__ = [
     "FoodEffect",
     "FoodInfo",
     "GenerationInfo",
+    "HarvestDrop",
     "HarvestInfo",
     "HarvestTier",
     "HarvestTool",
@@ -740,18 +741,31 @@ class FoodInfo(BaseModel, frozen=True, populate_by_name=True):
     teleports_randomly: bool = Field(default=False, alias="teleportsRandomly")
 
 
+class HarvestDrop(BaseModel, frozen=True, populate_by_name=True):
+    """An item dropped when this block is broken.
+
+    `silk_touch` indicates whether this drop requires the Silk Touch enchantment.
+    """
+
+    id: str
+    name: str | None = None
+    count: int = 1
+    silk_touch: bool = Field(default=False, alias="silkTouch")
+
+
 class HarvestInfo(BaseModel, frozen=True, populate_by_name=True):
     """What tool and tier are needed to harvest a block.
 
     Carries the tool list in the order of `HarvestTool`, the material floor tier
-    from `HarvestTier`, and whether breaking the block without the right tool
-    still drops itself.
+    from `HarvestTier`, whether breaking the block without the right tool
+    still drops itself, and what the block drops when broken.
     """
 
     type: Literal["HarvestInfo"] = "HarvestInfo"
     tools: tuple[HarvestTool, ...] = ()
     tier: HarvestTier
     drops_without_tool: bool = Field(default=False, alias="dropsWithoutTool")
+    drops: tuple[HarvestDrop, ...] = ()
 
 
 class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
@@ -1015,6 +1029,11 @@ class EntityDraft:
         self._aliases: dict[str, SourceTier] = {}
         self._sections: dict[str, Section] = {}
         self._provenance: dict[str, SourceTier] = {"id": tier, "kind": tier, "name": tier}
+
+    @property
+    def name(self) -> str:
+        """The display name set so far."""
+        return self._name
 
     @property
     def wiki_url(self) -> str | None:

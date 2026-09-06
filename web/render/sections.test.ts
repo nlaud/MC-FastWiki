@@ -735,6 +735,69 @@ describe("Section renderers with real committed build data", () => {
       expect(el.textContent).toContain("Stone");
       expect(el.textContent).not.toContain("Stone (any)");
     });
+
+    it("links every drop and badges only the silk touch ones", () => {
+      const harvestSection: HarvestInfo = {
+        type: "HarvestInfo",
+        tools: ["pickaxe"],
+        tier: "iron",
+        dropsWithoutTool: false,
+        drops: [
+          { id: "minecraft:diamond_ore", name: "Diamond Ore", count: 1, silkTouch: true },
+          { id: "minecraft:diamond", name: "Diamond", count: 1, silkTouch: false },
+        ],
+      };
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      expect(el.textContent).toContain("Drops");
+      const links = el.querySelectorAll(".entity-link");
+      expect(links.length).toBe(2);
+      // The plain drop sorts ahead of the silk-touch one whatever order it arrived in.
+      expect(requireItem(links[0], "first link").textContent).toBe("Diamond");
+      expect(requireItem(links[1], "second link").textContent).toBe("Diamond Ore");
+
+      const badges = el.querySelectorAll(".sources-note-badge");
+      expect(badges.length).toBe(1);
+      expect(requireItem(badges[0], "silk touch badge").textContent).toBe("requires silk touch");
+      const badged = requireItem(
+        requireItem(badges[0], "silk touch badge").closest(".harvest-drop"),
+        "badged drop",
+      );
+      expect(requireItem(badged.querySelector(".entity-name"), "badged name").textContent).toBe(
+        "Diamond Ore",
+      );
+    });
+
+    it("prints a drop count above one and omits it at one", () => {
+      const harvestSection: HarvestInfo = {
+        type: "HarvestInfo",
+        tools: ["pickaxe"],
+        tier: "iron",
+        dropsWithoutTool: false,
+        drops: [
+          { id: "minecraft:redstone", name: "Redstone Dust", count: 4, silkTouch: false },
+          { id: "minecraft:diamond", name: "Diamond", count: 1, silkTouch: false },
+        ],
+      };
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      const quantities = el.querySelectorAll(".item-quantity");
+      expect(quantities.length).toBe(1);
+      expect(requireItem(quantities[0], "quantity").textContent).toBe("4 ");
+    });
+
+    it("omits the drops row when the section carries none", () => {
+      const harvestSection: HarvestInfo = {
+        type: "HarvestInfo",
+        tools: ["pickaxe"],
+        tier: "iron",
+        dropsWithoutTool: false,
+        drops: [],
+      };
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+
+      expect(el.querySelector(".harvest-drops")).toBeNull();
+    });
   });
 
   describe("renderRecipeTree", () => {

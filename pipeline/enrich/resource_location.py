@@ -80,6 +80,8 @@ __all__ = [
     "NO_DISPLAY_NAME",
     "JoinTable",
     "ResourceLocation",
+    "alternative_names",
+    "alternative_registry_id",
     "fetch_join_table",
     "parse_resource_locations",
 ]
@@ -349,3 +351,56 @@ def fetch_join_table(
         transport=transport,
     )
     return parse_resource_locations(rows)
+
+
+def alternative_names(name: str) -> tuple[str, ...]:
+    """Return the other display names `name` may be written as, in try order.
+
+    A wiki table names a thing the way a player says it, and for two families
+    that phrasing is shorter than the display name any row actually carries.
+    Both are the same shape of miss: the exact name joins to nothing, not
+    because the item is absent but because the wiki wrote a nickname for it.
+
+    **`<Pattern> Armor Trim` is `<Pattern> Armor Trim Smithing Template`.** The
+    trim is the pattern applied to a piece of armor; the thing that has a
+    registry ID is the smithing template that applies it. `droptable` writes
+    the elder guardian's drop as `Tide Armor Trim`, which is what the loot is
+    called in game, and there is no `minecraft:tide_armor_trim` for that to
+    reach.
+
+    **`Arrow of <Effect>` is `Tipped Arrow`.** The effect is a potion component
+    on the stack, not a registry entry, exactly as `Enchanted <item>` is an
+    enchantment on a stack -- there is no `minecraft:arrow_of_poison`. Bogged,
+    Parched and Stray all drop one and all three rows resolved to nothing
+    without this.
+
+    Callers try the exact name first and reach here only on a miss, which is
+    what keeps a name that is already a real row pointing at itself.
+    """
+    if name.endswith(" Armor Trim"):
+        return (f"{name} Smithing Template",)
+    if name.startswith("Arrow of "):
+        return ("Tipped Arrow",)
+    return ()
+
+
+def alternative_registry_id(name: str) -> str | None:
+    """Return the registry ID `name` names outright, where no row joins to it.
+
+    One family cannot go through `alternative_names`, because the name it
+    would have to resolve through is not unique: all 23 music discs carry the
+    display name `Music Disc`, as this module's own docstring says, so a row
+    naming one disc has no display name that reaches only that disc. The wiki
+    disambiguates them by page -- `Music Disc Tears`, `Music Disc Lava
+    Chicken` -- and those page titles map to `minecraft:music_disc_<slug>` by
+    construction, which is a rule about the vanilla naming scheme rather than
+    a guess about which disc was meant.
+
+    Returns `None` for every other name. A caller still has to check the ID it
+    gets back against a real registry, because this builds a candidate rather
+    than confirming one.
+    """
+    if not name.startswith("Music Disc "):
+        return None
+    slug = name.removeprefix("Music Disc ").strip().casefold().replace(" ", "_")
+    return f"{NAMESPACE}:music_disc_{slug}"

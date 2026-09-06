@@ -199,7 +199,7 @@ module's precedence names that the mcmeta payload does not publish.
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
@@ -210,7 +210,13 @@ from pipeline.enrich import droptable as enrich_droptable
 from pipeline.enrich import infobox as enrich_infobox
 from pipeline.enrich import spawn_table as enrich_spawn_table
 from pipeline.enrich import trade as enrich_trade
-from pipeline.enrich.resource_location import NAMESPACE, JoinTable, ResourceLocation
+from pipeline.enrich.resource_location import (
+    NAMESPACE,
+    JoinTable,
+    ResourceLocation,
+    alternative_names,
+    alternative_registry_id,
+)
 from pipeline.enrich.sprite import SpriteIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
@@ -235,6 +241,7 @@ from pipeline.normalize.entity import (
     EntityRef,
     FoodEffect,
     FoodInfo,
+    HarvestDrop,
     HarvestInfo,
     IntegerRange,
     ItemAmount,
@@ -255,6 +262,8 @@ from pipeline.normalize.entity import (
 )
 from pipeline.normalize.reconcile import ICON_RULES, resolve_display_name_icon, resolve_icon
 from pipeline.obtain.brewing import POTION_ID_TEMPLATE
+from pipeline.obtain.loot import SILK_TOUCH_NOTE
+from pipeline.obtain.producer import ObtainMethod, Producer
 
 __all__ = [
     "DEFAULT_REPORT_PATH",
@@ -266,6 +275,7 @@ __all__ = [
     "MultiRegistryId",
     "UndecidedEntityType",
     "UnplacedRow",
+    "block_drops_from_producers",
     "merge_entities",
     "write_report",
 ]
@@ -401,6 +411,12 @@ _STRONG_POTION_PREFIX = "strong_"
 # than a separate item. `_wiki_rows` strips this prefix, but only after the
 # full name has failed to resolve; see that function's own docstring.
 ENCHANTED_PREFIX = "Enchanted "
+
+# The wiki's own disambiguator between a mob and the item it drops -- `Pufferfish
+# (item)` against the pufferfish mob. It is page-title punctuation, never part of
+# a name the game uses, so `_wiki_rows` strips it on the same terms as the prefix
+# above: only after the full name has failed to resolve.
+ITEM_SUFFIX = " (item)"
 
 
 def _potion_name(path: str) -> str:
@@ -541,6 +557,26 @@ def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[Resourc
     finds nothing, which is what keeps `Enchanted Book` and `Enchanted Golden
     Apple` pointing at themselves: both are real registry items, both resolve
     on the first attempt, and neither ever reaches the second.
+
+    **`<item> (item)` falls back to `<item>`.** The parenthetical is the wiki's
+    own disambiguator between a mob and the item it drops, not part of any
+    name the game uses. `Tropical Fish (item)` and `Pufferfish (item)` are
+    both written that way by `trade` and by the food lists, and neither has a
+    registry entry under the suffixed spelling.
+
+    **Two families resolve through `pipeline.enrich.resource_location`.**
+    `<Pattern> Armor Trim` and `Arrow of <Effect>` are nicknames for a longer
+    display name, and `Music Disc <Song>` is a page title that names a
+    registry ID outright; that module owns all three because
+    `pipeline.obtain.loot` reads the identical rules against the same join
+    table, and a second copy of them here would be free to drift.
+
+    **A page title is the last resort.** Some rows carry a display name the
+    bucket never lists but a page title does -- `Leather Tunic` for
+    `minecraft:leather_chestplate`, `The End (biome)` for `minecraft:the_end`.
+    It runs last because a page title is a weaker claim than a display name:
+    one page can name several rows, and a page match that is ambiguous is
+    handled by `_disambiguate_ids` or dropped, never guessed.
     """
     wanted = WIKI_KIND.get(registry, ())
 
@@ -550,9 +586,33 @@ def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[Resourc
         )
 
     rows = rows_for(name)
-    if rows or not name.startswith(ENCHANTED_PREFIX):
+    if rows:
         return rows
-    return rows_for(name.removeprefix(ENCHANTED_PREFIX))
+
+    if name.startswith(ENCHANTED_PREFIX):
+        rows = rows_for(name.removeprefix(ENCHANTED_PREFIX))
+        if rows:
+            return rows
+
+    if name.endswith(ITEM_SUFFIX):
+        rows = rows_for(name.removesuffix(ITEM_SUFFIX))
+        if rows:
+            return rows
+
+    for alternative in alternative_names(name):
+        rows = rows_for(alternative)
+        if rows:
+            return rows
+
+    direct_id = alternative_registry_id(name)
+    if direct_id is not None:
+        rows = tuple(
+            row for row in join_table.by_registry_id.get(direct_id, ()) if row.kind in wanted
+        )
+        if rows:
+            return rows
+
+    return tuple(row for row in join_table.entries if row.page == name and row.kind in wanted)
 
 
 def _own_row(
@@ -668,6 +728,53 @@ def _own_row(
     return None
 
 
+def _disambiguate_ids(
+    name: str,
+    ids: set[str],
+    rows: Sequence[ResourceLocation],
+    by_id: Mapping[str, object],
+    *,
+    registry: str,
+) -> set[str]:
+    """Disambiguate multiple candidate registry IDs for a display name.
+
+    1. Filter candidates against `by_id` (accounting for entity_type prefixing).
+       This safely removes joke/April Fools items such as `minecraft:snektato`
+       sharing the display name 'Potato' with `minecraft:potato`.
+    2. Prefer candidates whose wiki page title matches `name` exactly.
+    3. Prefer candidates whose registry path matches the lookup name slug exactly.
+    """
+    if len(ids) <= 1:
+        return ids
+
+    def in_by_id(target: str) -> bool:
+        if target in by_id:
+            return True
+        if registry == "entity_type":
+            path = target.split(":", 1)[-1]
+            if f"{NAMESPACE}:entity_type/{path}" in by_id:
+                return True
+        return False
+
+    valid_ids = {i for i in ids if in_by_id(i)}
+    if len(valid_ids) == 1:
+        return valid_ids
+
+    candidates = valid_ids if valid_ids else ids
+    on_page = {
+        row.registry_id for row in rows if row.page == name and row.registry_id in candidates
+    }
+    if len(on_page) == 1:
+        return on_page
+
+    slug = name.casefold().replace(" ", "_")
+    exact = {i for i in candidates if i.split(":", 1)[-1] == slug}
+    if len(exact) == 1:
+        return exact
+
+    return candidates
+
+
 def _maybe_ref(
     name: str, registry: str, join_table: JoinTable, by_id: Mapping[str, object]
 ) -> EntityRef | None:
@@ -682,6 +789,8 @@ def _maybe_ref(
     """
     rows = _wiki_rows(name, registry, join_table)
     ids = {row.registry_id for row in rows}
+    if len(ids) > 1:
+        ids = _disambiguate_ids(name, ids, rows, by_id, registry=registry)
     if len(ids) != 1:
         return None
     target = next(iter(ids))
@@ -719,6 +828,8 @@ def _resolve_forward(
             )
         )
         return None
+    if len(ids) > 1:
+        ids = _disambiguate_ids(name, ids, rows, by_id, registry=registry)
     if len(ids) > 1:
         unplaced.append(
             UnplacedRow(
@@ -1152,6 +1263,48 @@ def _build_food_info(
     )
 
 
+def block_drops_from_producers(
+    producers: Iterable[Producer],
+) -> dict[str, tuple[HarvestDrop, ...]]:
+    """Return what each block drops, keyed by the block's registry ID.
+
+    `pipeline.obtain.loot` has already read every block loot table into
+    `BLOCK_DROP` producers, so this is a re-key of work that exists rather than
+    a second read of the same JSON: a producer answers "what makes this item",
+    and `HarvestInfo` needs the transpose, "what does this block make". The one
+    input of a `BLOCK_DROP` producer is the block itself, which is the key.
+
+    Silk touch is read from `Producer.note` against `loot.SILK_TOUCH_NOTE`
+    rather than re-derived, for the reason that constant's own comment gives:
+    the gate is decided once, while the loot table is being walked, and any
+    second opinion formed here could disagree with the obtain tree drawn from
+    the same producers on the same page.
+
+    Duplicates are dropped. One block can reach the same `(item, count,
+    silk touch)` leaf down more than one branch of an `alternatives` tree --
+    every leaf-and-sapling table does -- and a drops row that printed the same
+    item twice would be reporting the loot table's shape, not the block's
+    drops. Order is otherwise the order the tables were walked in, which is the
+    order the entries appear in the file.
+    """
+    drops: dict[str, list[HarvestDrop]] = {}
+    for producer in producers:
+        if producer.method is not ObtainMethod.BLOCK_DROP or not producer.inputs:
+            continue
+        block_id = producer.inputs[0].item
+        if block_id is None:
+            continue
+        drop = HarvestDrop(
+            id=producer.output.item,
+            count=producer.output.count,
+            silk_touch=producer.note == SILK_TOUCH_NOTE,
+        )
+        seen = drops.setdefault(block_id, [])
+        if drop not in seen:
+            seen.append(drop)
+    return {block_id: tuple(items) for block_id, items in drops.items()}
+
+
 def merge_entities(
     *,
     registries: Mapping[str, Sequence[str]],
@@ -1169,6 +1322,7 @@ def merge_entities(
     breeding_index: enrich_breeding.BreedingIndex | None = None,
     food_index: Mapping[str, FoodFacts] | None = None,
     harvest_index: Mapping[str, BlockHarvest] | None = None,
+    block_drops: Mapping[str, Sequence[HarvestDrop]] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1607,10 +1761,21 @@ def merge_entities(
                 HarvestTool.PICKAXE not in harvest_facts.tools
                 and harvest_facts.tier is HarvestTier.WOODEN
             )
+            raw_drops = block_drops.get(block_id, ()) if block_drops is not None else ()
+            drops_with_names = tuple(
+                HarvestDrop(
+                    id=drop.id,
+                    name=drafts[drop.id].name if drop.id in drafts else drop.name,
+                    count=drop.count,
+                    silk_touch=drop.silk_touch,
+                )
+                for drop in raw_drops
+            )
             harvest_section = HarvestInfo(
                 tools=harvest_facts.tools,
                 tier=harvest_facts.tier,
                 drops_without_tool=drops_without_tool,
+                drops=drops_with_names,
             )
             block_draft.add_section_first(harvest_section, SourceTier.A)
 
