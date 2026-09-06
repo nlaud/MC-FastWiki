@@ -31,7 +31,7 @@ from pipeline.enrich.droptable import DropIndex, LootingDrop, MobDrop
 from pipeline.enrich.droptable import Ratio as DropRatio
 from pipeline.enrich.infobox import EntityInfobox, HealthValue, InfoboxReport
 from pipeline.enrich.infobox import Measure as InfoboxMeasure
-from pipeline.enrich.resource_location import parse_resource_locations
+from pipeline.enrich.resource_location import JoinTable, parse_resource_locations
 from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
@@ -40,8 +40,22 @@ from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.fetch.extracts import ExtractReport, PageExtract
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
-from pipeline.normalize.entity import BreedingInfo, EntityKind, HarvestInfo, SourceTier
-from pipeline.normalize.merge import MergeResult, merge_entities, write_report
+from pipeline.normalize.entity import (
+    BreedingInfo,
+    EntityKind,
+    HarvestDrop,
+    HarvestInfo,
+    SourceTier,
+)
+from pipeline.normalize.merge import (
+    MergeResult,
+    _maybe_ref,
+    block_drops_from_producers,
+    merge_entities,
+    write_report,
+)
+from pipeline.obtain.loot import SILK_TOUCH_NOTE
+from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
 
 # --- Fixture builders -------------------------------------------------------
 
@@ -1364,3 +1378,110 @@ def test_harvest_info_unplaced_row_recorded() -> None:
     assert len(unplaced) == 1
     assert unplaced[0].subject == "minecraft:ghost_block"
 
+
+@pytest.fixture(name="ref_join_table")
+def _ref_join_table() -> tuple[JoinTable, dict[str, object]]:
+    """A join table holding every display-name shape `_maybe_ref` has a rule for."""
+    rows = [
+        rl_row("Potato", "potato", "item"),
+        # `snektato` is the April Fools item whose display name is also "Potato".
+        # It reaches the registry but never becomes an entity, which is the only
+        # thing that separates the two rows.
+        rl_row("Potato", "snektato", "item"),
+        rl_row("Tide Armor Trim Smithing Template", "tide_armor_trim_smithing_template", "item"),
+        rl_row("Tipped Arrow", "tipped_arrow", "item"),
+        rl_row("Pufferfish", "pufferfish", "item"),
+        # All 23 discs share one display name, so only the page title tells them apart.
+        rl_row("Music Disc", "music_disc_tears", "item") | {"page_name": "Music Disc Tears"},
+        rl_row("Music Disc", "music_disc_11", "item") | {"page_name": "Music Disc 11"},
+    ]
+    by_id: dict[str, object] = {
+        "minecraft:potato": object(),
+        "minecraft:tide_armor_trim_smithing_template": object(),
+        "minecraft:tipped_arrow": object(),
+        "minecraft:pufferfish": object(),
+        "minecraft:music_disc_tears": object(),
+        "minecraft:music_disc_11": object(),
+    }
+    return parse_resource_locations(rows), by_id
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        # Two rows share "Potato"; only one of them is a built entity.
+        ("Potato", "minecraft:potato"),
+        # The trim is named for the pattern, the registry for the template.
+        ("Tide Armor Trim", "minecraft:tide_armor_trim_smithing_template"),
+        # The effect is a component on the stack, not a registry entry.
+        ("Arrow of Poison", "minecraft:tipped_arrow"),
+        # The page title names the disc; the display name names all 23.
+        ("Music Disc Tears", "minecraft:music_disc_tears"),
+        # The parenthetical is the wiki's mob-vs-item disambiguator.
+        ("Pufferfish (item)", "minecraft:pufferfish"),
+    ],
+)
+def test_maybe_ref_resolves_the_names_the_wiki_writes(
+    ref_join_table: tuple[JoinTable, dict[str, object]], name: str, expected: str
+) -> None:
+    join_table, by_id = ref_join_table
+    ref = _maybe_ref(name, "item", join_table, by_id)
+    assert ref is not None
+    assert ref.id == expected
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # Names a variant group, not one registry entry.
+        "Wool",
+        "Flowers",
+        # Names all 23 discs at once.
+        "Music Disc",
+    ],
+)
+def test_maybe_ref_leaves_a_collective_name_unlinked(
+    ref_join_table: tuple[JoinTable, dict[str, object]], name: str
+) -> None:
+    join_table, by_id = ref_join_table
+    assert _maybe_ref(name, "item", join_table, by_id) is None
+
+
+def test_block_drops_from_producers_keys_drops_by_the_block() -> None:
+    producers = [
+        Producer(
+            method=ObtainMethod.BLOCK_DROP,
+            output=ProducerOutput(item="minecraft:diamond", count=1),
+            inputs=(ProducerInput(item="minecraft:diamond_ore"),),
+            source_id="loot_table/blocks/diamond_ore.json",
+        ),
+        Producer(
+            method=ObtainMethod.BLOCK_DROP,
+            output=ProducerOutput(item="minecraft:diamond_ore", count=1),
+            inputs=(ProducerInput(item="minecraft:diamond_ore"),),
+            source_id="loot_table/blocks/diamond_ore.json",
+            note=SILK_TOUCH_NOTE,
+        ),
+        # The same leaf reached down a second branch of one alternatives tree.
+        Producer(
+            method=ObtainMethod.BLOCK_DROP,
+            output=ProducerOutput(item="minecraft:diamond", count=1),
+            inputs=(ProducerInput(item="minecraft:diamond_ore"),),
+            source_id="loot_table/blocks/diamond_ore.json",
+        ),
+        # Not a block drop, so it names no block and belongs to no drops row.
+        Producer(
+            method=ObtainMethod.CHEST_LOOT,
+            output=ProducerOutput(item="minecraft:diamond", count=1),
+            inputs=(),
+            source_id="loot_table/chests/simple_dungeon.json",
+        ),
+    ]
+
+    drops = block_drops_from_producers(producers)
+
+    assert set(drops) == {"minecraft:diamond_ore"}
+    assert drops["minecraft:diamond_ore"] == (
+        HarvestDrop(id="minecraft:diamond", count=1, silk_touch=False),
+        HarvestDrop(id="minecraft:diamond_ore", count=1, silk_touch=True),
+    )

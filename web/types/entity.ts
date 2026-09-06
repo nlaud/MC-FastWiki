@@ -417,6 +417,22 @@ export interface HarvestInfo {
    * Whether the block drops itself when broken without the required tool.
    */
   dropsWithoutTool: boolean;
+  /**
+   * Items dropped when the block is harvested, including standard and silk touch drops.
+   */
+  drops?: HarvestDrop[];
+}
+/**
+ * An item dropped when this block is broken.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "harvestDrop".
+ */
+export interface HarvestDrop {
+  id: string;
+  name?: string;
+  count?: number;
+  silkTouch?: boolean;
 }
 /**
  * Every source of a status effect. The payload of this section arrives in Phase 6.

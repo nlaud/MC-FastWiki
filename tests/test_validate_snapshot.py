@@ -122,15 +122,14 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "entity": 28,
     }
     assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2128)
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2097, "blurb": 1971, "icon": 2035}
+    # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2097, "blurb": 1971, "icon": 2036}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
-        # to `<item>`. 15 trade rows had resolved to nothing, and 12 of the
-        # items they name carried no trade table at all as a result -- Diamond
-        # Chestplate, Diamond Pickaxe, Diamond Sword and Fishing Rod among
-        # them. The other 3 land on items that already had a table.
-        "TradeTable": 169,
+        # to `<item>`. 169 before Potato trade disambiguation resolved onto
+        # minecraft:potato.
+        "TradeTable": 170,
         "StatBlock": 93,
         "DropTable": 65,
         "SpawnInfo": 53,
@@ -142,12 +141,11 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "FoodInfo": 45,
         "HarvestInfo": 861,
     }
-    # 4002 before skipping the 4 dye_white_* bleaching recipes (bed, carpet, harness, wool).
-    assert snapshot.obtain_producer_count == 3998
-    # 1910 before the four HudSprite hunger shanks joined the atlas. They belong
-    # to no entity, so they arrive through `CuratedData.hud_sprites` rather than
-    # through an `Entity.icon`; see `data/curated/hud-sprites.json`.
-    assert snapshot.atlas_icon_count == 1914
+    # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
+    assert snapshot.obtain_producer_count == 4001
+    # 1914 before Local Brewery (InvSprite:Potion) and Ominous Banner (BlockSprite:ominous-banner)
+    # joined the atlas.
+    assert snapshot.atlas_icon_count == 1916
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:

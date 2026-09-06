@@ -166,7 +166,12 @@ from pipeline.fetch.version_manifest import fetch_version_manifest
 from pipeline.fetch.wikitext import fetch_page_wikitext
 from pipeline.normalize.curated import load_curated
 from pipeline.normalize.merge import DEFAULT_REPORT_PATH as MERGE_REPORT_PATH
-from pipeline.normalize.merge import WIKI_KIND, MergeReport, merge_entities
+from pipeline.normalize.merge import (
+    WIKI_KIND,
+    MergeReport,
+    block_drops_from_producers,
+    merge_entities,
+)
 from pipeline.normalize.merge import write_report as write_merge_report
 from pipeline.normalize.reconcile import DEFAULT_REPORT_PATH as RECONCILE_REPORT_PATH
 from pipeline.normalize.reconcile import ReconciliationReport, reconcile
@@ -671,6 +676,7 @@ def run_build(
         breeding_index=breeding_index,
         food_index=food_index,
         harvest_index=harvest_index,
+        block_drops=block_drops_from_producers(loot_result.producers),
     )
     report(f"normalize: {len(result.entities)} entities merged")
 

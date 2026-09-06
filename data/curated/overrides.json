@@ -1,12 +1,30 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-written corrections to one entity's name, kind, icon, blurb, or wikiUrl, for the rare case where Tier A or Tier B is simply wrong for that one ID and nobody upstream is going to fix it before the next build. Two entries exist as of 2026-08-31, both correcting the clause-2 default of pipeline.extract.entity_class.classify_entity_types: an entity_type ID with no spawn egg but with an entity loot table defaults to kind mob, and that default is wrong for two of the five IDs it applies to. minecraft:armor_stand has a real item form -- breaking one drops the item -- so a player typing 'armor stand' should land on it. minecraft:player has no item form at all and is not a mob under any reading, so entity is the only honest kind. The other three IDs the default applies to (giant, illusioner, mannequin) are left uncorrected on purpose: giant and illusioner are genuine mobs, and the clause-2 default of mob for mannequin is a maintainer decision, not an oversight -- see pipeline/normalize/merge.py's module docstring for the reasoning behind all three. See pipeline/normalize/curated.py for the loader and the shape each entry may carry.",
+  "note": "Hand-written corrections to one entity's name, kind, icon, blurb, or wikiUrl, for the rare case where Tier A or Tier B is simply wrong for that one ID and nobody upstream is going to fix it before the next build. Two kind entries exist as of 2026-08-31 for armor_stand and player. Icon overrides provide verified 16x16 sprite titles per Decisions 3 and 15 for advancements with missing or imprecise icons (Local Brewery, Hero of the Village, Voluntary Exile) and entities with oversized raw renders (Sculk, Sculk Shrieker, Zombie Horse Spawn Egg). See pipeline/normalize/curated.py for the loader and the shape each entry may carry.",
   "entities": {
     "minecraft:armor_stand": {
       "kind": "item"
     },
     "minecraft:player": {
       "kind": "entity"
+    },
+    "minecraft:nether/brew_potion": {
+      "icon": "InvSprite:Potion"
+    },
+    "minecraft:adventure/hero_of_the_village": {
+      "icon": "BlockSprite:ominous-banner"
+    },
+    "minecraft:adventure/voluntary_exile": {
+      "icon": "BlockSprite:ominous-banner"
+    },
+    "minecraft:sculk": {
+      "icon": "BlockSprite:sculk"
+    },
+    "minecraft:sculk_shrieker": {
+      "icon": "BlockSprite:sculk-shrieker"
+    },
+    "minecraft:zombie_horse_spawn_egg": {
+      "icon": "ItemSprite:zombie-horse-spawn-egg"
     }
   }
 }

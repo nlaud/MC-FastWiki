@@ -837,6 +837,29 @@
       "type": "string",
       "enum": ["wooden", "stone", "iron", "diamond"]
     },
+    "harvestDrop": {
+      "title": "HarvestDrop",
+      "description": "An item dropped when this block is broken.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "default": 1
+        },
+        "silkTouch": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "harvestInfo": {
       "title": "HarvestInfo",
       "description": "What tool and tier are needed to harvest a block, from the vanilla block tags. tools lists the mineable tools in HarvestTool order. tier is the material floor. dropsWithoutTool indicates whether the block drops itself when broken without the right tool.",
@@ -861,6 +884,14 @@
           "description": "Whether the block drops itself when broken without the required tool.",
           "type": "boolean",
           "default": false
+        },
+        "drops": {
+          "description": "Items dropped when the block is harvested, including standard and silk touch drops.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/harvestDrop"
+          },
+          "default": []
         }
       }
     },

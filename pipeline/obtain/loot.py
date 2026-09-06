@@ -88,7 +88,12 @@ from typing import Any
 from pydantic import BaseModel
 
 from pipeline.enrich.droptable import DropIndex
-from pipeline.enrich.resource_location import JoinTable, ResourceLocation
+from pipeline.enrich.resource_location import (
+    JoinTable,
+    ResourceLocation,
+    alternative_names,
+    alternative_registry_id,
+)
 from pipeline.enrich.trade import TradeIndex
 from pipeline.obtain import ObtainError
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
@@ -97,6 +102,7 @@ __all__ = [
     "BLOCK_LOOT_DIRECTORY",
     "CHEST_LOOT_DIRECTORY",
     "SILK_TOUCH_ENCHANTMENT",
+    "SILK_TOUCH_NOTE",
     "LootExtractionResult",
     "SkippedLootEntry",
     "UnresolvedTradeOrDrop",
@@ -119,6 +125,15 @@ _CONTAINER_TYPES = frozenset(
 _ITEM_TYPE = "minecraft:item"
 
 SILK_TOUCH_ENCHANTMENT = "minecraft:silk_touch"
+
+# The qualifier a silk-touch-gated producer carries, in the vocabulary
+# `Producer.note` defines. It is a named constant rather than a literal at the
+# one place it is written because two readers now match on it -- the obtain
+# tree renderer, through the emitted payload, and `pipeline.normalize.merge`'s
+# block drops, which asks whether a producer is gated before it turns one into
+# a `HarvestDrop`. A reworded literal would silently unset every silk-touch
+# flag on that second reader rather than fail.
+SILK_TOUCH_NOTE = "requires silk touch"
 
 # Mirrors `pipeline.normalize.merge.WIKI_KIND`'s `item` and `entity_type`
 # rows. See the module docstring for why this is a restatement rather than an
@@ -335,7 +350,7 @@ def extract_block_and_chest_loot(files: Mapping[str, bytes]) -> LootExtractionRe
                     output=ProducerOutput(item=item_id, count=count),
                     inputs=(ProducerInput(item=block_id),),
                     source_id=key,
-                    note="requires silk touch" if silk_touch else None,
+                    note=SILK_TOUCH_NOTE if silk_touch else None,
                 )
             )
 
@@ -398,7 +413,16 @@ def _resolve(name: str, *, join_table: JoinTable, kinds: tuple[str, ...]) -> str
        the display name of both is the bare word. Matching the page title
        recovers them.
 
-    A name that reaches none of the three is reported rather than guessed at.
+    4. **A name the wiki writes as a nickname, through `pipeline.enrich.
+       resource_location`.** `<Pattern> Armor Trim`, `Arrow of <Effect>` and
+       `Music Disc <Song>` are all names a loot or trade row states that no
+       row's display name carries; that module owns the three rules and
+       argues each one, because `pipeline.normalize.merge` reads the
+       identical set against the same join table and a second copy here would
+       be free to drift. Route 4 runs last, so a name that is already a real
+       row never reaches it.
+
+    A name that reaches none of the four is reported rather than guessed at.
     That is the right answer for most of what is left: "Enchanted Diamond
     Sword", "Any color Wool", and "Explorer Map" are a component, a variant
     group, and map data respectively, and none of the three is one registry
@@ -416,7 +440,22 @@ def _resolve(name: str, *, join_table: JoinTable, kinds: tuple[str, ...]) -> str
             return resolved
 
     by_page = tuple(row for row in join_table.entries if row.page == name and row.kind in kinds)
-    return _one_id(by_page)
+    resolved = _one_id(by_page)
+    if resolved is not None:
+        return resolved
+
+    for alternative in alternative_names(name):
+        resolved = _resolve(alternative, join_table=join_table, kinds=kinds)
+        if resolved is not None:
+            return resolved
+
+    direct_id = alternative_registry_id(name)
+    if direct_id is not None:
+        return _one_id(
+            tuple(row for row in join_table.by_registry_id.get(direct_id, ()) if row.kind in kinds)
+        )
+
+    return None
 
 
 def producers_from_drop_index(
