@@ -1,4 +1,5 @@
 import type { Entity, RecipeTree, TradeTable } from "../../types/entity.js";
+import type { IndexEntry } from "../../types/index.js";
 import type { Obtain, ObtainProducer } from "../../types/obtain.js";
 import { loadObtain } from "../../search/load.js";
 import type { RenderContext } from "../context.js";
@@ -95,6 +96,36 @@ export function formatOdds(
     return null;
   }
   return { chance, count, rate };
+}
+
+/**
+ * Finds the mob a drop table is named after, never the item that shares its id.
+ *
+ * A mob and an item can hold the same registry id: the chicken mob and the raw
+ * chicken item are both `minecraft:chicken`, as are cod, salmon and rabbit.
+ * The build settles that collision by enumerating such a mob under an
+ * `entity_type/` path and leaving the bare id to the item, so a lookup of the
+ * bare id alone returned "Raw Chicken" for four mobs and linked the Feather
+ * page's drop row to a food item.
+ *
+ * Two steps, in this order:
+ *
+ * 1. The `entity_type/` path, which only ever names an entity.
+ * 2. The bare id, accepted only when the entry it finds really is a mob or an
+ *    entity. Most mobs have no colliding item and are enumerated bare.
+ *
+ * A name that reaches neither returns null, and the caller prints plain text
+ * rather than a wrong link. Four April Fools mobs land there today, and that
+ * is the right answer for a mob this build does not enumerate.
+ */
+function lookupMob(mobName: string, ctx: RenderContext): IndexEntry | null {
+  const path = mobName.toLowerCase().replace(/\s+/g, "_");
+  const qualified = ctx.lookup(`minecraft:entity_type/${path}`);
+  if (qualified) {
+    return qualified;
+  }
+  const bare = ctx.lookup(`minecraft:${path}`);
+  return bare && (bare.k === "mob" || bare.k === "entity") ? bare : null;
 }
 
 /**
@@ -339,11 +370,10 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
           li.append(lead);
 
           const mobName = p.src.replace(/^droptable\//, "").trim();
-          const mobId = `minecraft:${mobName.toLowerCase().replace(/\s+/g, "_")}`;
-          const entry = mobName ? ctx.lookup(mobId) : null;
+          const entry = mobName ? lookupMob(mobName, ctx) : null;
 
           if (entry) {
-            li.append(entityLink({ id: mobId, name: entry.n }, ctx));
+            li.append(entityLink({ id: entry.id, name: entry.n }, ctx));
           } else if (mobName) {
             const plain = document.createElement("span");
             plain.className = "sources-mob-name";

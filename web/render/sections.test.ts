@@ -1062,6 +1062,64 @@ describe("Section renderers with real committed build data", () => {
       expect(titles).toEqual(["Chest Loot", "Fishing", "Mob Drops", "Villager Trades"]);
     });
 
+    it("links a mob drop to the mob, never to the item sharing its id", () => {
+      // The chicken mob and the raw chicken item are both `minecraft:chicken`.
+      // Looking up the bare id alone found the item, so the Feather page said
+      // "Dropped by Raw Chicken" and linked a food item.
+      const featherTree = buildObtainTree("minecraft:feather", obtainGraph);
+      const featherSection = {
+        type: "RecipeTree",
+        root: featherTree.root,
+        rawProducers: featherTree.rawProducers,
+        sources: featherTree.sources,
+      } as unknown as RecipeTree;
+      const featherEl = requireItem(
+        renderRecipeTree(featherSection, ctx),
+        "Feather RecipeTree element",
+      );
+
+      const mobGroup = featherEl.querySelector(".sources-mob-group");
+      expect(mobGroup).not.toBeNull();
+      expect(mobGroup?.textContent).toContain("Chicken");
+      expect(mobGroup?.textContent).not.toContain("Raw Chicken");
+
+      const link = mobGroup?.querySelector(".entity-link");
+      expect(link?.textContent).toBe("Chicken");
+    });
+
+    it("links every mob drop row to a mob or entity, or to nothing at all", () => {
+      // The whole class the Raw Chicken bug belonged to. Cod, Salmon, Chicken
+      // and Rabbit all share an id with their raw meat, and a row that links to
+      // an item is wrong however plausible the name looks.
+      const itemsWithMobDrops = Object.entries(obtainGraph.producers)
+        .filter(([, ps]) => ps.some((p) => p.m === "mob_loot"))
+        .map(([id]) => id);
+      expect(itemsWithMobDrops.length).toBeGreaterThan(50);
+
+      for (const itemId of itemsWithMobDrops) {
+        const tree = buildObtainTree(itemId, obtainGraph);
+        const section = {
+          type: "RecipeTree",
+          root: tree.root,
+          rawProducers: tree.rawProducers,
+          sources: tree.sources,
+        } as unknown as RecipeTree;
+        const el = renderRecipeTree(section, ctx);
+        const rows = el?.querySelectorAll(".sources-mob-item") ?? [];
+        for (const row of Array.from(rows)) {
+          const linkedId = row.querySelector(".entity-link")?.getAttribute("data-id");
+          if (linkedId === null || linkedId === undefined) {
+            continue; // Rendered as plain text, which is the honest fallback.
+          }
+          const entry = ctx.lookup(linkedId);
+          expect(entry, `${itemId} links a mob row to unknown ${linkedId}`).not.toBeNull();
+          expect(entry?.k, `${itemId} links a mob row to a ${entry?.k ?? "?"}`).toMatch(
+            /^(mob|entity)$/,
+          );
+        }
+      }
+    });
+
     it("renders dispensers, pots, and spawners under Chest Loot", () => {
       const keyTree = buildObtainTree("minecraft:ominous_trial_key", obtainGraph);
       const keySection = {
