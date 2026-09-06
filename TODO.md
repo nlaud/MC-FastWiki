@@ -18,25 +18,72 @@ reasoning survives even after the choice is made.
 - [ ] **Effect** — every source of the effect, and what it actually does.
       Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
 
-## Phase 6b — Obtaining, scraped from the wiki
+## Phase 6b - Obtain methods with no adapter
 
-The wiki already aggregates every acquisition path per item. Take it rather than rebuilding it from
-loot tables (see Decision 11).
+`pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
+and mob-drop tables.
+That covers eight methods and 4001 producers.
+Decision 11 planned the opposite approach and was overtaken by what shipped; read that entry for
+why the reversal happened and what it costs.
 
-- [ ] Resolve the `Obtaining` section index per page via `prop=sections` — it varies, so never
-      hardcode a section number
-- [ ] Fetch the **rendered** section (`prop=text`), not wikitext — wikitext holds only unexpanded
-      template calls like `{{LootChestItem|name-tag}}` and `{{Trade sources}}`
-- [ ] Parse the **embedded JSON** in generated-loot rows rather than the table markup:
-      `{"item":"Name Tag","stacksize":1,"chance":0.2529...,"structure":"Monster Room",
-      "container":"Chest"}`
-- [ ] Parse the Trading table, keeping the JE column and dropping BE
-- [ ] Keep the other subsections that appear — Crafting, Fishing, and anything else the page lists
-- [ ] Tables headed "Java Edition and Bedrock Edition" mean the two agree; still apply edition
-      filtering where they diverge
-- [ ] Rate-limit and cache: this is roughly one request per item page. It is a one-time cost per
-      Minecraft version, but be a good citizen about it
-- [ ] An empty Obtaining result is a **scrape failure, not an unobtainable item** — report it
+What is left is the set of ways to get an item that no adapter reads.
+`data/reports/obtain-report.json` lists 343 items with no producer of any kind.
+267 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
+`*_wall_sign`, crop stages), 88 spawn eggs, 22 technical and fluid blocks, and 18 creative or
+operator blocks.
+Nobody obtains a `potted_cactus` - the pot and the cactus are the obtainable things, and the potted
+state is what the world holds after you combine them.
+
+The other 76 are real, and fall into five causes.
+Each bullet names one cause rather than one item, because the fix is per-cause.
+A sixth bullet covers fishing, which strands no item but is missing all the same.
+
+- [ ] **Archaeology - 25 items.** Every pottery sherd, plus `suspicious_sand` and
+      `suspicious_gravel`.
+      Brushing a suspicious block runs an archaeology loot table, and `pipeline/obtain/loot.py`
+      reads only `loot_table/blocks` and `loot_table/chests`.
+      This is the largest single gap and the cheapest to close, because an archaeology table is the
+      same shape the block and chest readers already walk.
+- [ ] **Recipe types the extractor skips - 17 items.** The 16 colored bundles come from
+      `minecraft:crafting_transmute`, and `firework_star` from
+      `minecraft:crafting_special_firework_star`.
+      `obtain-report.json` already lists all 86 skipped recipes with a reason.
+      Most of the 86 are harmless because the item they make has another producer; these 17 are the
+      ones left with nothing at all.
+- [ ] **World interaction - 6 items.** `axolotl_bucket`, `salmon_bucket`, `tadpole_bucket`,
+      `sulfur_cube_bucket`, `lava_bucket`, and `powder_snow_bucket`.
+      `ObtainMethod.FILLING` already exists for this exact shape and is used once, for the water
+      bottle, and its own docstring says filling a bucket would fit there unchanged.
+- [ ] **Silk-touch-only blocks - 7 items.** The `infested_*` family.
+      Breaking one spawns a silverfish and drops nothing, while silk touch drops the block itself.
+      First confirm whether the vanilla loot table states that or whether it is engine behavior no
+      table carries, because the answer decides whether this is a reader gap or a curated entry.
+- [ ] **Mob and world one-offs - 9 items.** `armadillo_scute` (brushing an armadillo),
+      `turtle_scute` (a baby turtle growing up), `blue_egg` and `brown_egg` (chicken variants),
+      `dragon_breath` (bottling), `elytra` (an end ship item frame), `ominous_trial_key` (an
+      ominous vault), and `filled_map` and `written_book` (using the blank item).
+      These share no adapter and do not want one.
+      A small curated producer table is the honest fix, which makes this Tier C work rather than a
+      scrape.
+
+- [ ] **Fishing - 0 stranded items, but a missing method.** There is no `ObtainMethod.FISHING`, and
+      nothing reads the fishing loot tables.
+      This strands no item, because everything a player can fish up already has another producer,
+      so the count above cannot surface it.
+      It still hides a real acquisition path: the tree never tells a player a saddle or a name tag
+      comes out of the water.
+      Listed last because it costs no coverage, only completeness.
+
+The 12 music discs in the same report are **not** an adapter gap, and are recorded here only so the
+343 is not read as 343 missing adapters.
+The creeper drop row names `Music Disc`, which is the display name of all 23 discs, so it correctly
+refuses to resolve to one.
+Reading the wikitext note beside that row, which lists the discs by name, is what would fix it.
+See Decision 20.
+
+Two things the earlier version of this phase asked for are dropped on purpose: fetching each item
+page's rendered `Obtaining` section, and rate-limiting one request per item page.
+Neither is needed now that the graph comes from data files.
 
 ## Phase 6c — Additional entity kinds
 
@@ -253,6 +300,26 @@ New collections the added data makes nearly free:
 
     Two gotchas: the `Obtaining` section index varies per page, so resolve it from `prop=sections`;
     and an empty result means the scrape broke, not that the item is unobtainable.
+
+    **Reversed by what shipped.** The obtain graph reads mcmeta loot tables and recipe files
+    directly, and borrows the wiki only for trades and mob drops.
+    That is the inverted-loot-table approach this entry rejected.
+    Nothing above turned out to be wrong. The reasoning was simply overtaken.
+    Building the tree needed a producer graph -- what makes this item, and what makes each of its
+    inputs, all the way down -- and the wiki's `Obtaining` section is a flat list per page, not a
+    graph.
+    A scrape would have had to be re-joined into the same producer shape the data files already
+    state exactly, so it would have added a network dependency, a per-page rate limit, and a parse
+    of rendered HTML, to arrive at data the pipeline could read offline.
+
+    Three things the scrape would have carried are now genuinely missing, and only the first is
+    worth acting on.
+    Chest loot rows drop their `chance` figure, so the tree says an item is in a chest but not how
+    often.
+    Fishing has no adapter at all.
+    Anything the wiki lists under `Obtaining` that no data file states -- archaeology, world
+    generation, and the one-off interactions -- has to be recovered another way, which is what
+    Phase 6b now tracks.
 
 12. **Brewing is part of the recipe tree, not a parallel one.** A potion node expands into its
     brewing step; every ingredient of that step keeps expanding by whatever produces it. Potion of
