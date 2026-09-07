@@ -230,6 +230,193 @@ def test_smithing_transform_reads_all_three_ingredient_slots() -> None:
     assert tags == {"minecraft:netherite_tool_materials"}
 
 
+# --- crafting_transmute, crafting_dye, crafting_special_firework_star_fade -----
+
+
+def test_crafting_transmute_reads_input_and_material() -> None:
+    result = extract(
+        {
+            "light_blue_bundle": {
+                "type": "minecraft:crafting_transmute",
+                "input": "#minecraft:bundles",
+                "material": "minecraft:light_blue_dye",
+                "result": {"id": "minecraft:light_blue_bundle"},
+            }
+        },
+        tags={"bundles": ["minecraft:bundle", "minecraft:light_blue_bundle"]},
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:light_blue_bundle"
+    assert producer.output.count == 1
+    assert len(producer.inputs) == 2
+    assert producer.inputs[0].tag == "minecraft:bundles"
+    assert producer.inputs[0].count == 1
+    assert producer.inputs[1].item == "minecraft:light_blue_dye"
+    assert producer.inputs[1].count == 1
+    assert producer.note is None
+
+
+def test_crafting_transmute_map_cloning_records_range_in_note() -> None:
+    result = extract(
+        {
+            "map_cloning": {
+                "type": "minecraft:crafting_transmute",
+                "add_material_count_to_result": True,
+                "input": "minecraft:filled_map",
+                "material": "minecraft:map",
+                "material_count": {"max": 8, "min": 1},
+                "result": {"id": "minecraft:filled_map"},
+            }
+        }
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.output.item == "minecraft:filled_map"
+    assert producer.output.count == 1
+    assert len(producer.inputs) == 2
+    assert producer.inputs[0].item == "minecraft:filled_map"
+    assert producer.inputs[0].count == 1
+    assert producer.inputs[1].item == "minecraft:map"
+    assert producer.inputs[1].count == 1
+    assert producer.note is not None
+    assert "1 to 8" in producer.note
+
+
+def test_crafting_dye_reads_target_and_dye() -> None:
+    result = extract(
+        {
+            "leather_boots_dyed": {
+                "type": "minecraft:crafting_dye",
+                "dye": "#minecraft:dyes",
+                "group": "dyed_armor",
+                "target": "minecraft:leather_boots",
+                "result": {"id": "minecraft:leather_boots"},
+            }
+        },
+        tags={"dyes": ["minecraft:red_dye", "minecraft:blue_dye"]},
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:leather_boots"
+    assert producer.inputs[0].item == "minecraft:leather_boots"
+    assert producer.inputs[1].tag == "minecraft:dyes"
+
+
+def test_crafting_special_firework_star_fade_reads_target_and_dye() -> None:
+    result = extract(
+        {
+            "firework_star_fade": {
+                "type": "minecraft:crafting_special_firework_star_fade",
+                "dye": "#minecraft:dyes",
+                "target": "minecraft:firework_star",
+                "result": {"id": "minecraft:firework_star"},
+            }
+        },
+        tags={"dyes": ["minecraft:red_dye", "minecraft:blue_dye"]},
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:firework_star"
+    assert producer.inputs[0].item == "minecraft:firework_star"
+    assert producer.inputs[1].tag == "minecraft:dyes"
+
+
+# --- firework_star, imbue, decorated_pot ---------------------------------------
+
+
+def test_crafting_special_firework_star_reads_fuel_and_dye_and_records_modifiers() -> None:
+    result = extract(
+        {
+            "firework_star": {
+                "type": "minecraft:crafting_special_firework_star",
+                "fuel": "minecraft:gunpowder",
+                "dye": "#minecraft:dyes",
+                "shapes": {
+                    "burst": "minecraft:feather",
+                    "creeper": "#minecraft:skulls",
+                    "large_ball": "minecraft:fire_charge",
+                    "star": "minecraft:gold_nugget",
+                },
+                "trail": "minecraft:diamond",
+                "twinkle": "minecraft:glowstone_dust",
+                "result": {"id": "minecraft:firework_star"},
+            }
+        },
+        tags={"dyes": ["minecraft:red_dye", "minecraft:blue_dye"]},
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:firework_star"
+    assert producer.output.count == 1
+    assert len(producer.inputs) == 2
+    assert producer.inputs[0].item == "minecraft:gunpowder"
+    assert producer.inputs[0].count == 1
+    assert producer.inputs[1].tag == "minecraft:dyes"
+    assert producer.inputs[1].count == 1
+    assert producer.note is not None
+    assert "shapes" in producer.note
+    assert "trail" in producer.note
+    assert "twinkle" in producer.note
+
+
+def test_crafting_imbue_reads_material_and_source_with_count_eight() -> None:
+    result = extract(
+        {
+            "tipped_arrow": {
+                "type": "minecraft:crafting_imbue",
+                "material": "minecraft:arrow",
+                "source": "minecraft:lingering_potion",
+                "result": {"count": 8, "id": "minecraft:tipped_arrow"},
+            }
+        }
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:tipped_arrow"
+    assert producer.output.count == 8
+    assert len(producer.inputs) == 2
+    assert producer.inputs[0].item == "minecraft:arrow"
+    assert producer.inputs[0].count == 1
+    assert producer.inputs[1].item == "minecraft:lingering_potion"
+    assert producer.inputs[1].count == 1
+
+
+def test_crafting_decorated_pot_aggregates_into_single_input_with_count_four() -> None:
+    result = extract(
+        {
+            "decorated_pot": {
+                "type": "minecraft:crafting_decorated_pot",
+                "back": "#minecraft:decorated_pot_ingredients",
+                "front": "#minecraft:decorated_pot_ingredients",
+                "left": "#minecraft:decorated_pot_ingredients",
+                "right": "#minecraft:decorated_pot_ingredients",
+                "result": {"id": "minecraft:decorated_pot"},
+            }
+        },
+        tags={"decorated_pot_ingredients": ["minecraft:brick", "minecraft:angler_pottery_sherd"]},
+    )
+    assert len(result.producers) == 1
+    producer = result.producers[0]
+    assert producer.method is ObtainMethod.CRAFTING
+    assert producer.station is None
+    assert producer.output.item == "minecraft:decorated_pot"
+    assert len(producer.inputs) == 1
+    assert producer.inputs[0].tag == "minecraft:decorated_pot_ingredients"
+    assert producer.inputs[0].count == 4
+
+
 # --- Skipped, not raised: crafting_special_* and unhandled types --------------
 
 
@@ -241,32 +428,35 @@ def test_crafting_special_recipes_are_skipped_and_reported_not_raised() -> None:
                 "map": "minecraft:filled_map",
                 "material": "minecraft:paper",
                 "result": {"id": "minecraft:filled_map"},
+            },
+            "banner_duplicate": {
+                "type": "minecraft:crafting_special_bannerduplicate",
+                "result": {"id": "minecraft:white_banner"},
+            },
+        }
+    )
+    assert result.producers == ()
+    assert len(result.skipped) == 2
+    for skipped in result.skipped:
+        assert skipped.reason == "a crafting_special_* recipe declares no ingredient list"
+
+
+def test_smithing_trim_is_skipped_as_unhandled_type() -> None:
+    """`smithing_trim` is skipped under unhandled recipe type."""
+    result = extract(
+        {
+            "sentry_armor_trim": {
+                "type": "minecraft:smithing_trim",
+                "template": "minecraft:sentry_armor_trim_smithing_template",
+                "base": "minecraft:iron_chestplate",
+                "addition": "minecraft:redstone",
             }
         }
     )
     assert result.producers == ()
     assert len(result.skipped) == 1
-    assert result.skipped[0].recipe_id == "minecraft:map_extending"
-    assert result.skipped[0].recipe_type == "minecraft:crafting_special_mapextending"
-
-
-def test_crafting_transmute_is_named_and_skipped() -> None:
-    """`crafting_transmute` (dyeing a bundle in place) has no ingredient-to-item shape."""
-    result = extract(
-        {
-            "black_bundle": {
-                "type": "minecraft:crafting_transmute",
-                "input": "#minecraft:bundles",
-                "material": "minecraft:black_dye",
-                "result": {"id": "minecraft:black_bundle"},
-            }
-        }
-    )
-    assert result.producers == ()
-    assert (
-        result.skipped[0].reason
-        == "this recipe type carries no representable ingredient-to-item shape"
-    )
+    assert result.skipped[0].recipe_type == "minecraft:smithing_trim"
+    assert result.skipped[0].reason == "unhandled recipe type"
 
 
 def test_an_unrecognized_future_recipe_type_is_skipped_not_raised() -> None:
@@ -293,6 +483,33 @@ def test_an_unrecognized_future_recipe_type_is_skipped_not_raised() -> None:
         {"type": "minecraft:crafting_shapeless", "ingredients": [], "result": {"id": "x"}},
         {"type": "minecraft:smelting", "result": {"id": "x"}},
         {"type": "minecraft:smelting", "ingredient": "minecraft:iron_ore", "result": {}},
+        {
+            "type": "minecraft:crafting_transmute",
+            "input": "minecraft:filled_map",
+            "result": {"id": "minecraft:filled_map"},
+        },
+        {
+            "type": "minecraft:crafting_dye",
+            "dye": "minecraft:red_dye",
+            "result": {"id": "minecraft:leather_boots"},
+        },
+        {
+            "type": "minecraft:crafting_special_firework_star",
+            "dye": "minecraft:red_dye",
+            "result": {"id": "minecraft:firework_star"},
+        },
+        {
+            "type": "minecraft:crafting_imbue",
+            "material": "minecraft:arrow",
+            "result": {"id": "minecraft:tipped_arrow"},
+        },
+        {
+            "type": "minecraft:crafting_decorated_pot",
+            "front": "minecraft:brick",
+            "left": "minecraft:brick",
+            "right": "minecraft:brick",
+            "result": {"id": "minecraft:decorated_pot"},
+        },
     ],
 )
 def test_a_malformed_recipe_of_a_known_type_raises(document: dict[str, Any]) -> None:

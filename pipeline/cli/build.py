@@ -125,6 +125,7 @@ which read to prime.
 
 import json
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -183,11 +184,14 @@ from pipeline.obtain.chests import (
     verify_chest_sources,
 )
 from pipeline.obtain.loot import (
+    LOOT_SOURCES_FILENAME,
     LootExtractionResult,
     UnresolvedTradeOrDrop,
-    extract_block_and_chest_loot,
+    extract_loot,
+    load_loot_sources,
     producers_from_drop_index,
     producers_from_trade_index,
+    verify_loot_sources,
 )
 from pipeline.obtain.producer import ObtainMethod, ProducerIndex
 from pipeline.obtain.recipes import RecipeExtractionResult, SkippedRecipe, extract_recipes
@@ -561,21 +565,41 @@ def run_build(
         f"{len(harvest_index)} blocks with harvest requirements"
     )
 
-    # --- 3b. obtain, Tier A half: crafting/smelting recipes and block/chest loot ---
+    # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
     item_tags = TagIndex(files, registry="item")
     recipe_result: RecipeExtractionResult = extract_recipes(files, tags=item_tags)
-    loot_result: LootExtractionResult = extract_block_and_chest_loot(files)
+    loot_result: LootExtractionResult = extract_loot(files)
     curated_chests = load_chest_sources(CURATED_DIRECTORY / CHEST_SOURCES_FILENAME)
+    curated_loot = load_loot_sources(CURATED_DIRECTORY / LOOT_SOURCES_FILENAME)
     chest_tables = {
         producer.source_id
         for producer in loot_result.producers
         if producer.method is ObtainMethod.CHEST_LOOT
     }
     verify_chest_sources(chest_tables, curated_chests)
+    loot_methods = {
+        ObtainMethod.BRUSHING,
+        ObtainMethod.FISHING,
+        ObtainMethod.BARTERING,
+        ObtainMethod.GIFT,
+        ObtainMethod.SHEARING,
+        ObtainMethod.HARVESTING,
+    }
+    loot_tables = {
+        producer.source_id
+        for producer in loot_result.producers
+        if producer.method in loot_methods
+    }
+    verify_loot_sources(loot_tables, curated_loot)
+    method_counts = Counter(p.method for p in loot_result.producers)
+    method_summary = ", ".join(
+        f"{m.value}={method_counts[m]}"
+        for m in sorted(method_counts, key=lambda m: m.value)
+    )
     report(
         f"obtain, tier A: {len(recipe_result.producers)} recipe producers "
         f"({len(recipe_result.skipped)} recipes skipped), "
-        f"{len(loot_result.producers)} block/chest loot producers"
+        f"{len(loot_result.producers)} loot producers ({method_summary})"
     )
 
     # --- 4. Tier B buckets -------------------------------------------------------

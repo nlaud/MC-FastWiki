@@ -22,60 +22,49 @@ reasoning survives even after the choice is made.
 
 `pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
 and mob-drop tables.
-That covers eight methods and 4001 producers.
+That covers 14 methods and 4311 producers (12 loot-table families read, closing 27 gaps).
+Every producer whose outcome is a draw rather than a certainty also carries its odds - the chance,
+the stack range, and the expected yield per chest, catch, barter, shear, brush or kill.
+A producer only carries them where the source states them: an entry under `minecraft:alternatives`
+is picked by condition rather than by weight, and an entry with its own `conditions` has a real
+probability no loot table writes down, so both forfeit the three fields rather than guess.
 Decision 11 planned the opposite approach and was overtaken by what shipped; read that entry for
 why the reversal happened and what it costs.
 
 What is left is the set of ways to get an item that no adapter reads.
-`data/reports/obtain-report.json` lists 343 items with no producer of any kind.
+`data/reports/obtain-report.json` lists 298 items with no producer of any kind.
 267 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
-`*_wall_sign`, crop stages), 88 spawn eggs, 22 technical and fluid blocks, and 18 creative or
-operator blocks.
+`*_wall_sign`, crop stages, plus `suspicious_sand` and `suspicious_gravel` which break to nothing),
+88 spawn eggs, 22 technical and fluid blocks, and 18 creative or operator blocks.
 Nobody obtains a `potted_cactus` - the pot and the cactus are the obtainable things, and the potted
 state is what the world holds after you combine them.
 
-The other 76 are real, and fall into five causes.
+The other 31 are real, and fall into three causes plus curated one-offs.
 Each bullet names one cause rather than one item, because the fix is per-cause.
-A sixth bullet covers fishing, which strands no item but is missing all the same.
 
-- [ ] **Archaeology - 25 items.** Every pottery sherd, plus `suspicious_sand` and
-      `suspicious_gravel`.
-      Brushing a suspicious block runs an archaeology loot table, and `pipeline/obtain/loot.py`
-      reads only `loot_table/blocks` and `loot_table/chests`.
-      This is the largest single gap and the cheapest to close, because an archaeology table is the
-      same shape the block and chest readers already walk.
-- [ ] **Recipe types the extractor skips - 17 items.** The 16 colored bundles come from
-      `minecraft:crafting_transmute`, and `firework_star` from
-      `minecraft:crafting_special_firework_star`.
-      `obtain-report.json` already lists all 86 skipped recipes with a reason.
-      Most of the 86 are harmless because the item they make has another producer; these 17 are the
-      ones left with nothing at all.
-- [ ] **World interaction - 6 items.** `axolotl_bucket`, `salmon_bucket`, `tadpole_bucket`,
-      `sulfur_cube_bucket`, `lava_bucket`, and `powder_snow_bucket`.
-      `ObtainMethod.FILLING` already exists for this exact shape and is used once, for the water
-      bottle, and its own docstring says filling a bucket would fit there unchanged.
+The recipe-type cause is closed.
+`pipeline/obtain/recipes.py` now reads eleven recipe types rather than six, and the 43 recipes it
+still skips are the 18 `smithing_trim` files, the 21 remaining `crafting_special_*` files, and the
+4 `dye_white_*` files, none of which makes an item that lacks another producer.
+
 - [ ] **Silk-touch-only blocks - 7 items.** The `infested_*` family.
       Breaking one spawns a silverfish and drops nothing, while silk touch drops the block itself.
       First confirm whether the vanilla loot table states that or whether it is engine behavior no
       table carries, because the answer decides whether this is a reader gap or a curated entry.
-- [ ] **Mob and world one-offs - 9 items.** `armadillo_scute` (brushing an armadillo),
-      `turtle_scute` (a baby turtle growing up), `blue_egg` and `brown_egg` (chicken variants),
-      `dragon_breath` (bottling), `elytra` (an end ship item frame), `ominous_trial_key` (an
-      ominous vault), and `filled_map` and `written_book` (using the blank item).
-      These share no adapter and do not want one.
-      A small curated producer table is the honest fix, which makes this Tier C work rather than a
-      scrape.
-
-- [ ] **Fishing - 0 stranded items, but a missing method.** There is no `ObtainMethod.FISHING`, and
-      nothing reads the fishing loot tables.
-      This strands no item, because everything a player can fish up already has another producer,
-      so the count above cannot surface it.
-      It still hides a real acquisition path: the tree never tells a player a saddle or a name tag
-      comes out of the water.
-      Listed last because it costs no coverage, only completeness.
+- [ ] **World interaction - 6 items.** `axolotl_bucket`, `salmon_bucket`, `tadpole_bucket`,
+      `sulfur_cube_bucket`, `lava_bucket`, and `powder_snow_bucket`.
+      `ObtainMethod.FILLING` already exists for this exact shape and is used once, for the water
+      bottle, and its own docstring says filling a bucket would fit there unchanged.
+- [ ] **Curated one-offs and vault rewards - 6 items.** `elytra` (an end ship item frame),
+      `dragon_breath` (bottling), `written_book` (using the blank item; plus an origin note for
+      `filled_map` which is craftable via cloning but requires a blank map to create originally),
+      plus the 3 vault-only pottery sherds (`flow_pottery_sherd`, `guster_pottery_sherd`, `scrape_pottery_sherd`).
+      The 3 vault sherds appear only in the `decorated_pot_sherds` item tag in the 26.2 archive with no
+      loot table reaching them, so they require curated attribution.
+      These share no adapter and do not want one. A small curated producer table is the honest fix.
 
 The 12 music discs in the same report are **not** an adapter gap, and are recorded here only so the
-343 is not read as 343 missing adapters.
+316 is not read as 316 missing adapters.
 The creeper drop row names `Music Disc`, which is the display name of all 23 discs, so it correctly
 refuses to resolve to one.
 Reading the wikitext note beside that row, which lists the discs by name, is what would fix it.
@@ -159,6 +148,7 @@ collection should mean adding one manifest file, never writing code.
 - [ ] `banner_patterns` — all unique banner pattern recipes
 - [ ] `workstations` — all workstation block recipes
 - [ ] `minecarts` — all minecart recipes
+- [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in
 - [ ] Every member renders as a link that opens the real entity window
 
 New collections the added data makes nearly free:
@@ -168,6 +158,7 @@ New collections the added data makes nearly free:
 - [ ] `structures` — every structure and its biome
 - [ ] `chest_loot` — every lootable chest, as a hub into the structures that contain them
 - [ ] `villager_trades` — professions as an index into the trade tables
+- [ ] `bartering` — the full bartering table for piglin bartering
 
 ## Phase 8 — Minecraft theming
 

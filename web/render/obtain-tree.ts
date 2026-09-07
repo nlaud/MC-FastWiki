@@ -67,7 +67,13 @@ export function isAcquisition(graph: Obtain, producer: ObtainProducer): boolean 
     producer.m === "trade" ||
     producer.m === "chest_loot" ||
     producer.m === "block_drop" ||
-    producer.m === "mob_loot"
+    producer.m === "mob_loot" ||
+    producer.m === "brushing" ||
+    producer.m === "harvesting" ||
+    producer.m === "shearing" ||
+    producer.m === "fishing" ||
+    producer.m === "bartering" ||
+    producer.m === "gift"
   ) {
     return true;
   }

@@ -164,6 +164,14 @@ class ObtainProducer(BaseModel, frozen=True, populate_by_name=True):
     redundant data written once per producer instead of once per item.
     `count` is `Producer.output.count`, the one part of `ProducerOutput` that
     is not implied by the key.
+
+    `chance`, `count_max` and `per_attempt` are the three odds fields, carried
+    through unchanged and unrounded. They are absent together on a producer
+    whose outcome no upstream source states odds for -- see `pipeline.obtain.
+    producer.Producer` for which shapes forfeit them and why. Rounding is left
+    to the renderer, because the payload is read by a display that wants one
+    decimal place and by a test that wants the exact figure, and a payload that
+    has already rounded cannot serve the second.
     """
 
     method: ObtainMethod = Field(alias="m")
@@ -171,6 +179,9 @@ class ObtainProducer(BaseModel, frozen=True, populate_by_name=True):
     source_id: str = Field(alias="src")
     station: str | None = Field(default=None, alias="st")
     note: str | None = Field(default=None, alias="nt")
+    chance: float | None = Field(default=None, alias="ch")
+    count_max: int | None = Field(default=None, alias="cx")
+    per_attempt: float | None = Field(default=None, alias="pa")
     inputs: tuple[ObtainProducerInput, ...] = Field(default=(), alias="in")
     grid: tuple[int | None, ...] | None = Field(default=None, alias="g")
     grid_width: int | None = Field(default=None, alias="gw")
@@ -216,6 +227,9 @@ def _to_obtain_producer(producer: Producer) -> ObtainProducer:
         source_id=producer.source_id,
         station=producer.station,
         note=producer.note,
+        chance=producer.chance,
+        count_max=producer.count_max,
+        per_attempt=producer.per_attempt,
         inputs=tuple(_to_obtain_input(one_input) for one_input in producer.inputs),
         grid=producer.grid,
         grid_width=producer.grid_width,
@@ -235,15 +249,22 @@ def build_obtain_graph(
     returns it.
     """
     if sources is None:
+        merged_sources: dict[str, ChestSource] = {}
         try:
             from pipeline.obtain.chests import DEFAULT_CHEST_SOURCES_PATH, load_chest_sources
 
             if DEFAULT_CHEST_SOURCES_PATH.is_file():
-                sources = load_chest_sources(DEFAULT_CHEST_SOURCES_PATH)
-            else:
-                sources = {}
+                merged_sources.update(load_chest_sources(DEFAULT_CHEST_SOURCES_PATH))
         except Exception:
-            sources = {}
+            pass
+        try:
+            from pipeline.obtain.loot import DEFAULT_LOOT_SOURCES_PATH, load_loot_sources
+
+            if DEFAULT_LOOT_SOURCES_PATH.is_file():
+                merged_sources.update(load_loot_sources(DEFAULT_LOOT_SOURCES_PATH))
+        except Exception:
+            pass
+        sources = merged_sources
 
     sorted_sources = {k: sources[k] for k in sorted(sources)}
     producers = {
@@ -283,6 +304,9 @@ def producer_index_from_graph(graph: ObtainGraph) -> ProducerIndex:
             source_id=entry.source_id,
             station=entry.station,
             note=entry.note,
+            chance=entry.chance,
+            count_max=entry.count_max,
+            per_attempt=entry.per_attempt,
             grid=entry.grid,
             grid_width=entry.grid_width,
             grid_height=entry.grid_height,

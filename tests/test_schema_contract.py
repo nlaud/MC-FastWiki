@@ -499,10 +499,16 @@ def test_curated_chest_sources_completeness() -> None:
 
     assert DEFAULT_CHEST_SOURCES_PATH.is_file()
     chests = load_chest_sources(DEFAULT_CHEST_SOURCES_PATH)
-    assert len(chests) == 54
+    assert len(chests) == 63
 
+    valid_prefixes = (
+        "loot_table/chests/",
+        "loot_table/dispensers/",
+        "loot_table/pots/",
+        "loot_table/spawners/",
+    )
     for path, entry in chests.items():
-        assert path.startswith("loot_table/chests/")
+        assert any(path.startswith(prefix) for prefix in valid_prefixes)
         assert path.endswith(".json")
         assert entry.structure
         assert entry.structure[0].isupper()
@@ -515,3 +521,31 @@ def test_curated_chest_sources_completeness() -> None:
     # Missing table check: raises ObtainError
     with pytest.raises(ObtainError, match="found 1 chest loot tables with no curated entry"):
         verify_chest_sources(["loot_table/chests/unknown_mystery_chest.json"], chests)
+
+
+def test_curated_loot_sources_completeness() -> None:
+    from pipeline.obtain import ObtainError
+    from pipeline.obtain.loot import (
+        DEFAULT_LOOT_SOURCES_PATH,
+        load_loot_sources,
+        verify_loot_sources,
+    )
+
+    assert DEFAULT_LOOT_SOURCES_PATH.is_file()
+    loot = load_loot_sources(DEFAULT_LOOT_SOURCES_PATH)
+    assert len(loot) == 56
+
+    for path, entry in loot.items():
+        assert path.startswith("loot_table/")
+        assert path.endswith(".json")
+        assert entry.structure
+        assert entry.structure[0].isupper()
+        assert entry.container
+        assert entry.container[0].isupper()
+
+    # Completeness check: verifying against its own keys succeeds
+    verify_loot_sources(loot.keys(), loot)
+
+    # Missing table check: raises ObtainError
+    with pytest.raises(ObtainError, match="found 1 loot tables with no curated entry"):
+        verify_loot_sources(["loot_table/archaeology/unknown_arch.json"], loot)

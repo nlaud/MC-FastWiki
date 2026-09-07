@@ -28,10 +28,22 @@ DEFAULT_CHEST_SOURCES_PATH = Path("data/curated") / CHEST_SOURCES_FILENAME
 
 
 class ChestSource(BaseModel, frozen=True):
-    """Curated structure and container attribution for one chest loot table."""
+    """Curated structure and container attribution for one loot table.
+
+    `ref` is the registry id of the entity or block a player interacts with,
+    where the source *is* one thing a page exists for: the piglin you barter
+    with, the sheep you shear, the armadillo you brush. It is optional because
+    most sources are not one entity -- a chest in a mineshaft, a fishing
+    catch, a hero-of-the-village gift -- and inventing a ref for those would
+    point a link at a page that does not answer the question the label asks.
+    A renderer with a `ref` draws the label as a link, and without one draws
+    it as plain text, the same rule `pipeline.normalize.merge` uses for a name
+    it cannot resolve to exactly one entity.
+    """
 
     structure: str
     container: str
+    ref: str | None = None
 
 
 class CuratedChestData(BaseModel, frozen=True):
@@ -68,6 +80,7 @@ def load_chest_sources(path: Path = DEFAULT_CHEST_SOURCES_PATH) -> dict[str, Che
         result[table_id] = ChestSource(
             structure=entry["structure"],
             container=entry["container"],
+            ref=entry.get("ref"),
         )
     return result
 

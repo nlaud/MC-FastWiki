@@ -1,6 +1,6 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-maintained structure and container attribution for all 54 chest loot tables in Java Edition 26.2. Structure names use Title Case and will become links when structure pages exist in Phase 6c. Container labels describe the specific chest, barrel, dispenser, or vault within that structure.",
+  "note": "Hand-maintained structure and container attribution for all 63 chest, dispenser, pot, and spawner loot tables in Java Edition 26.2. Structure names use Title Case and will become links when structure pages exist in Phase 6c. Container labels describe the specific chest, barrel, dispenser, pot, or spawner vault within that structure.",
   "chests": {
     "loot_table/chests/abandoned_mineshaft.json": {
       "structure": "Mineshaft",
@@ -217,6 +217,42 @@
     "loot_table/chests/woodland_mansion.json": {
       "structure": "Woodland Mansion",
       "container": "Chest"
+    },
+    "loot_table/dispensers/trial_chambers/chamber.json": {
+      "structure": "Trial Chambers",
+      "container": "Chamber Dispenser"
+    },
+    "loot_table/dispensers/trial_chambers/corridor.json": {
+      "structure": "Trial Chambers",
+      "container": "Corridor Dispenser"
+    },
+    "loot_table/dispensers/trial_chambers/water.json": {
+      "structure": "Trial Chambers",
+      "container": "Water Dispenser"
+    },
+    "loot_table/pots/trial_chambers/corridor.json": {
+      "structure": "Trial Chambers",
+      "container": "Corridor Decorated Pot"
+    },
+    "loot_table/spawners/ominous/trial_chamber/consumables.json": {
+      "structure": "Trial Chambers",
+      "container": "Ominous Spawner Consumables"
+    },
+    "loot_table/spawners/ominous/trial_chamber/key.json": {
+      "structure": "Trial Chambers",
+      "container": "Ominous Trial Spawner"
+    },
+    "loot_table/spawners/trial_chamber/consumables.json": {
+      "structure": "Trial Chambers",
+      "container": "Trial Spawner Consumables"
+    },
+    "loot_table/spawners/trial_chamber/items_to_drop_when_ominous.json": {
+      "structure": "Trial Chambers",
+      "container": "Ominous Item Spawner"
+    },
+    "loot_table/spawners/trial_chamber/key.json": {
+      "structure": "Trial Chambers",
+      "container": "Trial Spawner"
     }
   }
 }
