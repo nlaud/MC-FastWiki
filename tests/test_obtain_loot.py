@@ -8,6 +8,7 @@ docstring for the correction. These tests pin the corrected shapes down.
 
 import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -21,7 +22,10 @@ from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.loot import (
     BLOCK_LOOT_DIRECTORY,
     CHEST_LOOT_DIRECTORY,
+    SHEARS_NOTE,
+    SILK_TOUCH_NOTE,
     SKIPPED_FAMILIES,
+    _conditions_gate,
     extract_block_and_chest_loot,
     extract_loot,
     producers_from_drop_index,
@@ -29,6 +33,10 @@ from pipeline.obtain.loot import (
     verify_loot_sources,
 )
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerOutput
+
+# The committed snapshot of the pinned archive's tool gates. Rebuilt by hand with
+# `python -m tests.fixtures.build_loot_gate_snapshot`; the name carries the version.
+GATE_FIXTURE = "mcmeta_26_2_loot_gates.json"
 
 
 def archive(*, blocks: Mapping[str, Any] = {}, chests: Mapping[str, Any] = {}) -> dict[str, bytes]:
@@ -96,6 +104,205 @@ def test_the_silk_touch_branch_of_a_real_ore_table_carries_the_note() -> None:
     by_item = {p.output.item: p for p in result.producers}
     assert by_item["minecraft:diamond_ore"].note == "requires silk touch"
     assert by_item["minecraft:diamond"].note is None
+
+
+def test_pool_level_silk_touch_gate_carries_note_and_retains_odds() -> None:
+    """A pool-level silk-touch gate notes the requirement and retains its odds."""
+    files = archive(
+        blocks={
+            "glass": {
+                "type": "minecraft:block",
+                "pools": [
+                    {
+                        "rolls": 1.0,
+                        "conditions": [
+                            {
+                                "condition": "minecraft:match_tool",
+                                "predicate": {
+                                    "predicates": {
+                                        "minecraft:enchantments": [
+                                            {
+                                                "enchantments": "minecraft:silk_touch",
+                                                "levels": {"min": 1},
+                                            }
+                                        ]
+                                    }
+                                },
+                            }
+                        ],
+                        "entries": [{"type": "minecraft:item", "name": "minecraft:glass"}],
+                    }
+                ],
+            }
+        }
+    )
+    result = extract_block_and_chest_loot(files)
+    producer = result.producers[0]
+    assert producer.output.item == "minecraft:glass"
+    assert producer.note == "requires silk touch"
+    assert producer.chance == 1.0
+    assert producer.count_max == 1
+    assert producer.per_attempt == 1.0
+
+
+def test_pool_level_shears_gate_carries_shears_note() -> None:
+    """A pool-level shears gate notes the shears requirement."""
+    files = archive(
+        blocks={
+            "vine": {
+                "type": "minecraft:block",
+                "pools": [
+                    {
+                        "rolls": 1.0,
+                        "conditions": [
+                            {
+                                "condition": "minecraft:match_tool",
+                                "predicate": {"items": "minecraft:shears"},
+                            }
+                        ],
+                        "entries": [{"type": "minecraft:item", "name": "minecraft:vine"}],
+                    }
+                ],
+            }
+        }
+    )
+    result = extract_block_and_chest_loot(files)
+    producer = result.producers[0]
+    assert producer.output.item == "minecraft:vine"
+    assert producer.note == "requires shears"
+    assert producer.chance == 1.0
+
+
+def test_ungated_pool_carries_no_gate_note() -> None:
+    """An ordinary ungated block pool produces no tool gate note."""
+    files = archive(
+        blocks={
+            "stone": {
+                "type": "minecraft:block",
+                "pools": [
+                    {
+                        "rolls": 1.0,
+                        "entries": [{"type": "minecraft:item", "name": "minecraft:cobblestone"}],
+                    }
+                ],
+            }
+        }
+    )
+    result = extract_block_and_chest_loot(files)
+    producer = result.producers[0]
+    assert producer.note is None
+
+
+def _gate_snapshot() -> dict[str, Any]:
+    """Return the committed tool gate snapshot of the pinned archive.
+
+    Read from disk, never fetched. `tests/fixtures/build_loot_gate_snapshot.py`
+    is what opens the network, by hand, and its docstring holds the rebuild steps.
+    """
+    path = Path(__file__).parent / "fixtures" / GATE_FIXTURE
+    document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return document
+
+
+def test_the_gate_snapshot_names_the_archive_this_suite_pins() -> None:
+    """A snapshot of another version answers another question, so the header is checked."""
+    snapshot = _gate_snapshot()
+    assert snapshot["version_id"] == "26.2"
+    assert snapshot["tag"] == "26.2-data"
+    assert snapshot["commit_sha"] == "4d12c0553e21e461085d08dcb2c5d412398c494e"
+
+
+def test_pool_level_tool_gates_across_the_pinned_archive() -> None:
+    """76 block tables gate silk touch at the pool level, and 6 gate shears.
+
+    The fault this pins is not that the gate was unreadable. It is that
+    `_table_leaves` walked each pool's `entries` and never its own `conditions`,
+    so every one of these 82 tables published an ungated, certain drop -- the site
+    told a reader to break Glass and Bee Nest with their bare hands.
+    """
+    snapshot = _gate_snapshot()
+    tables = snapshot["tables"]
+
+    pool_silk = 0
+    pool_shears = 0
+    for document in tables.values():
+        gates = {
+            _conditions_gate(pool.get("conditions"))
+            for pool in document.get("pools", [])
+            if isinstance(pool, dict)
+        }
+        if SILK_TOUCH_NOTE in gates:
+            pool_silk += 1
+        elif SHEARS_NOTE in gates:
+            pool_shears += 1
+
+    assert pool_silk == snapshot["answer"]["poolSilkTouchTables"] == 76
+    assert pool_shears == snapshot["answer"]["poolShearsTables"] == 6
+
+
+def test_the_walk_notes_every_gated_drop_of_the_pinned_archive() -> None:
+    """Replaying the real tables must reproduce the snapshot's note for every drop.
+
+    This runs `extract_loot` over the committed documents rather than comparing two
+    numbers the rebuild script wrote, so a walk that stops inheriting a pool gate
+    into an `alternatives` child fails here.
+    """
+    snapshot = _gate_snapshot()
+    files = {
+        path: json.dumps(document).encode() for path, document in snapshot["tables"].items()
+    }
+
+    result = extract_loot(files)
+    notes = {
+        f"{producer.source_id}|{producer.output.item}": producer.note
+        for producer in result.producers
+    }
+    assert notes == snapshot["answer"]["notes"]
+
+
+def test_the_gated_drops_a_player_would_check_by_hand() -> None:
+    """Spot checks against the game, so the snapshot is not only self-consistent."""
+    snapshot = _gate_snapshot()
+    files = {
+        path: json.dumps(document).encode() for path, document in snapshot["tables"].items()
+    }
+    by_source_and_item = {
+        (p.source_id, p.output.item): p for p in extract_loot(files).producers
+    }
+
+    # Pool-level gate: the block drops itself only under silk touch.
+    for name in ("bee_nest", "glass", "ice", "sculk"):
+        src = f"{BLOCK_LOOT_DIRECTORY}/{name}.json"
+        assert by_source_and_item[(src, f"minecraft:{name}")].note == SILK_TOUCH_NOTE
+
+    # Pool-level shears gate.
+    vine = (f"{BLOCK_LOOT_DIRECTORY}/vine.json", "minecraft:vine")
+    assert by_source_and_item[vine].note == SHEARS_NOTE
+
+    # An infested block drops its *host*, gated, and never the infested block.
+    infested = f"{BLOCK_LOOT_DIRECTORY}/infested_stone.json"
+    assert by_source_and_item[(infested, "minecraft:stone")].note == SILK_TOUCH_NOTE
+    assert (infested, "minecraft:infested_stone") not in by_source_and_item
+
+    # Entry-level gate inside `alternatives`: the shape that already worked.
+    ore = f"{BLOCK_LOOT_DIRECTORY}/diamond_ore.json"
+    assert by_source_and_item[(ore, "minecraft:diamond_ore")].note == SILK_TOUCH_NOTE
+    assert by_source_and_item[(ore, "minecraft:diamond")].note is None
+
+    # Entry-level shears gate: the grass keeps its note, the seeds beside it do not.
+    grass = f"{BLOCK_LOOT_DIRECTORY}/short_grass.json"
+    assert by_source_and_item[(grass, "minecraft:short_grass")].note == SHEARS_NOTE
+    assert by_source_and_item[(grass, "minecraft:wheat_seeds")].note is None
+
+    # Stone is the pair a player checks first: silk touch keeps the stone, and
+    # breaking it plainly yields cobblestone with no requirement to state.
+    stone = f"{BLOCK_LOOT_DIRECTORY}/stone.json"
+    assert by_source_and_item[(stone, "minecraft:stone")].note == SILK_TOUCH_NOTE
+    assert by_source_and_item[(stone, "minecraft:cobblestone")].note is None
+
+    # A control table names no gate at all, so the walk must stay silent on it.
+    dirt = (f"{BLOCK_LOOT_DIRECTORY}/dirt.json", "minecraft:dirt")
+    assert by_source_and_item[dirt].note is None
 
 
 def test_both_branches_of_an_alternatives_block_input_the_block_itself() -> None:

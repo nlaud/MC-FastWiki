@@ -264,6 +264,13 @@ def build_obtain_graph(
                 merged_sources.update(load_loot_sources(DEFAULT_LOOT_SOURCES_PATH))
         except Exception:
             pass
+        try:
+            from pipeline.obtain.curated import DEFAULT_PRODUCERS_PATH, load_curated_sources
+
+            if DEFAULT_PRODUCERS_PATH.is_file():
+                merged_sources.update(load_curated_sources(DEFAULT_PRODUCERS_PATH))
+        except Exception:
+            pass
         sources = merged_sources
 
     sorted_sources = {k: sources[k] for k in sorted(sources)}

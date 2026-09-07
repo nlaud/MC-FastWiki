@@ -1,6 +1,6 @@
 import type { RenderContext } from "../context.js";
 import type { TreeProducer } from "../obtain-tree.js";
-import { renderSlot } from "./slot.js";
+import { humaniseId, renderSlot } from "./slot.js";
 
 /**
  * Renders a Brewing Stand workstation card.
@@ -85,7 +85,7 @@ export function renderFillingCard(
   chipsContainer.className = "station-chips";
   const chip = document.createElement("span");
   chip.className = "station-chip station-chip-filling";
-  chip.textContent = "Water Source";
+  chip.textContent = producer.station ? humaniseId(producer.station) : "Water Source";
   chipsContainer.append(chip);
   cardEl.append(chipsContainer);
 

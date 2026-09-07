@@ -162,9 +162,10 @@ def test_merge_of_no_indexes_is_empty() -> None:
 # --- ObtainMethod ------------------------------------------------------------
 
 
-def test_obtain_method_has_the_fourteen_named_members() -> None:
-    """Fourteen methods: crafting, smelting, brewing, filling, mob_loot, chest_loot,
-    trade, block_drop, brushing, fishing, bartering, gift, shearing, harvesting.
+def test_obtain_method_has_the_sixteen_named_members() -> None:
+    """Sixteen methods: crafting, smelting, brewing, filling, mob_loot, chest_loot,
+    trade, block_drop, brushing, fishing, bartering, gift, shearing, harvesting,
+    using, world_generation.
     """
     assert {member.value for member in ObtainMethod} == {
         "crafting",
@@ -181,6 +182,8 @@ def test_obtain_method_has_the_fourteen_named_members() -> None:
         "gift",
         "shearing",
         "harvesting",
+        "using",
+        "world_generation",
     }
 
 

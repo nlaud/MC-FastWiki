@@ -23,13 +23,20 @@ recipe:
    producer, and `TODO.md` Phase 6's looting-tier display is `pipeline.
    enrich.droptable`'s job for mobs, with no chest/block equivalent
    requested yet.
-2. Silk touch is never `condition: "minecraft:tool/can_silk_touch"`. It is
-   `condition: "minecraft:match_tool"` whose `predicate.predicates.
-   "minecraft:enchantments"` array names `"minecraft:silk_touch"` with a
-   `levels.min` of at least 1 -- verified on `diamond_ore.json` and
-   `coal_ore.json`, both of which pair a silk-touch-gated "drop the block
-   itself" entry with an unconditioned, fortune-scaled "drop the raw
-   resource" entry inside one `minecraft:alternatives` wrapper.
+2. Silk touch is never `condition: "minecraft:tool/can_silk_touch"`, which
+   appears only on newer snapshots. It is `condition: "minecraft:match_tool"`
+   whose `predicate.predicates."minecraft:enchantments"` array names
+   `"minecraft:silk_touch"` with a `levels.min` of at least 1.
+   Tool gates appear both at the entry level inside `minecraft:alternatives`
+   (verified on `diamond_ore.json` and `coal_ore.json`) and at the pool level
+   (on 82 block tables across the pinned archive: 76 silk-touch and 6 shears).
+
+Pool-level conditions such as `survives_explosion` (on roughly 825 tables)
+and pool-level tool gates (silk touch and shears) do not forfeit odds: a
+silk-touch gate is deterministic for a player holding the tool, so the note
+states the tool requirement while the odds describe the draw given it. Entry-level
+conditions continue to forfeit odds, because the probability of an entry condition
+holding is not stated by the table.
 
 Entries nest through `minecraft:alternatives`, `minecraft:group`, and
 `minecraft:sequence`, each carrying a `children` array of more entries,
@@ -37,8 +44,8 @@ verified on the block tables above. A flat read of `pools[].entries[]` alone
 would miss every drop gated by a condition, which on the live ore tables is
 half of them. The walk here recurses through all three container types and
 collects every `type: "minecraft:item"` leaf, in the order it meets them, and
-records whether a silk-touch condition governs it, from any depth of the
-containers above it.
+records whether a tool gate condition governs it, from any depth of the
+containers or pool above it.
 
 An entry `type` this module does not recognize (`minecraft:loot_table`, a
 reference to another table; `minecraft:tag`, a whole tag as one weighted
@@ -106,6 +113,7 @@ __all__ = [
     "DEFAULT_LOOT_SOURCES_PATH",
     "LOOT_SOURCES_FILENAME",
     "READ_FAMILIES",
+    "SHEARS_NOTE",
     "SILK_TOUCH_ENCHANTMENT",
     "SILK_TOUCH_NOTE",
     "SKIPPED_FAMILIES",
@@ -183,6 +191,7 @@ SILK_TOUCH_ENCHANTMENT = "minecraft:silk_touch"
 # a `HarvestDrop`. A reworded literal would silently unset every silk-touch
 # flag on that second reader rather than fail.
 SILK_TOUCH_NOTE = "requires silk touch"
+SHEARS_NOTE = "requires shears"
 
 # Mirrors `pipeline.normalize.merge.WIKI_KIND`'s `item` and `entity_type`
 # rows. See the module docstring for why this is a restatement rather than an
@@ -211,7 +220,7 @@ class LootLeaf(BaseModel, frozen=True):
     item: str
     count_min: int
     count_max: int
-    silk_touch: bool
+    gate: str | None = None
     chance: float | None = None
     rolls: float | None = None
 
@@ -392,20 +401,39 @@ def _condition_is_silk_touch(condition: Mapping[str, Any]) -> bool:
     return False
 
 
-def _entry_has_silk_touch_condition(entry: Mapping[str, Any]) -> bool:
-    conditions = entry.get("conditions")
-    if not isinstance(conditions, list):
+def _condition_is_shears(condition: Mapping[str, Any]) -> bool:
+    """Return whether one `conditions[]` entry is the shears gate.
+
+    The real shape in 26.2: `condition: "minecraft:match_tool"` whose
+    `predicate.items` is `"minecraft:shears"` (or `["minecraft:shears"]`).
+    """
+    if condition.get("condition") != "minecraft:match_tool":
         return False
-    return any(
-        isinstance(condition, Mapping) and _condition_is_silk_touch(condition)
-        for condition in conditions
-    )
+    predicate = condition.get("predicate")
+    if not isinstance(predicate, Mapping):
+        return False
+    items = predicate.get("items")
+    return items == "minecraft:shears" or items == ["minecraft:shears"]
+
+
+def _conditions_gate(conditions: Any) -> str | None:
+    """Return the first matching gate note from `conditions`, or `None`."""
+    if not isinstance(conditions, list):
+        return None
+    for condition in conditions:
+        if not isinstance(condition, Mapping):
+            continue
+        if _condition_is_silk_touch(condition):
+            return SILK_TOUCH_NOTE
+        if _condition_is_shears(condition):
+            return SHEARS_NOTE
+    return None
 
 
 def _walk_entries(
     entries: Sequence[Any],
     *,
-    silk_touch: bool,
+    gate: str | None,
     source: str,
     skipped: list[SkippedLootEntry],
     pool_weight: int | None = None,
@@ -413,9 +441,10 @@ def _walk_entries(
 ) -> list[LootLeaf]:
     """Return every item leaf reachable from `entries`.
 
-    `silk_touch` carries whether an ancestor container already gated this
-    branch on silk touch, so a leaf under `minecraft:alternatives` inherits
-    its parent's gate rather than each recursion re-deriving it.
+    `gate` carries whether an ancestor container or pool already gated this
+    branch on a tool requirement (e.g. silk touch or shears), so a leaf under
+    `minecraft:alternatives` inherits its parent's gate rather than each recursion
+    re-deriving it.
 
     `pool_weight` and `rolls` describe the pool these entries are the *direct*
     children of, and both are `None` on every recursive call. That is what
@@ -433,12 +462,12 @@ def _walk_entries(
         if not isinstance(entry_type, str):
             raise ObtainError(f"{source} holds a loot entry with no 'type'.")
         conditioned = isinstance(entry.get("conditions"), list) and bool(entry["conditions"])
-        gated = silk_touch or _entry_has_silk_touch_condition(entry)
+        entry_gate = gate or _conditions_gate(entry.get("conditions"))
         if entry_type in _CONTAINER_TYPES:
             children = entry.get("children")
             if not isinstance(children, list):
                 raise ObtainError(f"{source} holds a {entry_type} entry with no 'children' list.")
-            found.extend(_walk_entries(children, silk_touch=gated, source=source, skipped=skipped))
+            found.extend(_walk_entries(children, gate=entry_gate, source=source, skipped=skipped))
         elif entry_type == _ITEM_TYPE:
             name = entry.get("name")
             if not isinstance(name, str) or not name:
@@ -455,7 +484,7 @@ def _walk_entries(
                     item=_namespaced(name),
                     count_min=count_min,
                     count_max=count_max,
-                    silk_touch=gated,
+                    gate=entry_gate,
                     chance=chance,
                     rolls=rolls if chance is not None else None,
                 )
@@ -515,10 +544,11 @@ def _table_leaves(
         # table states, so the base roll count is what an unluck-ed attempt
         # actually gets -- and that is the number this tool's reader wants.
         rolls = _numeric_average(pool.get("rolls", 1))
+        gate = _conditions_gate(pool.get("conditions"))
         leaves.extend(
             _walk_entries(
                 pool_entries,
-                silk_touch=False,
+                gate=gate,
                 source=source,
                 skipped=skipped,
                 pool_weight=total_weight if total_weight > 0 else None,
@@ -590,7 +620,7 @@ def extract_loot(files: Mapping[str, bytes]) -> LootExtractionResult:
                     output=ProducerOutput(item=leaf.item, count=leaf.count_min),
                     inputs=inputs,
                     source_id=key,
-                    note=SILK_TOUCH_NOTE if leaf.silk_touch else None,
+                    note=leaf.gate,
                     chance=leaf.chance,
                     count_max=leaf.count_max if leaf.chance is not None else None,
                     per_attempt=leaf.per_attempt,

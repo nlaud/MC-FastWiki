@@ -5,6 +5,7 @@ import { renderCraftingCard } from "./crafting.js";
 import { renderFurnaceCard } from "./furnace.js";
 import { renderSmithingCard } from "./smithing.js";
 import { renderStonecutterCard } from "./stonecutter.js";
+import { renderUsingCard } from "./using.js";
 
 export { advanceTickerForTesting, resetTickerForTesting, subscribeTicker } from "./ticker.js";
 export { humaniseTag, renderSlot, type SlotOptions } from "./slot.js";
@@ -13,6 +14,7 @@ export { renderFurnaceCard } from "./furnace.js";
 export { renderStonecutterCard } from "./stonecutter.js";
 export { renderSmithingCard } from "./smithing.js";
 export { renderBrewingCard, renderFillingCard } from "./brewing.js";
+export { renderUsingCard } from "./using.js";
 export { renderLeafCard } from "./leaf.js";
 
 export interface StationCardOptions {
@@ -41,6 +43,8 @@ export function renderStationCard(
     cardEl = renderBrewingCard(producer, resultItem, ctx);
   } else if (producer.method === "filling") {
     cardEl = renderFillingCard(producer, resultItem, ctx);
+  } else if (producer.method === "using") {
+    cardEl = renderUsingCard(producer, resultItem, ctx);
   } else if (producer.method === "smelting") {
     cardEl = renderFurnaceCard(producer, resultItem, ctx);
   } else {

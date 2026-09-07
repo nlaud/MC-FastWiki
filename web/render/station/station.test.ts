@@ -6,12 +6,14 @@ import {
   humaniseTag,
   renderBrewingCard,
   renderCraftingCard,
+  renderFillingCard,
   renderFurnaceCard,
   renderLeafCard,
   renderSlot,
   renderSmithingCard,
   renderStationCard,
   renderStonecutterCard,
+  renderUsingCard,
   resetTickerForTesting,
 } from "./index.js";
 
@@ -346,6 +348,117 @@ describe("BrewingCard", () => {
     expect(card.querySelector('[data-slot-role="ingredient"]')).not.toBeNull();
     const bottles = card.querySelectorAll('[data-slot-role="bottle"]');
     expect(bottles.length).toBe(3);
+  });
+});
+
+describe("FillingCard", () => {
+  it("renders with station-filling class and defaults to Water Source", () => {
+    const ctx = createMockContext();
+    const producer: TreeProducer = {
+      method: "filling",
+      station: null,
+      note: null,
+      source_id: "water_bottle",
+      count: 1,
+      inputs: [
+        {
+          label: "minecraft:glass_bottle",
+          item: "minecraft:glass_bottle",
+          tag: null,
+          count: 1,
+          members: [],
+          node: null,
+        },
+      ],
+    };
+
+    const card = renderFillingCard(producer, "minecraft:potion/water", ctx);
+    expect(card.classList.contains("station-filling")).toBe(true);
+    expect(card.querySelector(".station-chip-filling")?.textContent).toBe("Water Source");
+    expect(card.querySelector(".filling-body")).not.toBeNull();
+  });
+
+  it("humanises custom stations for filling cards", () => {
+    const ctx = createMockContext();
+    const lavaProducer: TreeProducer = {
+      method: "filling",
+      station: "lava_source",
+      note: null,
+      source_id: "curated/filling/lava_bucket",
+      count: 1,
+      inputs: [],
+    };
+    const lavaCard = renderFillingCard(lavaProducer, "minecraft:lava_bucket", ctx);
+    expect(lavaCard.querySelector(".station-chip-filling")?.textContent).toBe("Lava Source");
+
+    const axolotlProducer: TreeProducer = {
+      method: "filling",
+      station: "axolotl",
+      note: null,
+      source_id: "curated/filling/axolotl_bucket",
+      count: 1,
+      inputs: [],
+    };
+    const axolotlCard = renderFillingCard(axolotlProducer, "minecraft:axolotl_bucket", ctx);
+    expect(axolotlCard.querySelector(".station-chip-filling")?.textContent).toBe("Axolotl");
+  });
+
+  it("renderStationCard dispatches filling method to renderFillingCard", () => {
+    const ctx = createMockContext();
+    const producer: TreeProducer = {
+      method: "filling",
+      station: "water_source",
+      note: null,
+      source_id: "curated/filling/water_bucket",
+      count: 1,
+      inputs: [],
+    };
+    const card = renderStationCard(producer, "minecraft:water_bucket", ctx);
+    expect(card.classList.contains("station-filling")).toBe(true);
+    expect(card.querySelector(".station-chip-filling")?.textContent).toBe("Water Source");
+  });
+});
+
+describe("UsingCard", () => {
+  it("renders with station-using class and Using chip", () => {
+    const ctx = createMockContext();
+    const producer: TreeProducer = {
+      method: "using",
+      station: "using",
+      note: "signed, and cannot be edited again",
+      source_id: "curated/using/written_book",
+      count: 1,
+      inputs: [
+        {
+          label: "minecraft:writable_book",
+          item: "minecraft:writable_book",
+          tag: null,
+          count: 1,
+          members: [],
+          node: null,
+        },
+      ],
+    };
+
+    const card = renderUsingCard(producer, "minecraft:written_book", ctx);
+    expect(card.classList.contains("station-using")).toBe(true);
+    expect(card.querySelector(".station-chip-using")?.textContent).toBe("Using");
+    expect(card.querySelector(".using-body")).not.toBeNull();
+  });
+
+  it("renderStationCard dispatches using method to renderUsingCard", () => {
+    const ctx = createMockContext();
+    const producer: TreeProducer = {
+      method: "using",
+      station: "using",
+      note: null,
+      source_id: "curated/using/written_book",
+      count: 1,
+      inputs: [],
+    };
+    const card = renderStationCard(producer, "minecraft:written_book", ctx);
+    expect(card.classList.contains("station-using")).toBe(true);
+    expect(card.querySelector(".station-chip-using")?.textContent).toBe("Using");
   });
 });
 

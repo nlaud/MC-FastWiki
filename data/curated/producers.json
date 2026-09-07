@@ -1,0 +1,136 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Hand-maintained producers for 14 one-off items in Java Edition 26.2. Covers bucket and bottle filling interactions, book signing, and world-generation items (elytra and trial chamber pottery sherds) that have no recipe or loot table.",
+  "producers": [
+    {
+      "output": "minecraft:water_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:bucket"],
+      "station": "water_source",
+      "source_id": "curated/filling/water_bucket",
+      "note": "water source block, waterlogged block, or full cauldron",
+      "wiki": "Water Bucket"
+    },
+    {
+      "output": "minecraft:lava_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:bucket"],
+      "station": "lava_source",
+      "source_id": "curated/filling/lava_bucket",
+      "note": "lava source block or cauldron",
+      "wiki": "Lava Bucket"
+    },
+    {
+      "output": "minecraft:powder_snow_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:bucket"],
+      "station": "powder_snow",
+      "source_id": "curated/filling/powder_snow_bucket",
+      "note": "powder snow block or cauldron",
+      "wiki": "Powder Snow Bucket"
+    },
+    {
+      "output": "minecraft:milk_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:bucket"],
+      "station": "cow",
+      "source_id": "curated/filling/milk_bucket",
+      "note": "milked from a cow, mooshroom, or goat",
+      "wiki": "Milk Bucket"
+    },
+    {
+      "output": "minecraft:axolotl_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:water_bucket"],
+      "station": "axolotl",
+      "source_id": "curated/filling/axolotl_bucket",
+      "note": "used on an axolotl",
+      "wiki": "Bucket of mob"
+    },
+    {
+      "output": "minecraft:salmon_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:water_bucket"],
+      "station": "salmon",
+      "source_id": "curated/filling/salmon_bucket",
+      "note": "used on a salmon",
+      "wiki": "Bucket of mob"
+    },
+    {
+      "output": "minecraft:tadpole_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:water_bucket"],
+      "station": "tadpole",
+      "source_id": "curated/filling/tadpole_bucket",
+      "note": "used on a tadpole",
+      "wiki": "Bucket of mob"
+    },
+    {
+      "output": "minecraft:sulfur_cube_bucket",
+      "method": "filling",
+      "inputs": ["minecraft:bucket"],
+      "station": "sulfur_cube",
+      "source_id": "curated/filling/sulfur_cube_bucket",
+      "note": "empty bucket, large sulfur cubes only",
+      "wiki": "Bucket of Sulfur Cube"
+    },
+    {
+      "output": "minecraft:dragon_breath",
+      "method": "filling",
+      "inputs": ["minecraft:glass_bottle"],
+      "station": "dragon_breath",
+      "source_id": "curated/filling/dragon_breath",
+      "note": "bottled from the dragon's breath attack or a dragon fireball cloud",
+      "wiki": "Dragon's Breath"
+    },
+    {
+      "output": "minecraft:written_book",
+      "method": "using",
+      "inputs": ["minecraft:writable_book"],
+      "station": "using",
+      "source_id": "curated/using/written_book",
+      "note": "signed, and cannot be edited again",
+      "wiki": "Written Book"
+    },
+    {
+      "output": "minecraft:elytra",
+      "method": "world_generation",
+      "inputs": [],
+      "source_id": "world_generation/end_ship/elytra",
+      "structure": "End Ship",
+      "container": "Item Frame",
+      "note": "in the treasure room",
+      "wiki": "Elytra"
+    },
+    {
+      "output": "minecraft:flow_pottery_sherd",
+      "method": "world_generation",
+      "inputs": [],
+      "source_id": "world_generation/trial_chamber/flow_pottery_sherd",
+      "structure": "Trial Chamber",
+      "container": "Decorated Pot",
+      "note": "1/13 per pot",
+      "wiki": "Flow Pottery Sherd"
+    },
+    {
+      "output": "minecraft:guster_pottery_sherd",
+      "method": "world_generation",
+      "inputs": [],
+      "source_id": "world_generation/trial_chamber/guster_pottery_sherd",
+      "structure": "Trial Chamber",
+      "container": "Decorated Pot",
+      "note": "1/13 per pot",
+      "wiki": "Guster Pottery Sherd"
+    },
+    {
+      "output": "minecraft:scrape_pottery_sherd",
+      "method": "world_generation",
+      "inputs": [],
+      "source_id": "world_generation/trial_chamber/scrape_pottery_sherd",
+      "structure": "Trial Chamber",
+      "container": "Decorated Pot",
+      "note": "1/13 per pot",
+      "wiki": "Scrape Pottery Sherd"
+    }
+  ]
+}

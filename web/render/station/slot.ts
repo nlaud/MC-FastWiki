@@ -16,7 +16,13 @@ export function humaniseTag(tag: string): string {
     .join(" ");
 }
 
-function humaniseId(id: string): string {
+/**
+ * Title Cases a registry id for display: `minecraft:lava_bucket` -> `Lava Bucket`.
+ *
+ * Exported because three station modules needed the same fallback name and each
+ * had grown its own byte-identical copy.
+ */
+export function humaniseId(id: string): string {
   const bare = id.replace(/^[a-z0-9_-]+:/, "");
   return bare
     .split("_")
