@@ -221,6 +221,7 @@ from pipeline.enrich.resource_location import (
 from pipeline.enrich.sprite import SpriteIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
+from pipeline.extract.generation import BlockGeneration
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
@@ -244,7 +245,10 @@ from pipeline.normalize.entity import (
     EntityRef,
     FoodEffect,
     FoodInfo,
+    GenerationInfo,
+    GenerationScope,
     HarvestDrop,
+    HarvestGate,
     HarvestInfo,
     IntegerRange,
     ItemAmount,
@@ -262,10 +266,11 @@ from pipeline.normalize.entity import (
     StatBlock,
     TradeEntry,
     TradeTable,
+    VeinInfo,
 )
 from pipeline.normalize.reconcile import ICON_RULES, resolve_display_name_icon, resolve_icon
 from pipeline.obtain.brewing import POTION_ID_TEMPLATE
-from pipeline.obtain.loot import SILK_TOUCH_NOTE
+from pipeline.obtain.loot import SHEARS_NOTE, SILK_TOUCH_NOTE
 from pipeline.obtain.producer import ObtainMethod, Producer
 
 __all__ = [
@@ -535,6 +540,16 @@ def _fallback_name(path: str) -> str:
     docstring's field-merge section for the measurement behind that claim.
     """
     return path.replace("_", " ").title()
+
+
+def _biome_ref(biome_id: str, join_table: JoinTable) -> EntityRef:
+    """Return an EntityRef for a biome, using its display name if known, else a fallback."""
+    rows = join_table.by_registry_id.get(biome_id, ())
+    for row in rows:
+        if row.kind == "biome":
+            return EntityRef(id=biome_id, name=row.display_name)
+    path = biome_id.split(":", 1)[-1]
+    return EntityRef(id=biome_id, name=_fallback_name(path))
 
 
 def _wiki_rows(name: str, registry: str, join_table: JoinTable) -> tuple[ResourceLocation, ...]:
@@ -1342,14 +1357,15 @@ def block_drops_from_producers(
     and `HarvestInfo` needs the transpose, "what does this block make". The one
     input of a `BLOCK_DROP` producer is the block itself, which is the key.
 
-    Silk touch is read from `Producer.note` against `loot.SILK_TOUCH_NOTE`
-    rather than re-derived, for the reason that constant's own comment gives:
-    the gate is decided once, while the loot table is being walked, and any
-    second opinion formed here could disagree with the obtain tree drawn from
-    the same producers on the same page.
+    Drop gates (`silk_touch`, `shears`) are read from `Producer.note` against
+    `loot.SILK_TOUCH_NOTE` and `loot.SHEARS_NOTE` rather than re-derived, for
+    the reason that constant's own comment gives: the gate is decided once,
+    while the loot table is being walked, and any second opinion formed here
+    could disagree with the obtain tree drawn from the same producers on the
+    same page.
 
     Duplicates are dropped. One block can reach the same `(item, count,
-    silk touch)` leaf down more than one branch of an `alternatives` tree --
+    gate)` leaf down more than one branch of an `alternatives` tree --
     every leaf-and-sapling table does -- and a drops row that printed the same
     item twice would be reporting the loot table's shape, not the block's
     drops. Order is otherwise the order the tables were walked in, which is the
@@ -1362,10 +1378,15 @@ def block_drops_from_producers(
         block_id = producer.inputs[0].item
         if block_id is None:
             continue
+        gate: HarvestGate | None = None
+        if producer.note == SILK_TOUCH_NOTE:
+            gate = "silk_touch"
+        elif producer.note == SHEARS_NOTE:
+            gate = "shears"
         drop = HarvestDrop(
             id=producer.output.item,
             count=producer.output.count,
-            silk_touch=producer.note == SILK_TOUCH_NOTE,
+            gate=gate,
         )
         seen = drops.setdefault(block_id, [])
         if drop not in seen:
@@ -1392,6 +1413,7 @@ def merge_entities(
     harvest_index: Mapping[str, BlockHarvest] | None = None,
     block_drops: Mapping[str, Sequence[HarvestDrop]] | None = None,
     effect_index: enrich_effect.EffectIndex | None = None,
+    generation_index: Mapping[str, BlockGeneration] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1836,7 +1858,7 @@ def merge_entities(
                     id=drop.id,
                     name=drafts[drop.id].name if drop.id in drafts else drop.name,
                     count=drop.count,
-                    silk_touch=drop.silk_touch,
+                    gate=drop.gate,
                 )
                 for drop in raw_drops
             )
@@ -1847,6 +1869,54 @@ def merge_entities(
                 drops=drops_with_names,
             )
             block_draft.add_section_first(harvest_section, SourceTier.A)
+
+    if generation_index is not None:
+        for block_id, gen_facts in generation_index.items():
+            block_draft = drafts.get(block_id)
+            if block_draft is None:
+                unplaced.append(
+                    UnplacedRow(
+                        table="generation",
+                        subject=block_id,
+                        reason=(
+                            "the block has worldgen features and this build does not enumerate it "
+                            "as an entity"
+                        ),
+                    )
+                )
+                continue
+            gen_section = GenerationInfo(
+                scopes=tuple(
+                    GenerationScope(
+                        dimension=scope.dimension.value,
+                        min_y=scope.min_y,
+                        max_y=scope.max_y,
+                        densest_y=scope.densest_y,
+                        surface_only=scope.surface_only,
+                        attempts_per_chunk=scope.attempts_per_chunk,
+                        biome_count=scope.biome_count,
+                        all_biomes_of_dimension=scope.all_biomes_of_dimension,
+                        biomes=tuple(
+                            _biome_ref(biome_id, join_table) for biome_id in scope.biomes
+                        ),
+                        veins=tuple(
+                            VeinInfo(
+                                feature=vein.feature,
+                                min_y=vein.min_y,
+                                max_y=vein.max_y,
+                                surface=vein.surface,
+                                densest_y=vein.densest_y,
+                                tries=vein.tries,
+                                chunk_chance=vein.chunk_chance,
+                                vein_size=vein.vein_size,
+                            )
+                            for vein in scope.veins
+                        ),
+                    )
+                    for scope in gen_facts.scopes
+                )
+            )
+            block_draft.add_section(gen_section, SourceTier.A)
 
     if effect_index is not None:
         clear_all_removers: list[EffectLink] = []

@@ -837,6 +837,12 @@
       "type": "string",
       "enum": ["wooden", "stone", "iron", "diamond"]
     },
+    "harvestGate": {
+      "title": "HarvestGate",
+      "description": "The special requirement to drop an item, e.g. Silk Touch or shears.",
+      "type": "string",
+      "enum": ["silk_touch", "shears"]
+    },
     "harvestDrop": {
       "title": "HarvestDrop",
       "description": "An item dropped when this block is broken.",
@@ -854,9 +860,8 @@
           "type": "integer",
           "default": 1
         },
-        "silkTouch": {
-          "type": "boolean",
-          "default": false
+        "gate": {
+          "$ref": "#/$defs/harvestGate"
         }
       }
     },
@@ -1093,15 +1098,124 @@
         }
       }
     },
+    "veinInfo": {
+      "title": "VeinInfo",
+      "description": "One placed feature's contribution to a block's generation in one dimension.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature"],
+      "properties": {
+        "feature": {
+          "description": "The namespaced ID of the placed feature.",
+          "type": "string"
+        },
+        "minY": {
+          "description": "Lowest Y level for this feature, clipped to the dimension's build range. Absent together with maxY when the feature is placed on a surface heightmap.",
+          "type": "integer"
+        },
+        "maxY": {
+          "description": "Highest Y level for this feature. Absent under the same rule as minY.",
+          "type": "integer"
+        },
+        "surface": {
+          "description": "Whether this feature is placed on a surface heightmap rather than in a height band.",
+          "type": "boolean",
+          "default": false
+        },
+        "densestY": {
+          "description": "Y level of highest density for trapezoid distributions.",
+          "type": "integer"
+        },
+        "tries": {
+          "description": "Attempts per chunk. Absent where the placement states no per-chunk count.",
+          "type": "number"
+        },
+        "chunkChance": {
+          "description": "1-in-N chance per chunk, if rarity-filtered.",
+          "type": "integer"
+        },
+        "veinSize": {
+          "description": "Maximum blocks per vein, if configured.",
+          "type": "integer"
+        }
+      }
+    },
     "generationInfo": {
       "title": "GenerationInfo",
-      "description": "Where a block, a structure, or a biome generates. The payload of this section arrives in Phase 6c.",
+      "description": "Where a block, a structure, or a biome generates. Carries one scope per dimension the block generates in, because the band, the attempt count and the biome list are all facts about one dimension: gravel and the two mushrooms generate in the overworld and the nether at once.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": ["type", "scopes"],
       "properties": {
         "type": {
           "const": "GenerationInfo"
+        },
+        "scopes": {
+          "description": "One entry per dimension this block generates in, ordered overworld, nether, end.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/generationScope"
+          },
+          "default": []
+        }
+      }
+    },
+    "generationScope": {
+      "title": "GenerationScope",
+      "description": "How one block generates in one dimension.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "biomeCount", "allBiomesOfDimension", "biomes", "veins"],
+      "properties": {
+        "dimension": {
+          "description": "The dimension these facts describe.",
+          "type": "string",
+          "enum": ["overworld", "nether", "end"]
+        },
+        "minY": {
+          "description": "Lowest Y level where this block generates in this dimension, clipped to the dimension's build range. Absent when every vein is placed on a surface heightmap, which states no band.",
+          "type": "integer"
+        },
+        "maxY": {
+          "description": "Highest Y level where this block generates in this dimension. Absent under the same rule as minY.",
+          "type": "integer"
+        },
+        "densestY": {
+          "description": "Y level with the highest density, taken from the declared trapezoid rather than the clipped band. Absent when the distribution is uniform, or when the veins that have a peak disagree or do not cover the whole band.",
+          "type": "integer"
+        },
+        "surfaceOnly": {
+          "description": "Whether every vein of this scope is placed on a surface heightmap rather than in a height band.",
+          "type": "boolean",
+          "default": false
+        },
+        "attemptsPerChunk": {
+          "description": "Placement attempts per chunk, summed over the veins that state one. Absent where no vein states a per-chunk count: a count that runs after the position modifier is patch density, not an attempt rate, and a noise-driven count is no fixed number at all.",
+          "type": "number"
+        },
+        "biomeCount": {
+          "description": "Number of biomes of this dimension the block generates in.",
+          "type": "integer"
+        },
+        "allBiomesOfDimension": {
+          "description": "Whether this block generates in every biome of this dimension, measured against the dimension's own biome tag.",
+          "type": "boolean"
+        },
+        "biomes": {
+          "description": "Biomes of this dimension where this block generates. Empty when allBiomesOfDimension is true.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        },
+        "veins": {
+          "description": "The individual placed features that generate this block in this dimension.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/veinInfo"
+          },
+          "default": []
         }
       }
     },

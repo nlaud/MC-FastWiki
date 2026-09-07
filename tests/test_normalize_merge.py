@@ -55,7 +55,7 @@ from pipeline.normalize.merge import (
     merge_entities,
     write_report,
 )
-from pipeline.obtain.loot import SILK_TOUCH_NOTE
+from pipeline.obtain.loot import SHEARS_NOTE, SILK_TOUCH_NOTE
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
 
 # --- Fixture builders -------------------------------------------------------
@@ -1477,14 +1477,25 @@ def test_block_drops_from_producers_keys_drops_by_the_block() -> None:
             inputs=(),
             source_id="loot_table/chests/simple_dungeon.json",
         ),
+        # Shears-gated drop.
+        Producer(
+            method=ObtainMethod.BLOCK_DROP,
+            output=ProducerOutput(item="minecraft:cobweb", count=1),
+            inputs=(ProducerInput(item="minecraft:cobweb"),),
+            source_id="loot_table/blocks/cobweb.json",
+            note=SHEARS_NOTE,
+        ),
     ]
 
     drops = block_drops_from_producers(producers)
 
-    assert set(drops) == {"minecraft:diamond_ore"}
+    assert set(drops) == {"minecraft:diamond_ore", "minecraft:cobweb"}
     assert drops["minecraft:diamond_ore"] == (
-        HarvestDrop(id="minecraft:diamond", count=1, silk_touch=False),
-        HarvestDrop(id="minecraft:diamond_ore", count=1, silk_touch=True),
+        HarvestDrop(id="minecraft:diamond", count=1, gate=None),
+        HarvestDrop(id="minecraft:diamond_ore", count=1, gate="silk_touch"),
+    )
+    assert drops["minecraft:cobweb"] == (
+        HarvestDrop(id="minecraft:cobweb", count=1, gate="shears"),
     )
 
 

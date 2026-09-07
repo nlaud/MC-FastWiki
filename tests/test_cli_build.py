@@ -574,6 +574,7 @@ def test_reports_land_in_the_reports_directory(tmp_path: Path) -> None:
         "pages-without-infobox.json",
         "obtain-report.json",
         "validation.json",
+        "generation-report.json",
     }
     assert {path.name for path in reports_dir.iterdir()} == expected
     assert {path.name for path in outcome.report_paths} == expected

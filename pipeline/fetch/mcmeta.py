@@ -159,7 +159,15 @@ ARCHIVE_NAMESPACE_ROOT = "data/minecraft"
 # trade rebalance pack, which is not the vanilla game. The prefix test below
 # excludes it, because its path is `data/minecraft/datapacks/...` rather than
 # `data/minecraft/tags/...`.
-DATA_GROUPS = ("advancement", "loot_table", "recipe", "tags")
+DATA_GROUPS = (
+    "advancement",
+    "loot_table",
+    "recipe",
+    "tags",
+    "worldgen/biome",
+    "worldgen/configured_feature",
+    "worldgen/placed_feature",
+)
 
 # How many bytes of archive this module reads before it stops.
 #

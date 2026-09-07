@@ -8,14 +8,6 @@ the verified data-source details.
 reasoning survives even after the choice is made.
 
 ---
-## Phase 6 — Content renderers
-
-- [ ] **Block** — drops and natural generation.
-      Harvest tool and tier ship as the `HarvestInfo` section from `pipeline/extract/harvest.py`.
-      Block drops ship in `HarvestInfo.drops` from mcmeta loot tables via `pipeline/normalize/merge.py`,
-      rendering interactively on web alongside tool and tier requirements.
-      Natural generation is still open: no natural-generation data reaches `data/dist` at all.
-
 ## Phase 6b - Obtain methods with no adapter
 
 `pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
@@ -52,6 +44,10 @@ The pool-level tool gate bug is closed.
 requirements from 76 tables (stained glass, coral fans, ice, sculk, bee nest) and shears from 6 tables
 (`vine`, `seagrass`, `tall_seagrass`, `hanging_roots`, `nether_sprouts`, `small_dripleaf`). Reading pool
 conditions now notes the tool requirement while retaining odds.
+The Block page states that gate too: `HarvestDrop` carries a named `gate` rather than the
+`silkTouch` boolean it shipped with, so the 6 shears tables render a `requires shears` badge beside
+their drop instead of an unbadged one, and gated drops still sort after the drop a player gets by
+simply breaking the block.
 
 The curated one-off cause is closed.
 `data/curated/producers.json` carries 14 hand-verified producers that no recipe or loot table states,
@@ -64,11 +60,6 @@ Two claims the earlier version of this bullet made were wrong and are recorded h
 survives: the 3 sherds are not vault-only, because decorated pots carrying them generate naturally in
 trial chambers at 1/13 per pot, and `filled_map` needed nothing because `minecraft:map_cloning`
 already produces it.
-
-- [ ] **Shears harvest badge.** The 6 block tables with a shears gate (`vine`, `seagrass`, `tall_seagrass`,
-      `hanging_roots`, `nether_sprouts`, `small_dripleaf`) carry a `requires shears` note in the
-      Obtaining tree, but `HarvestDrop.silkTouch` remains a boolean so the Block page drop list leaves
-      them unbadged. Generalizing `HarvestDrop` across schema, pipeline, and web is tracked as a follow-up.
 
 The 12 music discs are **not** an adapter gap.
 The creeper drop row names `Music Disc`, which is the display name of all 23 discs, so it correctly
@@ -487,6 +478,41 @@ New collections the added data makes nearly free:
     and Decision 15 already applied to the three oversized sprites: a hand-recorded, verified
     `File:` title in `/data/curated/overrides.json`. A human recording a checked filename is not
     the pipeline guessing one.
+
+22. **A block generates in one dimension *per scope*, and a placement that states no band gets none.**
+    `GenerationInfo` carries one `GenerationScope` per dimension rather than one dimension per
+    block, and three blocks need it: `gravel` (`ore_gravel` plus `ore_gravel_nether`), and
+    `brown_mushroom` and `red_mushroom`, whose `*_normal` placed feature is itself listed by
+    `crimson_forest`, `nether_wastes` and `warped_forest` alongside its 44 overworld biomes.
+
+    The first cut carried one dimension per block, preferred the overworld when a block's features
+    disagreed, and special-cased the two mushroom features by id so the disagreement would not
+    raise. That dropped every nether vein and its biomes with it, so a Gravel page said "Overworld"
+    and a Brown Mushroom page counted 44 biomes instead of 47. The plan this work was approved from
+    asked for the opposite of both -- raise rather than pick -- and raising is not available either,
+    because the disagreement is what the files actually say. A scope per dimension is the only
+    reading that keeps the three rows that depend on it truthful, since a band, an attempt count and
+    a biome list are all facts about one world: the same `above_bottom 0` anchor is Y -64 in the
+    overworld and Y 0 in the nether.
+
+    Two rules of the same kind sit beside it, both fixing a fabricated number rather than a missing
+    one.
+
+    A `heightmap` placement states a surface, not a band, so those veins carry `surface` and no Y
+    numbers. Filling in the dimension's build range instead made 19 blocks -- sweet berry bush, dead
+    bush, short grass, lily pad and the rest of the surface plants -- claim "Y -64 to 320", which is
+    the whole world.
+
+    A `count` modifier ahead of the position modifier is an attempt per chunk; a `count` behind it
+    scatters blocks around a position already chosen, which is patch density. 38 of the 86 placed
+    features state their count that way, and reading the first cut's `pre_height` scan past them
+    fell through to a `tries: 1` default, so Dead Bush summed a rate out of numbers no file states.
+    Such a vein now carries no attempt count at all, which is the same answer `pipeline.obtain.loot`
+    gives when a loot table stalls short of a real probability.
+
+    The dimension biome counts come from resolving `is_overworld`, `is_nether` and `is_end` rather
+    than from the literals 55, 5 and 5, so a version that adds a biome cannot quietly turn "every
+    biome" into "all but one".
 
 ## Still open
 

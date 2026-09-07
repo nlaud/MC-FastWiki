@@ -61,6 +61,13 @@ export type HarvestTool = "pickaxe" | "axe" | "shovel" | "hoe";
  * via the `definition` "harvestTier".
  */
 export type HarvestTier = "wooden" | "stone" | "iron" | "diamond";
+/**
+ * The special requirement to drop an item, e.g. Silk Touch or shears.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "harvestGate".
+ */
+export type HarvestGate = "silk_touch" | "shears";
 
 /**
  * One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.
@@ -432,7 +439,7 @@ export interface HarvestDrop {
   id: string;
   name?: string;
   count?: number;
-  silkTouch?: boolean;
+  gate?: HarvestGate;
 }
 /**
  * Every source of a status effect, its category, and what it does.
@@ -537,14 +544,105 @@ export interface EnchantInfo {
   [k: string]: unknown;
 }
 /**
- * Where a block, a structure, or a biome generates. The payload of this section arrives in Phase 6c.
+ * Where a block, a structure, or a biome generates. Carries one scope per dimension the block generates in, because the band, the attempt count and the biome list are all facts about one dimension: gravel and the two mushrooms generate in the overworld and the nether at once.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "generationInfo".
  */
 export interface GenerationInfo {
   type: "GenerationInfo";
-  [k: string]: unknown;
+  /**
+   * One entry per dimension this block generates in, ordered overworld, nether, end.
+   */
+  scopes: GenerationScope[];
+}
+/**
+ * How one block generates in one dimension.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "generationScope".
+ */
+export interface GenerationScope {
+  /**
+   * The dimension these facts describe.
+   */
+  dimension: "overworld" | "nether" | "end";
+  /**
+   * Lowest Y level where this block generates in this dimension, clipped to the dimension's build range. Absent when every vein is placed on a surface heightmap, which states no band.
+   */
+  minY?: number;
+  /**
+   * Highest Y level where this block generates in this dimension. Absent under the same rule as minY.
+   */
+  maxY?: number;
+  /**
+   * Y level with the highest density, taken from the declared trapezoid rather than the clipped band. Absent when the distribution is uniform, or when the veins that have a peak disagree or do not cover the whole band.
+   */
+  densestY?: number;
+  /**
+   * Whether every vein of this scope is placed on a surface heightmap rather than in a height band.
+   */
+  surfaceOnly?: boolean;
+  /**
+   * Placement attempts per chunk, summed over the veins that state one. Absent where no vein states a per-chunk count: a count that runs after the position modifier is patch density, not an attempt rate, and a noise-driven count is no fixed number at all.
+   */
+  attemptsPerChunk?: number;
+  /**
+   * Number of biomes of this dimension the block generates in.
+   */
+  biomeCount: number;
+  /**
+   * Whether this block generates in every biome of this dimension, measured against the dimension's own biome tag.
+   */
+  allBiomesOfDimension: boolean;
+  /**
+   * Biomes of this dimension where this block generates. Empty when allBiomesOfDimension is true.
+   */
+  biomes: EntityRef[];
+  /**
+   * The individual placed features that generate this block in this dimension.
+   */
+  veins: VeinInfo[];
+}
+/**
+ * One placed feature's contribution to a block's generation in one dimension.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "veinInfo".
+ */
+export interface VeinInfo {
+  /**
+   * The namespaced ID of the placed feature.
+   */
+  feature: string;
+  /**
+   * Lowest Y level for this feature, clipped to the dimension's build range. Absent together with maxY when the feature is placed on a surface heightmap.
+   */
+  minY?: number;
+  /**
+   * Highest Y level for this feature. Absent under the same rule as minY.
+   */
+  maxY?: number;
+  /**
+   * Whether this feature is placed on a surface heightmap rather than in a height band.
+   */
+  surface?: boolean;
+  /**
+   * Y level of highest density for trapezoid distributions.
+   */
+  densestY?: number;
+  /**
+   * Attempts per chunk. Absent where the placement states no per-chunk count.
+   */
+  tries?: number;
+  /**
+   * 1-in-N chance per chunk, if rarity-filtered.
+   */
+  chunkChance?: number;
+  /**
+   * Maximum blocks per vein, if configured.
+   */
+  veinSize?: number;
 }
 /**
  * A plain list of links to other entities. The payload of this section arrives in Phase 6.

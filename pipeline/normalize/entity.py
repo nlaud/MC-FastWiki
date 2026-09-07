@@ -136,7 +136,9 @@ __all__ = [
     "FoodEffect",
     "FoodInfo",
     "GenerationInfo",
+    "GenerationScope",
     "HarvestDrop",
+    "HarvestGate",
     "HarvestInfo",
     "HarvestTier",
     "HarvestTool",
@@ -162,6 +164,7 @@ __all__ = [
     "StatBlock",
     "TradeEntry",
     "TradeTable",
+    "VeinInfo",
 ]
 
 # Mirrors `pipeline.schema.entity.schema.json`'s `$defs.entityId.pattern`
@@ -742,16 +745,20 @@ class FoodInfo(BaseModel, frozen=True, populate_by_name=True):
     teleports_randomly: bool = Field(default=False, alias="teleportsRandomly")
 
 
+HarvestGate = Literal["silk_touch", "shears"]
+
+
 class HarvestDrop(BaseModel, frozen=True, populate_by_name=True):
     """An item dropped when this block is broken.
 
-    `silk_touch` indicates whether this drop requires the Silk Touch enchantment.
+    `gate` indicates whether this drop requires a special tool or enchantment
+    such as Silk Touch or shears.
     """
 
     id: str
     name: str | None = None
     count: int = 1
-    silk_touch: bool = Field(default=False, alias="silkTouch")
+    gate: HarvestGate | None = None
 
 
 class HarvestInfo(BaseModel, frozen=True, populate_by_name=True):
@@ -808,13 +815,53 @@ class EnchantInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     type: Literal["EnchantInfo"] = "EnchantInfo"
 
 
-class GenerationInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+class VeinInfo(BaseModel, frozen=True, populate_by_name=True):
+    """One placed feature's contribution to a block's generation in one dimension.
+
+    `min_y` and `max_y` are absent together for a feature placed on a heightmap,
+    which states a surface rather than a band, and `surface` is what a renderer
+    reads to say so. `tries` is present only where the placement states a
+    per-chunk attempt count; `pipeline.extract.generation` explains which counts
+    qualify and which are patch density.
+    """
+
+    feature: str
+    min_y: int | None = Field(default=None, alias="minY")
+    max_y: int | None = Field(default=None, alias="maxY")
+    surface: bool = False
+    densest_y: int | None = Field(default=None, alias="densestY")
+    tries: int | float | None = None
+    chunk_chance: int | None = Field(default=None, alias="chunkChance")
+    vein_size: int | None = Field(default=None, alias="veinSize")
+
+
+class GenerationScope(BaseModel, frozen=True, populate_by_name=True):
+    """How one block generates in one dimension."""
+
+    dimension: str
+    min_y: int | None = Field(default=None, alias="minY")
+    max_y: int | None = Field(default=None, alias="maxY")
+    densest_y: int | None = Field(default=None, alias="densestY")
+    surface_only: bool = Field(default=False, alias="surfaceOnly")
+    attempts_per_chunk: int | float | None = Field(default=None, alias="attemptsPerChunk")
+    biome_count: int = Field(alias="biomeCount")
+    all_biomes_of_dimension: bool = Field(alias="allBiomesOfDimension")
+    biomes: tuple[EntityRef, ...] = ()
+    veins: tuple[VeinInfo, ...] = ()
+
+
+class GenerationInfo(BaseModel, frozen=True, populate_by_name=True):
     """Where a block, a structure, or a biome generates.
 
-    The payload of this section arrives in Phase 6c.
+    One scope per dimension the block generates in, rather than one dimension for
+    the whole block. Gravel and the two mushrooms generate in the overworld and
+    the nether at once, and every field of a scope -- the band, the attempts, the
+    biomes -- is a fact about one dimension, so folding two worlds into one row
+    would state a band that exists in neither.
     """
 
     type: Literal["GenerationInfo"] = "GenerationInfo"
+    scopes: tuple[GenerationScope, ...] = ()
 
 
 class LinkList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
