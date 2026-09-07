@@ -73,7 +73,8 @@ export function isAcquisition(graph: Obtain, producer: ObtainProducer): boolean 
     producer.m === "shearing" ||
     producer.m === "fishing" ||
     producer.m === "bartering" ||
-    producer.m === "gift"
+    producer.m === "gift" ||
+    producer.m === "world_generation"
   ) {
     return true;
   }

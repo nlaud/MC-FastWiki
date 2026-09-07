@@ -11,7 +11,7 @@
  */
 export type EntityId = string;
 /**
- * How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle. The six loot-table world interaction methods (`brushing`, `fishing`, `bartering`, `gift`, `shearing`, `harvesting`) earn their own enum members because each represents a distinct player action.
+ * How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle or fills a bucket. `using` is a direct player interaction consuming an item with no station. `world_generation` covers items found placed in structures. The six loot-table world interaction methods (`brushing`, `fishing`, `bartering`, `gift`, `shearing`, `harvesting`) earn their own enum members because each represents a distinct player action.
  *
  * This interface was referenced by `Obtain`'s JSON-Schema
  * via the `definition` "obtainMethod".
@@ -30,7 +30,9 @@ export type ObtainMethod =
   | "bartering"
   | "gift"
   | "shearing"
-  | "harvesting";
+  | "harvesting"
+  | "using"
+  | "world_generation";
 
 /**
  * data/dist/obtain.json, the flat producer graph the web app assembles into an item's obtain tree at render time. `pipeline.emit.obtain` writes this file from a `pipeline.obtain.producer.ProducerIndex`, and `pipeline.obtain.tree.build_obtain_tree` is the reference implementation of the walk a renderer performs against it -- see that module's own docstring for the four rules the walk applies (cycle handling, memoization, a depth cap, and repeated-subtree collapse). The pipeline used to materialise a depth-capped tree into every entity shard instead; measured against the real 26.2 data, that cost 73.8 MB raw and 4.1 MB gzipped for strictly less depth than this file carries at 1.05 MB raw and 0.07 MB gzipped, because the same subtrees were being duplicated into hundreds of shards. Every key of a producer or an input is short, the same convention `index.schema.json`'s `indexEntry` uses, because this file carries every producer this build knows about with no depth cap -- each short key's own description below names the long field it stands for.
@@ -77,7 +79,9 @@ export interface ObtainProducer {
     | "bartering"
     | "gift"
     | "shearing"
-    | "harvesting";
+    | "harvesting"
+    | "using"
+    | "world_generation";
   /**
    * Long form: count. How many of the output item this producer yields at once. Mirrors `pipeline.obtain.producer.ProducerOutput.count`.
    */

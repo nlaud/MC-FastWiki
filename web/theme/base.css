@@ -1404,6 +1404,12 @@ canvas,
   border-color: rgba(138, 180, 248, 0.35);
 }
 
+.station-chip-using {
+  color: #a8dab5;
+  background: rgba(168, 218, 181, 0.15);
+  border-color: rgba(168, 218, 181, 0.35);
+}
+
 .station-body {
   display: flex;
   align-items: center;
@@ -1739,7 +1745,8 @@ canvas,
   gap: 6px;
 }
 
-.sources-chest-label {
+.sources-chest-label,
+.sources-world_generation-label {
   color: #e0e0e0;
   font-weight: 500;
 }

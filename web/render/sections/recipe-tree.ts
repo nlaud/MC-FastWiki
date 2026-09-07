@@ -196,6 +196,7 @@ export const SOURCE_GROUP_ORDER: readonly {
   groupClass: string;
 }[] = [
   { method: "chest_loot", title: "Chest Loot", groupClass: "sources-chest-group" },
+  { method: "world_generation", title: "Natural Generation", groupClass: "sources-worldgen-group" },
   { method: "brushing", title: "Brushing", groupClass: "sources-brushing-group" },
   { method: "fishing", title: "Fishing", groupClass: "sources-fishing-group" },
   { method: "bartering", title: "Bartering", groupClass: "sources-bartering-group" },

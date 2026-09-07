@@ -1042,6 +1042,42 @@ describe("Section renderers with real committed build data", () => {
       );
     });
 
+    it("renders natural generation source group for world_generation producers", () => {
+      const graph: Obtain = {
+        schemaVersion: 1,
+        producers: {
+          "minecraft:elytra": [
+            {
+              m: "world_generation",
+              src: "world_generation/end_ship/elytra",
+              nt: "in the treasure room",
+            },
+          ],
+        },
+        sources: {
+          "world_generation/end_ship/elytra": {
+            structure: "End Ship",
+            container: "Item Frame",
+          },
+        },
+      };
+      const tree = buildObtainTree("minecraft:elytra", graph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "Elytra RecipeTree element");
+      const worldgenGroup = el.querySelector(".sources-worldgen-group");
+      expect(worldgenGroup).not.toBeNull();
+      expect(worldgenGroup?.querySelector(".sources-group-title")?.textContent).toBe(
+        "Natural Generation",
+      );
+      expect(worldgenGroup?.textContent).toContain("End Ship - Item Frame");
+      expect(worldgenGroup?.textContent).toContain("in the treasure room");
+    });
+
     it("orders source groups according to canonical SOURCE_GROUP_ORDER", () => {
       const saddleTree = buildObtainTree("minecraft:saddle", obtainGraph);
       const saddleSection = {

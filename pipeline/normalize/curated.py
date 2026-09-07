@@ -81,6 +81,7 @@ __all__ = [
     "ALIASES_FILENAME",
     "HUD_SPRITES_FILENAME",
     "OVERRIDES_FILENAME",
+    "PRODUCERS_FILENAME",
     "TAMING_FILENAME",
     "CuratedData",
     "EntityOverride",
@@ -94,6 +95,7 @@ ALIASES_FILENAME = "aliases.json"
 OVERRIDES_FILENAME = "overrides.json"
 TAMING_FILENAME = "taming.json"
 HUD_SPRITES_FILENAME = "hud-sprites.json"
+PRODUCERS_FILENAME = "producers.json"
 
 
 class EntityOverride(BaseModel, frozen=True, populate_by_name=True, extra="forbid"):
@@ -320,6 +322,11 @@ def load_curated(
         hud_document = _read_document(hud_sprites_path, name=HUD_SPRITES_FILENAME)
         hud_sprites = _parse_hud_sprites(hud_document, name=HUD_SPRITES_FILENAME)
         documents_to_check.append((HUD_SPRITES_FILENAME, hud_document))
+
+    producers_path = directory / PRODUCERS_FILENAME
+    if producers_path.exists():
+        producers_document = _read_document(producers_path, name=PRODUCERS_FILENAME)
+        documents_to_check.append((PRODUCERS_FILENAME, producers_document))
 
     stale: list[StaleDocument] = []
     for filename, document in documents_to_check:

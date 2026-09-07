@@ -1,14 +1,7 @@
 import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
 import { potionIconKey, potionName } from "./potion-icon.js";
-
-function humaniseId(id: string): string {
-  const bare = id.replace(/^[a-z0-9_-]+:/, "");
-  return bare
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+import { humaniseId } from "./slot.js";
 
 /**
  * Renders a Leaf node card for an item the tree does not walk any further.

@@ -57,24 +57,26 @@ __all__ = [
 class ObtainMethod(StrEnum):
     """How one `Producer` turns its inputs into its output.
 
-    Fourteen methods. There is no separate member for stonecutting or smithing:
+    Sixteen methods. There is no separate member for stonecutting or smithing:
     both are crafting-like -- a player stands at a station and trades items
     for one result, with no randomness -- and `Producer.station` already
     carries which station (`"stonecutter"`, `"smithing_table"`) without the
     enum needing a member for every station a recipe type happens to use.
 
-    `FILLING` is the one method that names no station and reads no recipe
-    file, because the thing it describes is a world interaction rather than a
-    recipe: a player right-clicks a source block or a cauldron with a
-    container and gets a filled one back. It exists because without it every
-    potion tree in the game bottoms out one step too early. `minecraft:
-    potion/water` is the root input of all 44 brewable potions, and it is not
-    brewed, crafted, dropped, or traded -- the wiki's own Brewing equipment
-    table says a water bottle is "made by filling a glass bottle from a
-    cauldron or a water source block." Leaving that edge out made the glass
-    bottle, and the glass and sand under it, unreachable from any potion,
-    which is exactly the gap review caught. Only the water bottle uses it
-    today; filling a bucket is the same shape and would fit here unchanged.
+    `FILLING` describes a world interaction where a player right-clicks a
+    source block, cauldron, or mob with a container and gets a filled one
+    back. It covers filling bottles (water) and buckets (water, lava, powder
+    snow, milk, mob buckets).
+
+    `USING` describes a player action at no station that consumes an item and
+    returns a different one (e.g. signing a writable book into a written book).
+    Stretching `FILLING` to cover it would contradict that method's focus on
+    filling a container from an in-world source.
+
+    `WORLD_GENERATION` covers items found placed in generated structures without
+    inputs or loot tables (e.g. an elytra in an End Ship item frame, or naturally
+    generated decorated pots in Trial Chambers yielding pottery sherds). On web,
+    these render alongside chest loot in the Natural Generation source group.
 
     The six loot-table world interaction methods (`BRUSHING`, `FISHING`,
     `BARTERING`, `GIFT`, `SHEARING`, `HARVESTING`) earn their own enum members
@@ -100,6 +102,8 @@ class ObtainMethod(StrEnum):
     GIFT = "gift"
     SHEARING = "shearing"
     HARVESTING = "harvesting"
+    USING = "using"
+    WORLD_GENERATION = "world_generation"
 
 
 

@@ -62,7 +62,7 @@
       "examples": ["minecraft:gunpowder", "minecraft:iron_ingot"]
     },
     "obtainMethod": {
-      "description": "How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle. The six loot-table world interaction methods (`brushing`, `fishing`, `bartering`, `gift`, `shearing`, `harvesting`) earn their own enum members because each represents a distinct player action.",
+      "description": "How one producer turns its inputs into its output. Mirrors `pipeline.obtain.producer.ObtainMethod` exactly -- there is no separate member for stonecutting or smithing, both of which are crafting-like and are told apart by `st` (station) rather than by their own method member. `filling` is the world interaction that produces a water bottle from a glass bottle or fills a bucket. `using` is a direct player interaction consuming an item with no station. `world_generation` covers items found placed in structures. The six loot-table world interaction methods (`brushing`, `fishing`, `bartering`, `gift`, `shearing`, `harvesting`) earn their own enum members because each represents a distinct player action.",
       "type": "string",
       "enum": [
         "crafting",
@@ -78,7 +78,9 @@
         "bartering",
         "gift",
         "shearing",
-        "harvesting"
+        "harvesting",
+        "using",
+        "world_generation"
       ]
     },
     "obtainProducer": {

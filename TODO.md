@@ -32,39 +32,47 @@ Decision 11 planned the opposite approach and was overtaken by what shipped; rea
 why the reversal happened and what it costs.
 
 What is left is the set of ways to get an item that no adapter reads.
-`data/reports/obtain-report.json` lists 298 items with no producer of any kind.
-267 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
+`data/reports/obtain-report.json` lists 286 items with no producer of any kind.
+274 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
 `*_wall_sign`, crop stages, plus `suspicious_sand` and `suspicious_gravel` which break to nothing),
-88 spawn eggs, 22 technical and fluid blocks, and 18 creative or operator blocks.
+88 spawn eggs, 22 technical and fluid blocks, 18 creative or operator blocks, and 7 `infested_*` blocks
+(their loot tables drop the host stone when broken with silk touch, spawn silverfish otherwise, and no
+vanilla recipe, trade, or drop produces them; they are world-generation-only for the same reason
+`potted_cactus` is empty).
 Nobody obtains a `potted_cactus` - the pot and the cactus are the obtainable things, and the potted
 state is what the world holds after you combine them.
 
-The other 31 are real, and fall into three causes plus curated one-offs.
-Each bullet names one cause rather than one item, because the fix is per-cause.
+The other 12 are the music discs, and they are the only real gap left in this phase.
 
 The recipe-type cause is closed.
 `pipeline/obtain/recipes.py` now reads eleven recipe types rather than six, and the 43 recipes it
 still skips are the 18 `smithing_trim` files, the 21 remaining `crafting_special_*` files, and the
 4 `dye_white_*` files, none of which makes an item that lacks another producer.
 
-- [ ] **Silk-touch-only blocks - 7 items.** The `infested_*` family.
-      Breaking one spawns a silverfish and drops nothing, while silk touch drops the block itself.
-      First confirm whether the vanilla loot table states that or whether it is engine behavior no
-      table carries, because the answer decides whether this is a reader gap or a curated entry.
-- [ ] **World interaction - 6 items.** `axolotl_bucket`, `salmon_bucket`, `tadpole_bucket`,
-      `sulfur_cube_bucket`, `lava_bucket`, and `powder_snow_bucket`.
-      `ObtainMethod.FILLING` already exists for this exact shape and is used once, for the water
-      bottle, and its own docstring says filling a bucket would fit there unchanged.
-- [ ] **Curated one-offs and vault rewards - 6 items.** `elytra` (an end ship item frame),
-      `dragon_breath` (bottling), `written_book` (using the blank item; plus an origin note for
-      `filled_map` which is craftable via cloning but requires a blank map to create originally),
-      plus the 3 vault-only pottery sherds (`flow_pottery_sherd`, `guster_pottery_sherd`, `scrape_pottery_sherd`).
-      The 3 vault sherds appear only in the `decorated_pot_sherds` item tag in the 26.2 archive with no
-      loot table reaching them, so they require curated attribution.
-      These share no adapter and do not want one. A small curated producer table is the honest fix.
+The pool-level tool gate bug is closed.
+`pipeline/obtain/loot.py` previously checked only entry-level conditions, omitting silk-touch
+requirements from 76 tables (stained glass, coral fans, ice, sculk, bee nest) and shears from 6 tables
+(`vine`, `seagrass`, `tall_seagrass`, `hanging_roots`, `nether_sprouts`, `small_dripleaf`). Reading pool
+conditions now notes the tool requirement while retaining odds.
 
-The 12 music discs in the same report are **not** an adapter gap, and are recorded here only so the
-316 is not read as 316 missing adapters.
+The curated one-off cause is closed.
+`data/curated/producers.json` carries 14 hand-verified producers that no recipe or loot table states,
+read by `pipeline/obtain/curated.py`: the six bucket fillings the earlier bullet named, plus
+`water_bucket` and `milk_bucket`, whose only producers were chest tables, plus `dragon_breath`
+(bottling), `written_book` (signing a writable book, under the new `USING` method), and `elytra` and
+the 3 pottery sherds (under the new `WORLD_GENERATION` method).
+Every row names the wiki page it was read from.
+Two claims the earlier version of this bullet made were wrong and are recorded here so the reversal
+survives: the 3 sherds are not vault-only, because decorated pots carrying them generate naturally in
+trial chambers at 1/13 per pot, and `filled_map` needed nothing because `minecraft:map_cloning`
+already produces it.
+
+- [ ] **Shears harvest badge.** The 6 block tables with a shears gate (`vine`, `seagrass`, `tall_seagrass`,
+      `hanging_roots`, `nether_sprouts`, `small_dripleaf`) carry a `requires shears` note in the
+      Obtaining tree, but `HarvestDrop.silkTouch` remains a boolean so the Block page drop list leaves
+      them unbadged. Generalizing `HarvestDrop` across schema, pipeline, and web is tracked as a follow-up.
+
+The 12 music discs are **not** an adapter gap.
 The creeper drop row names `Music Disc`, which is the display name of all 23 discs, so it correctly
 refuses to resolve to one.
 Reading the wikitext note beside that row, which lists the discs by name, is what would fix it.

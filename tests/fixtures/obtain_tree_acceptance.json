@@ -4000,7 +4000,416 @@
               "members": [],
               "node": {
                 "item": "minecraft:lava_bucket",
-                "producers": [],
+                "producers": [
+                  {
+                    "method": "filling",
+                    "station": "lava_source",
+                    "note": "lava source block or cauldron",
+                    "source_id": "curated/filling/lava_bucket",
+                    "inputs": [
+                      {
+                        "label": "minecraft:bucket",
+                        "item": "minecraft:bucket",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:bucket",
+                          "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/simple_dungeon.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/trial_chambers/intersection_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/village/village_savanna_house.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/woodland_mansion.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "crafting",
+                              "station": null,
+                              "note": null,
+                              "source_id": "minecraft:bucket",
+                              "inputs": [
+                                {
+                                  "label": "minecraft:iron_ingot",
+                                  "item": "minecraft:iron_ingot",
+                                  "tag": null,
+                                  "count": 3,
+                                  "members": [],
+                                  "node": {
+                                    "item": "minecraft:iron_ingot",
+                                    "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_mineshaft.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_bridge.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_other.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/bastion_treasure.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/buried_treasure.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/desert_pyramid.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/end_city_treasure.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/jungle_temple.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/nether_bridge.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/pillager_outpost.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/shipwreck_treasure.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/simple_dungeon.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/stronghold_corridor.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/stronghold_crossing.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/trial_chambers/reward_common.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/village/village_armorer.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/village/village_toolsmith.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/village/village_weaponsmith.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/woodland_mansion.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/pots/trial_chambers/corridor.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "crafting",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_iron_block",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:iron_block",
+                                            "item": "minecraft:iron_block",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:iron_block",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "crafting",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_nuggets",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:iron_nugget",
+                                            "item": "minecraft:iron_nugget",
+                                            "tag": null,
+                                            "count": 9,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:iron_nugget",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Husk",
+                                        "source_id": "droptable/Husk",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Iron Golem",
+                                        "source_id": "droptable/Iron Golem",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Zombie",
+                                        "source_id": "droptable/Zombie",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "mob_loot",
+                                        "station": null,
+                                        "note": "dropped by Zombie Villager",
+                                        "source_id": "droptable/Zombie Villager",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "blast_furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_blasting_deepslate_iron_ore",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:deepslate_iron_ore",
+                                            "item": "minecraft:deepslate_iron_ore",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:deepslate_iron_ore",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "blast_furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_blasting_iron_ore",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:iron_ore",
+                                            "item": "minecraft:iron_ore",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:iron_ore",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "blast_furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_blasting_raw_iron",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:raw_iron",
+                                            "item": "minecraft:raw_iron",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:raw_iron",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_smelting_deepslate_iron_ore",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:deepslate_iron_ore",
+                                            "item": "minecraft:deepslate_iron_ore",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:deepslate_iron_ore",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_smelting_iron_ore",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:iron_ore",
+                                            "item": "minecraft:iron_ore",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:iron_ore",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "smelting",
+                                        "station": "furnace",
+                                        "note": null,
+                                        "source_id": "minecraft:iron_ingot_from_smelting_raw_iron",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:raw_iron",
+                                            "item": "minecraft:raw_iron",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:raw_iron",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ],
+                                    "expandable": false,
+                                    "back_reference": null
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "expandable": false,
+                          "back_reference": null
+                        }
+                      }
+                    ]
+                  }
+                ],
                 "expandable": false,
                 "back_reference": null
               }
@@ -10777,7 +11186,7 @@
                   {
                     "method": "block_drop",
                     "station": null,
-                    "note": null,
+                    "note": "requires silk touch",
                     "source_id": "loot_table/blocks/infested_stone.json",
                     "inputs": [
                       {
@@ -10820,7 +11229,7 @@
                             {
                               "method": "block_drop",
                               "station": null,
-                              "note": null,
+                              "note": "requires silk touch",
                               "source_id": "loot_table/blocks/infested_cobblestone.json",
                               "inputs": [
                                 {
@@ -10999,7 +11408,7 @@
                                       {
                                         "method": "block_drop",
                                         "station": null,
-                                        "note": null,
+                                        "note": "requires silk touch",
                                         "source_id": "loot_table/blocks/infested_cobblestone.json",
                                         "inputs": [
                                           {
@@ -16764,6 +17173,27 @@
                     "note": null,
                     "source_id": "loot_table/chests/trial_chambers/supply.json",
                     "inputs": []
+                  },
+                  {
+                    "method": "filling",
+                    "station": "cow",
+                    "note": "milked from a cow, mooshroom, or goat",
+                    "source_id": "curated/filling/milk_bucket",
+                    "inputs": [
+                      {
+                        "label": "minecraft:bucket",
+                        "item": "minecraft:bucket",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:bucket",
+                          "producers": [],
+                          "expandable": false,
+                          "back_reference": "root.producers.40.inputs.0.producers.0.inputs.0"
+                        }
+                      }
+                    ]
                   }
                 ],
                 "expandable": false,
@@ -16807,6 +17237,27 @@
                     "note": null,
                     "source_id": "loot_table/dispensers/trial_chambers/water.json",
                     "inputs": []
+                  },
+                  {
+                    "method": "filling",
+                    "station": "water_source",
+                    "note": "water source block, waterlogged block, or full cauldron",
+                    "source_id": "curated/filling/water_bucket",
+                    "inputs": [
+                      {
+                        "label": "minecraft:bucket",
+                        "item": "minecraft:bucket",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:bucket",
+                          "producers": [],
+                          "expandable": false,
+                          "back_reference": "root.producers.40.inputs.0.producers.0.inputs.0"
+                        }
+                      }
+                    ]
                   }
                 ],
                 "expandable": false,
@@ -18079,7 +18530,29 @@
                                   "members": [],
                                   "node": {
                                     "item": "minecraft:lava_bucket",
-                                    "producers": [],
+                                    "producers": [
+                                      {
+                                        "method": "filling",
+                                        "station": "lava_source",
+                                        "note": "lava source block or cauldron",
+                                        "source_id": "curated/filling/lava_bucket",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:bucket",
+                                            "item": "minecraft:bucket",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:bucket",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ],
                                     "expandable": false,
                                     "back_reference": null
                                   }
@@ -22142,7 +22615,7 @@
                                       {
                                         "method": "block_drop",
                                         "station": null,
-                                        "note": null,
+                                        "note": "requires silk touch",
                                         "source_id": "loot_table/blocks/infested_stone.json",
                                         "inputs": [
                                           {
@@ -24709,6 +25182,27 @@
                                         "note": null,
                                         "source_id": "loot_table/chests/trial_chambers/supply.json",
                                         "inputs": []
+                                      },
+                                      {
+                                        "method": "filling",
+                                        "station": "cow",
+                                        "note": "milked from a cow, mooshroom, or goat",
+                                        "source_id": "curated/filling/milk_bucket",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:bucket",
+                                            "item": "minecraft:bucket",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:bucket",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
                                       }
                                     ],
                                     "expandable": false,
@@ -24752,6 +25246,27 @@
                                         "note": null,
                                         "source_id": "loot_table/dispensers/trial_chambers/water.json",
                                         "inputs": []
+                                      },
+                                      {
+                                        "method": "filling",
+                                        "station": "water_source",
+                                        "note": "water source block, waterlogged block, or full cauldron",
+                                        "source_id": "curated/filling/water_bucket",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:bucket",
+                                            "item": "minecraft:bucket",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:bucket",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
                                       }
                                     ],
                                     "expandable": false,
@@ -28370,7 +28885,7 @@
                             {
                               "method": "block_drop",
                               "station": null,
-                              "note": null,
+                              "note": "requires silk touch",
                               "source_id": "loot_table/blocks/infested_stone.json",
                               "inputs": [
                                 {
@@ -28413,7 +28928,7 @@
                                       {
                                         "method": "block_drop",
                                         "station": null,
-                                        "note": null,
+                                        "note": "requires silk touch",
                                         "source_id": "loot_table/blocks/infested_cobblestone.json",
                                         "inputs": [
                                           {

@@ -183,6 +183,7 @@ from pipeline.obtain.chests import (
     load_chest_sources,
     verify_chest_sources,
 )
+from pipeline.obtain.curated import DEFAULT_PRODUCERS_PATH, load_curated_producers
 from pipeline.obtain.loot import (
     LOOT_SOURCES_FILENAME,
     LootExtractionResult,
@@ -258,6 +259,7 @@ class ObtainReport(BaseModel, frozen=True):
     """
 
     items_with_no_producer: tuple[str, ...] = ()
+    curated_producer_count: int = 0
     potions_with_no_brewing_path: tuple[str, ...] = ()
     unresolved_tier_b_names: tuple[UnresolvedTradeOrDrop, ...] = ()
     unresolved_effect_names: tuple[str, ...] = ()
@@ -629,10 +631,20 @@ def run_build(
     brewing_result: BrewingExtractionResult = build_brewing_producers(
         brewing_index, registries.get("potion", ())
     )
+    item_paths = registries.get("item", ())
+    curated_producers = (
+        load_curated_producers(
+            DEFAULT_PRODUCERS_PATH,
+            item_registry=item_paths if len(item_paths) > 100 else None,
+        )
+        if DEFAULT_PRODUCERS_PATH.is_file()
+        else []
+    )
     report(
         f"obtain, tier B: {len(mob_loot_producers)} mob loot producers, "
         f"{len(trade_producers)} trade producers, {len(brewing_result.producers)} brewing "
-        f"producers, {len(brewing_result.uncovered_potions)} potions with no brewing path"
+        f"producers, {len(curated_producers)} curated producers, "
+        f"{len(brewing_result.uncovered_potions)} potions with no brewing path"
     )
 
     producer_index = ProducerIndex.merge(
@@ -642,6 +654,7 @@ def run_build(
             ProducerIndex.from_producers(mob_loot_producers),
             ProducerIndex.from_producers(trade_producers),
             ProducerIndex.from_producers(brewing_result.producers),
+            ProducerIndex.from_producers(curated_producers),
         ]
     )
 
@@ -816,6 +829,7 @@ def run_build(
         )
     )
     obtain_report = ObtainReport(
+        curated_producer_count=len(curated_producers),
         items_with_no_producer=items_with_no_producer,
         potions_with_no_brewing_path=brewing_result.uncovered_potions,
         unresolved_tier_b_names=tuple(unresolved_drops) + tuple(unresolved_trades),

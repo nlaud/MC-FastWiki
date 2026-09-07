@@ -371,3 +371,12 @@ def test_the_round_trip_is_not_vacuously_true() -> None:
     nugget_node = ingot_tree.root.producers[0].inputs[0].node
     assert nugget_node is not None
     assert nugget_node.producers == ()  # the cycle's only producer was dropped
+
+
+def test_build_obtain_graph_includes_curated_sources() -> None:
+    """build_obtain_graph merges world_generation sources from data/curated/producers.json."""
+    graph = build_obtain_graph(ProducerIndex.from_producers(()))
+    assert "world_generation/end_ship/elytra" in graph.sources
+    elytra_src = graph.sources["world_generation/end_ship/elytra"]
+    assert elytra_src.structure == "End Ship"
+    assert elytra_src.container == "Item Frame"

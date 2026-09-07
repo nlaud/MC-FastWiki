@@ -49,3 +49,12 @@ tests/fixtures/wiki_bucket_rows.json
 # The obtain tree acceptance fixture, written by
 # `tests/fixtures/build_obtain_tree_acceptance.py` with `json.dumps(indent=2)`.
 tests/fixtures/obtain_tree_acceptance.json
+
+# The loot table tool gate snapshot, written by
+# `tests/fixtures/build_loot_gate_snapshot.py` with `json.dumps(indent=2)`, and
+# excluded for the same two-writers reason as the mcmeta rules above. It carries
+# whole loot table documents, whose `pools[].entries[]` arrays are exactly what
+# Prettier keeps on one line and `json.dumps` never does.
+#
+# The glob carries the version, because the file name does.
+tests/fixtures/mcmeta_*_loot_gates.json
