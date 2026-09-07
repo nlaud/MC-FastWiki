@@ -207,6 +207,7 @@ from pydantic import BaseModel, model_validator
 from pipeline.enrich import advancement as enrich_advancement
 from pipeline.enrich import breeding as enrich_breeding
 from pipeline.enrich import droptable as enrich_droptable
+from pipeline.enrich import effect as enrich_effect
 from pipeline.enrich import infobox as enrich_infobox
 from pipeline.enrich import spawn_table as enrich_spawn_table
 from pipeline.enrich import trade as enrich_trade
@@ -235,6 +236,8 @@ from pipeline.normalize.entity import (
     DropNote,
     DropTable,
     EffectLink,
+    EffectSource,
+    EffectSources,
     Entity,
     EntityDraft,
     EntityKind,
@@ -804,6 +807,71 @@ def _maybe_ref(
     return EntityRef(id=target, name=name)
 
 
+# How a Causes row's qualifier spells the potion variant the row means, in the
+# display names the `potion` registry entities already carry. The wiki writes
+# `{{ItemLink|Potion of Swiftness}} (extended)` and `... II` where the registry
+# writes `Potion of Swiftness (Long)` and `Potion of Swiftness (Strong)`.
+_POTION_VARIANT_SUFFIXES: Mapping[str | None, str] = {
+    None: "",
+    "(extended)": " (Long)",
+    "II": " (Strong)",
+    "IV": " (Strong)",
+}
+
+_POTION_NAME_PREFIX = "Potion of "
+
+
+def _potion_variant_ref(
+    name: str, qualifier: str | None, by_id: Mapping[str, object]
+) -> EntityRef | None:
+    """Return the specific `minecraft:potion/<path>` entity a Causes row names.
+
+    The join table resolves every "Potion of X" name to `minecraft:potion`, the
+    generic potion *item*, because that is the registry entry the wiki page maps
+    to. That makes all 45 potion rows of the 26.2 build link to the same page and
+    carry a name their target does not match, which is the dead end Decision 13
+    exists to prevent. The 46 potion entities already carry the exact display
+    names this needs, so matching on the name plus the row's own qualifier
+    resolves the variant without re-deriving a registry path here.
+
+    Returns `None` for anything that is not a base potion row -- splash,
+    lingering, and tipped arrows have no per-variant entity to target, and
+    `pipeline.obtain.brewing` documents why their generic item is the right
+    reference.
+    """
+    if not name.startswith(_POTION_NAME_PREFIX):
+        return None
+    suffix = _POTION_VARIANT_SUFFIXES.get(qualifier)
+    if suffix is None:
+        return None
+    display = f"{name}{suffix}"
+    for entity_id, draft in by_id.items():
+        if not entity_id.startswith(f"{NAMESPACE}:potion/"):
+            continue
+        if getattr(draft, "name", None) == display:
+            return EntityRef(id=entity_id, name=display)
+    return None
+
+
+def _any_registry_ref(
+    name: str, join_table: JoinTable, by_id: Mapping[str, object]
+) -> EntityRef | None:
+    """Return the first `EntityRef` any registry resolves `name` to.
+
+    A Causes row names its cause in prose, so the registry it belongs to is not
+    known ahead of the lookup: `Beacon` is a block, `Golden Apple` an item, and
+    `Illusioner` an entity type. Tries the registries in the order a reader would
+    expect a name to mean, and the title-cased spelling as well, because the wiki
+    writes `Suspicious stew` alongside `Suspicious Stew`.
+    """
+    for candidate_name in (name, name.title()):
+        for registry in ("item", "block", "entity_type", "enchantment", "mob_effect"):
+            ref = _maybe_ref(candidate_name, registry, join_table, by_id)
+            if ref is not None:
+                return ref
+    return None
+
+
 def _resolve_forward(
     name: str,
     registry: str,
@@ -1323,6 +1391,7 @@ def merge_entities(
     food_index: Mapping[str, FoodFacts] | None = None,
     harvest_index: Mapping[str, BlockHarvest] | None = None,
     block_drops: Mapping[str, Sequence[HarvestDrop]] | None = None,
+    effect_index: enrich_effect.EffectIndex | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1778,6 +1847,88 @@ def merge_entities(
                 drops=drops_with_names,
             )
             block_draft.add_section_first(harvest_section, SourceTier.A)
+
+    if effect_index is not None:
+        clear_all_removers: list[EffectLink] = []
+        specific_removers: dict[str, list[EffectLink]] = {}
+        if food_index is not None:
+            for item_id, food_facts in food_index.items():
+                item_draft = drafts.get(item_id)
+                if item_draft is None:
+                    continue
+                item_name = item_draft.name
+                link = EffectLink(name=item_name, ref=EntityRef(id=item_id, name=item_name))
+                for eff in food_facts.effects:
+                    if eff.kind is ConsumeEffectKind.CLEAR_ALL_EFFECTS:
+                        if link not in clear_all_removers:
+                            clear_all_removers.append(link)
+                    elif eff.kind is ConsumeEffectKind.REMOVE_EFFECTS:
+                        for removed_effect_id in eff.removed:
+                            removers_list = specific_removers.setdefault(removed_effect_id, [])
+                            if link not in removers_list:
+                                removers_list.append(link)
+
+        for effect_facts in effect_index.effects:
+            target = _resolve_forward(
+                effect_facts.title,
+                "mob_effect",
+                join_table,
+                drafts,
+                table="effect",
+                unplaced=unplaced,
+            )
+            if target is None:
+                continue
+
+            target_draft = drafts.get(target)
+            if target_draft is None:
+                continue
+
+            resolved_sources: list[EffectSource] = []
+            for s in effect_facts.sources:
+                ref = _potion_variant_ref(s.name, s.qualifier, drafts) or _any_registry_ref(
+                    s.name, join_table, drafts
+                )
+                resolved_sources.append(
+                    EffectSource(
+                        name=s.name,
+                        ref=ref,
+                        qualifier=s.qualifier,
+                        potency=s.potency,
+                        length=s.length,
+                        note=s.note,
+                    )
+                )
+
+            target_removers: list[EffectLink] = []
+            for link in clear_all_removers:
+                if link not in target_removers:
+                    target_removers.append(link)
+            for link in specific_removers.get(target, ()):
+                if link not in target_removers:
+                    target_removers.append(link)
+
+            effect_section = EffectSources(
+                category=effect_facts.category,
+                behaviour=effect_facts.behaviour,
+                sources=tuple(resolved_sources),
+                removed_by=tuple(target_removers),
+            )
+
+            if target_draft.wiki_url is None:
+                unplaced.append(
+                    UnplacedRow(
+                        table="effect",
+                        subject=effect_facts.title,
+                        reason=(
+                            f"{target} has no resolved wiki page, so an EffectSources section "
+                            f"would carry wiki-authored content with no attribution link"
+                        ),
+                    )
+                )
+                continue
+
+            target_draft.add_section_first(effect_section, SourceTier.B)
 
     # --- Curated overrides: the last field-level write before `.build()` ---
 

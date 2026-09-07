@@ -2,6 +2,7 @@ import type {
   AdvancementInfo,
   BreedingInfo,
   DropTable,
+  EffectSources,
   Entity,
   FoodInfo,
   HarvestInfo,
@@ -14,6 +15,7 @@ import type { RenderContext } from "../context.js";
 import { renderAdvancementInfo } from "./advancement-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
 import { renderDropTable } from "./drop-table.js";
+import { renderEffectSources } from "./effect-sources.js";
 import { renderFoodInfo } from "./food-info.js";
 import { renderHarvestInfo } from "./harvest-info.js";
 import { renderRecipeTree } from "./recipe-tree.js";
@@ -36,6 +38,7 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   FoodInfo: (s, ctx) => renderFoodInfo(s as FoodInfo, ctx),
   HarvestInfo: (s, ctx) => renderHarvestInfo(s as HarvestInfo, ctx),
   RecipeTree: (s, ctx, entity) => renderRecipeTree(s as RecipeTree, ctx, entity),
+  EffectSources: (s, ctx) => renderEffectSources(s as EffectSources, ctx),
 };
 
 /**

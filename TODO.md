@@ -15,8 +15,6 @@ reasoning survives even after the choice is made.
       Block drops ship in `HarvestInfo.drops` from mcmeta loot tables via `pipeline/normalize/merge.py`,
       rendering interactively on web alongside tool and tier requirements.
       Natural generation is still open: no natural-generation data reaches `data/dist` at all.
-- [ ] **Effect** — every source of the effect, and what it actually does.
-      Zero `EffectSources` sections exist in the build, so the effect renderer is blocked on a pipeline emit.
 
 ## Phase 6b - Obtain methods with no adapter
 
@@ -174,6 +172,16 @@ New collections the added data makes nearly free:
 - [ ] GUI panel styling: beveled 3D borders, stone/dirt surfaces, inventory-slot framing
 - [ ] Sprite atlas rendering with `image-rendering: pixelated`; no smoothing, ever
 - [ ] Icons beside every entity name, in suggestion rows, and inside recipe grids
+- [ ] **All 46 potion entities carry no icon.** The wiki publishes four potion sprites in total
+      (`InvSprite:Potion`, `ItemSprite:potion`, `ItemSprite:splash-potion`, `ItemSprite:lingering-potion`),
+      because the game tints one texture rather than shipping a sprite per variant, so there is no
+      `Potion of Swiftness` file to resolve and Decision 3 forbids constructing one.
+      Every potion page and every potion row of an Effect page therefore renders iconless.
+      This predates the Effect work but became visible there: those rows used to borrow the generic
+      `minecraft:potion` icon because they wrongly linked to it, and now that they link to the right
+      variant they show none.
+      The fix is a renderer fallback from `minecraft:potion/<path>` to the generic potion sprite,
+      not a new sprite, because the texture really is the same one.
 - [ ] Hostile/passive and rarity color coding consistent across every renderer
 - [ ] Accessibility pass: contrast, focus rings, and a reduced-motion path — the pixel aesthetic
       must not make the tool unreadable under match pressure

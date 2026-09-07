@@ -126,6 +126,7 @@ __all__ = [
     "DropNote",
     "DropTable",
     "EffectLink",
+    "EffectSource",
     "EffectSources",
     "EnchantInfo",
     "Entity",
@@ -768,13 +769,25 @@ class HarvestInfo(BaseModel, frozen=True, populate_by_name=True):
     drops: tuple[HarvestDrop, ...] = ()
 
 
-class EffectSources(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
-    """Every source of a status effect.
+class EffectSource(BaseModel, frozen=True, populate_by_name=True):
+    """One source that grants or inflicts a status effect."""
 
-    The payload of this section arrives in Phase 6.
-    """
+    name: str = Field(min_length=1)
+    ref: EntityRef | None = None
+    qualifier: str | None = None
+    potency: str | None = None
+    length: str | None = None
+    note: str | None = None
+
+
+class EffectSources(BaseModel, frozen=True, populate_by_name=True):
+    """Every source of a status effect, its category, and what it does."""
 
     type: Literal["EffectSources"] = "EffectSources"
+    category: Literal["positive", "negative", "neutral"]
+    behaviour: str | None = None
+    sources: tuple[EffectSource, ...] = ()
+    removed_by: tuple[EffectLink, ...] = Field(default=(), alias="removedBy")
 
 
 class ChestLoot(BaseModel, frozen=True, populate_by_name=True, extra="allow"):

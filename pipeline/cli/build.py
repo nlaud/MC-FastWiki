@@ -145,6 +145,7 @@ from pipeline.enrich.advancement import fetch_advancements
 from pipeline.enrich.breeding import fetch_breeding
 from pipeline.enrich.brewing import fetch_brewing
 from pipeline.enrich.droptable import fetch_drop_tables
+from pipeline.enrich.effect import fetch_effects, verify_effect_sources
 from pipeline.enrich.infobox import DEFAULT_REPORT_PATH as INFOBOX_REPORT_PATH
 from pipeline.enrich.infobox import InfoboxReport, parse_infoboxes, select_infobox_pages
 from pipeline.enrich.infobox import write_report as write_infobox_report
@@ -677,11 +678,25 @@ def run_build(
     breeding_index = fetch_breeding(
         revision=version, cache=store, transport=network_transport
     )
+    effect_index = fetch_effects(
+        revision=version, cache=store, transport=network_transport
+    )
+    effect_errors = verify_effect_sources(
+        effect_index,
+        potion_paths=registries.get("potion", ()),
+        food_index=food_index,
+    )
+    if effect_errors:
+        raise CliError("effect sources verification failed:\n  " + "\n  ".join(effect_errors))
     report(
         f"tier B page text: {len(extract_report.extracts)} blurbs, "
         f"{len(mob_pages)} mob pages selected, {len(with_box)} infoboxes parsed, "
         f"{len(without_box)} mob pages with no infobox template, "
         f"{len(breeding_index.by_mob)} mobs with breeding data"
+    )
+    report(
+        f"tier B effects: {len(effect_index.by_title)} status effects parsed, "
+        f"{sum(len(facts.sources) for facts in effect_index.effects)} total sources"
     )
     if without_box:
         report(f"  pages without an infobox: {', '.join(without_box)}")
@@ -714,6 +729,7 @@ def run_build(
         food_index=food_index,
         harvest_index=harvest_index,
         block_drops=block_drops_from_producers(loot_result.producers),
+        effect_index=effect_index,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
