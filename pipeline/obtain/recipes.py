@@ -1,8 +1,8 @@
 """Turn mcmeta `recipe/*.json` into `Producer`s. The one Tier A adapter of this package.
 
-Six recipe types cover every producer this module emits, in the 1.21.2+
+Eleven recipe types cover every producer this module emits, in the 1.21.2+
 ingredient shape verified live against the pinned `26.2-data` archive on
-2026-09-01 -- a plain namespaced string (`"minecraft:oak_planks"`), a
+2026-09-06 -- a plain namespaced string (`"minecraft:oak_planks"`), a
 `#`-prefixed tag (`"#minecraft:planks"`), or a JSON list of either, never the
 pre-1.21.2 `{"item": ...}` object form:
 
@@ -20,26 +20,34 @@ pre-1.21.2 `{"item": ...}` object form:
   there is no separate enum member for it.
 - `minecraft:smithing_transform`: `base`, `template`, `addition`, `result`.
   `ObtainMethod.CRAFTING` with `station="smithing_table"`.
+- `minecraft:crafting_transmute`: `input` (base), `material` (addition), `result`.
+  `ObtainMethod.CRAFTING` with no station.
+- `minecraft:crafting_dye`: `target` (base), `dye` (addition), `result`.
+  `ObtainMethod.CRAFTING` with no station.
+- `minecraft:crafting_special_firework_star_fade`: `target` (base), `dye`
+  (addition), `result`. `ObtainMethod.CRAFTING` with no station.
+- `minecraft:crafting_special_firework_star`: `fuel`, `dye`, `result`.
+  `ObtainMethod.CRAFTING` with no station.
+- `minecraft:crafting_imbue`: `material`, `source`, `result`. `ObtainMethod.CRAFTING`
+  with no station.
+- `minecraft:crafting_decorated_pot`: `back`, `front`, `left`, `right`, `result`.
+  `ObtainMethod.CRAFTING` with no station.
 
 Every other recipe `type` is skipped and counted in the report rather than
-raised on, split into two reasons. `minecraft:crafting_special_*` (book
-cloning, banner duplication, firework stars, tipped arrows, armor dyeing, map
-cloning and extending, repairing, and the rest of the family mcmeta ships with
-no ingredient list at all) and `minecraft:crafting_transmute` (dyeing a
-bundle, in-place; no distinct "ingredient becomes item" shape a `Producer`
-can represent without guessing which of `input`/`material` is the thing being
-transformed) are named outright, matching `TODO.md`'s own instruction to
-count `crafting_special_*` rather than raise. Any *other* unrecognized `type`
--- one a future Minecraft version adds -- is skipped under the same "unhandled
-recipe type" reason rather than raised on: a new recipe type is new data, not
-a broken read, and `TODO.md`'s own Decision 6 argues at length for reading
-mcmeta *because* it is exact, versioned data that this pipeline does not have
-to guess about -- guessing how to parse a shape this module has never seen is
-exactly the guess Decision 6 exists to avoid. `ObtainError` is reserved for a
-malformed instance of a type this module *does* claim to handle in full: a
-`crafting_shaped` recipe whose `pattern` references a symbol `key` never
-defines, a `result` with no `id`, and so on. That split is what
-`tests/test_obtain_recipes.py` pins down.
+raised on. The remaining six `minecraft:crafting_special_*` types (banner
+duplication, book cloning, firework rockets, map extending, repairing, shield
+decoration; 21 files) declare no ingredient list in upstream data. Any *other*
+unrecognized `type` -- such as `minecraft:smithing_trim` (18 files) or one a
+future Minecraft version adds -- is skipped under the "unhandled recipe type"
+reason rather than raised on: a new recipe type is new data, not a broken read,
+and `TODO.md`'s own Decision 6 argues at length for reading mcmeta *because* it
+is exact, versioned data that this pipeline does not have to guess about --
+guessing how to parse a shape this module has never seen is exactly the guess
+Decision 6 exists to avoid. `ObtainError` is reserved for a malformed instance
+of a type this module *does* claim to handle in full: a `crafting_shaped` recipe
+whose `pattern` references a symbol `key` never defines, a recipe missing a
+required slot (`material`, `source`, `fuel`, `target`, etc.), a `result` with
+no `id`, and so on. That split is what `tests/test_obtain_recipes.py` pins down.
 
 ## Tag ingredients stay collapsed, not fanned out
 
@@ -64,10 +72,41 @@ detail, and it is called out in this task's own report rather than silently
 folded into the tag case, because it is the one place this module's
 `ProducerInput` shape bends slightly to cover a real upstream shape that has
 no tag id to hang off of.
+
+## The base-plus-addition shape
+
+`crafting_transmute`, `crafting_dye`, and `crafting_special_firework_star_fade`
+all share the same structure: taking a base item/tag, adding a colorant or
+material, and producing a result. They differ only in field naming (`input`/
+`material` vs `target`/`dye`). `map_cloning` is the one recipe in this family
+that declares a `material_count: {"min": 1, "max": 8}` range; the minimum
+count is applied to the material input, and the 1-to-8 range is recorded in
+`Producer.note` when max differs from min.
+
+## Firework star modifiers are not inputs
+
+In `minecraft:crafting_special_firework_star`, `shapes`, `trail`, and `twinkle`
+are optional modifiers that a player may add to customize the explosion effect.
+None is required to craft a firework star (only `fuel` and `dye` are required).
+They are read solely to build `Producer.note` rather than emitted as mandatory
+inputs.
+
+## Self-referential recipes
+
+`filled_map` (via `map_cloning`), dyed leather and wolf armor (via `crafting_dye`),
+and `firework_star` (via fade dyeing) are self-referential: `input`/`target`
+matches `result`. They are emitted because they represent legitimate player
+actions, and downstream tree generation handles cycle pruning automatically.
+
+## Crafting imbue input counts
+
+In `minecraft:crafting_imbue`, `result.count` is 8 while upstream provides no
+count for `material`. Both inputs are left at count 1 rather than inferring 8
+arrows, since the upstream file does not state that count.
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydantic import BaseModel
@@ -78,6 +117,12 @@ from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, Prod
 
 __all__ = [
     "COOKING_STATIONS",
+    "CRAFTING_DECORATED_POT_TYPE",
+    "CRAFTING_DYE_TYPE",
+    "CRAFTING_IMBUE_TYPE",
+    "CRAFTING_SPECIAL_FIREWORK_STAR_FADE_TYPE",
+    "CRAFTING_SPECIAL_FIREWORK_STAR_TYPE",
+    "CRAFTING_TRANSMUTE_TYPE",
     "NAMESPACE",
     "RECIPE_DIRECTORY",
     "SMITHING_TRANSFORM_TYPE",
@@ -94,6 +139,12 @@ _CRAFTING_SHAPED = "minecraft:crafting_shaped"
 _CRAFTING_SHAPELESS = "minecraft:crafting_shapeless"
 STONECUTTING_TYPE = "minecraft:stonecutting"
 SMITHING_TRANSFORM_TYPE = "minecraft:smithing_transform"
+CRAFTING_TRANSMUTE_TYPE = "minecraft:crafting_transmute"
+CRAFTING_DYE_TYPE = "minecraft:crafting_dye"
+CRAFTING_IMBUE_TYPE = "minecraft:crafting_imbue"
+CRAFTING_DECORATED_POT_TYPE = "minecraft:crafting_decorated_pot"
+CRAFTING_SPECIAL_FIREWORK_STAR_TYPE = "minecraft:crafting_special_firework_star"
+CRAFTING_SPECIAL_FIREWORK_STAR_FADE_TYPE = "minecraft:crafting_special_firework_star_fade"
 
 # The four cooking recipe types, mapped to the station name a `Producer`
 # carries. `ObtainMethod.SMELTING` is the method for all four; the station is
@@ -109,7 +160,7 @@ COOKING_STATIONS: Mapping[str, str] = {
 # them. See the module docstring for what each one is and why guessing its
 # shape would be worse than reporting it.
 _SPECIAL_CRAFTING_PREFIX = "minecraft:crafting_special_"
-_NAMED_SKIPS = frozenset({"minecraft:crafting_transmute"})
+_NAMED_SKIPS: frozenset[str] = frozenset()
 
 # A JSON pattern row's empty cell.
 _EMPTY_CELL = " "
@@ -244,6 +295,22 @@ def _crafting_shaped(
     )
 
 
+def _aggregate_inputs(inputs: Iterable[ProducerInput]) -> tuple[ProducerInput, ...]:
+    """Aggregate repeated ingredients by item/tag identity, summing their counts."""
+    aggregated: dict[tuple[str | None, str | None], ProducerInput] = {}
+    order: list[tuple[str | None, str | None]] = []
+    for entry in inputs:
+        key = (entry.item, entry.tag)
+        if key in aggregated:
+            aggregated[key] = aggregated[key].model_copy(
+                update={"count": aggregated[key].count + entry.count}
+            )
+        else:
+            aggregated[key] = entry
+            order.append(key)
+    return tuple(aggregated[key] for key in order)
+
+
 def _crafting_shapeless(
     document: Mapping[str, Any], *, recipe_id: str, tags: TagIndex, source: str
 ) -> Producer:
@@ -256,22 +323,10 @@ def _crafting_shapeless(
         _resolve_ingredient(entry, tags=tags, source=source, is_dye=is_dye)
         for entry in ingredients
     ]
-    aggregated: dict[tuple[str | None, str | None], ProducerInput] = {}
-    order: list[tuple[str | None, str | None]] = []
-    for entry in resolved:
-        key = (entry.item, entry.tag)
-        if key in aggregated:
-            aggregated[key] = aggregated[key].model_copy(
-                update={"count": aggregated[key].count + entry.count}
-            )
-        else:
-            aggregated[key] = entry
-            order.append(key)
-
     return Producer(
         method=ObtainMethod.CRAFTING,
         output=_result(document, source=source),
-        inputs=tuple(aggregated[key] for key in order),
+        inputs=_aggregate_inputs(resolved),
         source_id=recipe_id,
     )
 
@@ -312,6 +367,125 @@ def _smithing_transform(
         inputs=tuple(inputs),
         source_id=recipe_id,
         station="smithing_table",
+    )
+
+
+def _base_plus_addition(
+    document: Mapping[str, Any],
+    *,
+    base_field: str,
+    addition_field: str,
+    recipe_id: str,
+    tags: TagIndex,
+    source: str,
+) -> Producer:
+    base_raw = document.get(base_field)
+    if base_raw is None:
+        raise ObtainError(f"{source} carries no {base_field!r}.")
+    addition_raw = document.get(addition_field)
+    if addition_raw is None:
+        raise ObtainError(f"{source} carries no {addition_field!r}.")
+
+    base_input = _resolve_ingredient(base_raw, tags=tags, source=source)
+    addition_input = _resolve_ingredient(addition_raw, tags=tags, source=source)
+
+    note: str | None = None
+    material_count = document.get("material_count")
+    if isinstance(material_count, Mapping):
+        min_count = material_count.get("min", 1)
+        max_count = material_count.get("max", min_count)
+        if isinstance(min_count, int) and not isinstance(min_count, bool):
+            addition_input = addition_input.model_copy(update={"count": min_count})
+        if (
+            isinstance(max_count, int)
+            and not isinstance(max_count, bool)
+            and isinstance(min_count, int)
+            and not isinstance(min_count, bool)
+            and max_count != min_count
+        ):
+            note = f"accepts {min_count} to {max_count}"
+
+    return Producer(
+        method=ObtainMethod.CRAFTING,
+        output=_result(document, source=source),
+        inputs=(base_input, addition_input),
+        source_id=recipe_id,
+        note=note,
+    )
+
+
+def _firework_star_note(document: Mapping[str, Any]) -> str | None:
+    parts: list[str] = []
+    if "shapes" in document:
+        parts.append("shapes")
+    if "trail" in document:
+        parts.append("trail")
+    if "twinkle" in document:
+        parts.append("twinkle")
+    if not parts:
+        return None
+    return f"optional modifiers: {', '.join(parts)}"
+
+
+def _firework_star(
+    document: Mapping[str, Any], *, recipe_id: str, tags: TagIndex, source: str
+) -> Producer:
+    fuel = document.get("fuel")
+    if fuel is None:
+        raise ObtainError(f"{source} carries no 'fuel'.")
+    dye = document.get("dye")
+    if dye is None:
+        raise ObtainError(f"{source} carries no 'dye'.")
+
+    return Producer(
+        method=ObtainMethod.CRAFTING,
+        output=_result(document, source=source),
+        inputs=(
+            _resolve_ingredient(fuel, tags=tags, source=source),
+            _resolve_ingredient(dye, tags=tags, source=source),
+        ),
+        source_id=recipe_id,
+        note=_firework_star_note(document),
+    )
+
+
+def _crafting_imbue(
+    document: Mapping[str, Any], *, recipe_id: str, tags: TagIndex, source: str
+) -> Producer:
+    material = document.get("material")
+    if material is None:
+        raise ObtainError(f"{source} carries no 'material'.")
+    source_val = document.get("source")
+    if source_val is None:
+        raise ObtainError(f"{source} carries no 'source'.")
+
+    return Producer(
+        method=ObtainMethod.CRAFTING,
+        output=_result(document, source=source),
+        inputs=(
+            _resolve_ingredient(material, tags=tags, source=source),
+            _resolve_ingredient(source_val, tags=tags, source=source),
+        ),
+        source_id=recipe_id,
+    )
+
+
+def _crafting_decorated_pot(
+    document: Mapping[str, Any], *, recipe_id: str, tags: TagIndex, source: str
+) -> Producer:
+    slots = ("back", "front", "left", "right")
+    raw_inputs: list[ProducerInput] = []
+    for slot in slots:
+        value = document.get(slot)
+        if value is None:
+            raise ObtainError(f"{source} carries no {slot!r}.")
+        raw_inputs.append(_resolve_ingredient(value, tags=tags, source=source))
+
+    return Producer(
+        method=ObtainMethod.CRAFTING,
+        output=_result(document, source=source),
+        inputs=_aggregate_inputs(raw_inputs),
+        source_id=recipe_id,
     )
 
 
@@ -371,25 +545,6 @@ def extract_recipes(files: Mapping[str, bytes], *, tags: TagIndex) -> RecipeExtr
             )
             continue
 
-        if recipe_type.startswith(_SPECIAL_CRAFTING_PREFIX):
-            skipped.append(
-                SkippedRecipe(
-                    recipe_id=recipe_id,
-                    recipe_type=recipe_type,
-                    reason="a crafting_special_* recipe declares no ingredient list",
-                )
-            )
-            continue
-        if recipe_type in _NAMED_SKIPS:
-            skipped.append(
-                SkippedRecipe(
-                    recipe_id=recipe_id,
-                    recipe_type=recipe_type,
-                    reason="this recipe type carries no representable ingredient-to-item shape",
-                )
-            )
-            continue
-
         if recipe_type == _CRAFTING_SHAPED:
             producers.append(
                 _crafting_shaped(document, recipe_id=recipe_id, tags=tags, source=source)
@@ -423,6 +578,56 @@ def extract_recipes(files: Mapping[str, bytes], *, tags: TagIndex) -> RecipeExtr
         elif recipe_type == SMITHING_TRANSFORM_TYPE:
             producers.append(
                 _smithing_transform(document, recipe_id=recipe_id, tags=tags, source=source)
+            )
+        elif recipe_type == CRAFTING_TRANSMUTE_TYPE:
+            producers.append(
+                _base_plus_addition(
+                    document,
+                    base_field="input",
+                    addition_field="material",
+                    recipe_id=recipe_id,
+                    tags=tags,
+                    source=source,
+                )
+            )
+        elif recipe_type in (CRAFTING_DYE_TYPE, CRAFTING_SPECIAL_FIREWORK_STAR_FADE_TYPE):
+            producers.append(
+                _base_plus_addition(
+                    document,
+                    base_field="target",
+                    addition_field="dye",
+                    recipe_id=recipe_id,
+                    tags=tags,
+                    source=source,
+                )
+            )
+        elif recipe_type == CRAFTING_SPECIAL_FIREWORK_STAR_TYPE:
+            producers.append(
+                _firework_star(document, recipe_id=recipe_id, tags=tags, source=source)
+            )
+        elif recipe_type == CRAFTING_IMBUE_TYPE:
+            producers.append(
+                _crafting_imbue(document, recipe_id=recipe_id, tags=tags, source=source)
+            )
+        elif recipe_type == CRAFTING_DECORATED_POT_TYPE:
+            producers.append(
+                _crafting_decorated_pot(document, recipe_id=recipe_id, tags=tags, source=source)
+            )
+        elif recipe_type in _NAMED_SKIPS:
+            skipped.append(
+                SkippedRecipe(
+                    recipe_id=recipe_id,
+                    recipe_type=recipe_type,
+                    reason="this recipe type carries no representable ingredient-to-item shape",
+                )
+            )
+        elif recipe_type.startswith(_SPECIAL_CRAFTING_PREFIX):
+            skipped.append(
+                SkippedRecipe(
+                    recipe_id=recipe_id,
+                    recipe_type=recipe_type,
+                    reason="a crafting_special_* recipe declares no ingredient list",
+                )
             )
         else:
             skipped.append(

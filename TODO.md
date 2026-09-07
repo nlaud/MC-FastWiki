@@ -22,7 +22,7 @@ reasoning survives even after the choice is made.
 
 `pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
 and mob-drop tables.
-That covers 14 methods and 4268 producers (12 loot-table families read, closing 27 gaps).
+That covers 14 methods and 4311 producers (12 loot-table families read, closing 27 gaps).
 Every producer whose outcome is a draw rather than a certainty also carries its odds - the chance,
 the stack range, and the expected yield per chest, catch, barter, shear, brush or kill.
 A producer only carries them where the source states them: an entry under `minecraft:alternatives`
@@ -32,22 +32,21 @@ Decision 11 planned the opposite approach and was overtaken by what shipped; rea
 why the reversal happened and what it costs.
 
 What is left is the set of ways to get an item that no adapter reads.
-`data/reports/obtain-report.json` lists 316 items with no producer of any kind.
+`data/reports/obtain-report.json` lists 298 items with no producer of any kind.
 267 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
 `*_wall_sign`, crop stages, plus `suspicious_sand` and `suspicious_gravel` which break to nothing),
 88 spawn eggs, 22 technical and fluid blocks, and 18 creative or operator blocks.
 Nobody obtains a `potted_cactus` - the pot and the cactus are the obtainable things, and the potted
 state is what the world holds after you combine them.
 
-The other 49 are real, and fall into four causes plus curated one-offs.
+The other 31 are real, and fall into three causes plus curated one-offs.
 Each bullet names one cause rather than one item, because the fix is per-cause.
 
-- [ ] **Recipe types the extractor skips - 17 items.** The 16 colored bundles come from
-      `minecraft:crafting_transmute`, and `firework_star` from
-      `minecraft:crafting_special_firework_star`.
-      `obtain-report.json` already lists all 86 skipped recipes with a reason.
-      Most of the 86 are harmless because the item they make has another producer; these 17 are the
-      ones left with nothing at all.
+The recipe-type cause is closed.
+`pipeline/obtain/recipes.py` now reads eleven recipe types rather than six, and the 43 recipes it
+still skips are the 18 `smithing_trim` files, the 21 remaining `crafting_special_*` files, and the
+4 `dye_white_*` files, none of which makes an item that lacks another producer.
+
 - [ ] **Silk-touch-only blocks - 7 items.** The `infested_*` family.
       Breaking one spawns a silverfish and drops nothing, while silk touch drops the block itself.
       First confirm whether the vanilla loot table states that or whether it is engine behavior no
@@ -56,9 +55,10 @@ Each bullet names one cause rather than one item, because the fix is per-cause.
       `sulfur_cube_bucket`, `lava_bucket`, and `powder_snow_bucket`.
       `ObtainMethod.FILLING` already exists for this exact shape and is used once, for the water
       bottle, and its own docstring says filling a bucket would fit there unchanged.
-- [ ] **Curated one-offs and vault rewards - 7 items.** `elytra` (an end ship item frame),
-      `dragon_breath` (bottling), `filled_map` and `written_book` (using the blank item), plus the
-      3 vault-only pottery sherds (`flow_pottery_sherd`, `guster_pottery_sherd`, `scrape_pottery_sherd`).
+- [ ] **Curated one-offs and vault rewards - 6 items.** `elytra` (an end ship item frame),
+      `dragon_breath` (bottling), `written_book` (using the blank item; plus an origin note for
+      `filled_map` which is craftable via cloning but requires a blank map to create originally),
+      plus the 3 vault-only pottery sherds (`flow_pottery_sherd`, `guster_pottery_sherd`, `scrape_pottery_sherd`).
       The 3 vault sherds appear only in the `decorated_pot_sherds` item tag in the 26.2 archive with no
       loot table reaching them, so they require curated attribution.
       These share no adapter and do not want one. A small curated producer table is the honest fix.
@@ -148,6 +148,7 @@ collection should mean adding one manifest file, never writing code.
 - [ ] `banner_patterns` — all unique banner pattern recipes
 - [ ] `workstations` — all workstation block recipes
 - [ ] `minecarts` — all minecart recipes
+- [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in
 - [ ] Every member renders as a link that opens the real entity window
 
 New collections the added data makes nearly free:
@@ -157,6 +158,7 @@ New collections the added data makes nearly free:
 - [ ] `structures` — every structure and its biome
 - [ ] `chest_loot` — every lootable chest, as a hub into the structures that contain them
 - [ ] `villager_trades` — professions as an index into the trade tables
+- [ ] `bartering` — the full bartering table for piglin bartering
 
 ## Phase 8 — Minecraft theming
 
