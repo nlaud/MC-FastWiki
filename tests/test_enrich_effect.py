@@ -13,6 +13,8 @@ from pipeline.enrich.effect import (
     EffectIndex,
     EffectPageFacts,
     RawEffectSource,
+    _clean_behaviour_templates,
+    _clean_cell_value,
     _drop_other_edition_sentences,
     _extract_behaviour,
     _link_display_text,
@@ -271,6 +273,56 @@ def test_behaviour_leaves_java_only_prose_untouched() -> None:
     """The filter must not fire on prose that never mentions the other edition."""
     paragraph = "Speed increases movement speed by 20% per level. It also widens the FOV."
     assert _drop_other_edition_sentences(paragraph) == paragraph
+
+
+def test_a_note_keeps_its_links_as_wikilinks() -> None:
+    """A name in a note must stay linkable, per Decision 13.
+
+    The notes flattened every link into plain text, so `Witches`, `shipwreck`
+    and `villager` all reached the screen as dead words beside rows whose own
+    Cause column linked fine.
+    """
+    cell = "{{EntityLink|Witch|text=Witches}} drink this. Found in {{BlockLink|Shipwreck}} chests."
+    assert _clean_cell_value(cell, keep_links=True) == (
+        "[[Witch|Witches]] drink this. Found in [[Shipwreck]] chests."
+    )
+
+
+def test_a_qualifier_drops_its_links() -> None:
+    """A cause qualifier is a short fragment beside a name that already links."""
+    assert _clean_cell_value("set to {{EffectLink|Haste}} II") == "set to Haste II"
+
+
+def test_a_fraction_template_reads_as_a_fraction() -> None:
+    """`1{{frac|13|16}}` reads as "1 13/16", not "113/16" and not raw wikitext.
+
+    The wiki writes the whole number outside the template, so the two have to be
+    rejoined with a space.
+    """
+    assert _clean_behaviour_templates("jump height to 1{{frac|13|16}} blocks") == (
+        "jump height to 1 13/16 blocks"
+    )
+    assert _clean_behaviour_templates("only {{frac|5|8}} the normal rate") == (
+        "only 5/8 the normal rate"
+    )
+
+
+def test_a_section_link_becomes_a_link_or_its_label() -> None:
+    """`{{slink|Conduit|Conduit Power}}` shipped as raw wikitext before this."""
+    assert _clean_behaviour_templates("See {{slink|Conduit|Conduit Power}}", keep_links=True) == (
+        "See [[Conduit|Conduit Power]]"
+    )
+    # An empty first argument means a section of the same page, so there is no
+    # entity to point at and only the label survives.
+    assert _clean_behaviour_templates("See {{slink||Causes}}", keep_links=True) == "See Causes"
+
+
+def test_removing_a_template_leaves_no_gap() -> None:
+    """An empty parenthetical and a stranded space are artifacts of removal."""
+    assert _clean_behaviour_templates("a yellow-green color ({{hungerbar|2|9px}}).") == (
+        "a yellow-green color."
+    )
+    assert _clean_behaviour_templates("break a block.{{until|JE 26.3}}") == "break a block."
 
 
 def test_link_display_text_reads_a_named_display_argument() -> None:

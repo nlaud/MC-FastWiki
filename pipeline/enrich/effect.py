@@ -191,27 +191,121 @@ def _link_display_text(title: str, second: str | None) -> str:
     return title
 
 
-def _clean_behaviour_templates(text: str) -> str:
-    """Replace domain templates in behaviour prose with readable text."""
+def _tidy_spacing(text: str) -> str:
+    """Close the gaps that removing a template or a markup span leaves behind.
+
+    Both an empty parenthetical and a space stranded before its punctuation are
+    artifacts of removal, not of the source, so neither should reach the screen.
+    Runs after `strip_markup` as well as before it, because stripping markup
+    opens the same kind of gap that stripping a template does.
+    """
+    text = re.sub(r"\(\s*\)", "", text)
+    return re.sub(r"\s+([,.;:!?])", r"\1", text)
+
+
+def _link_markup(title: str, second: str | None, *, keep_links: bool) -> str:
+    """Return a link template as `[[Target|Label]]`, or as its display text.
+
+    The wikilink spelling is what `web/render/wikilinks.ts` reads, and it is the
+    same shape an advancement description already carries, so the web side needs
+    one parser rather than one per section.
+    """
+    title = title.strip()
+    label = _link_display_text(title, second).strip()
+    if not keep_links:
+        return label
+    return f"[[{title}]]" if label == title else f"[[{title}|{label}]]"
+
+
+def _fraction_text(match: re.Match[str]) -> str:
+    """Return `{{frac|...}}` as a readable fraction.
+
+    The template takes either two arguments (numerator and denominator) or
+    three (a whole number as well). Both spellings appear in the Causes tables:
+    jump height reads `1{{frac|13|16}}` and the beacon regeneration bug note
+    reads `{{frac|5|8}}`. Left alone, the raw call reaches the screen.
+
+    The wiki writes the whole number *outside* the template and lets the
+    rendered fraction sit against it, so this reattaches it with a space.
+    Without that, `1{{frac|13|16}}` reads as `113/16`.
+    """
+    whole = match.group(1)
+    parts = [p.strip() for p in match.group(2).split("|") if p.strip()]
+    if len(parts) >= 3:
+        fraction = f"{parts[0]} {parts[1]}/{parts[2]}"
+    elif len(parts) == 2:
+        fraction = f"{parts[0]}/{parts[1]}"
+    else:
+        return match.group(0)
+    return f"{whole} {fraction}" if whole else fraction
+
+
+def _section_link(match: re.Match[str], *, keep_links: bool) -> str:
+    """Return `{{slink|Page|Label}}` as a link, or as its label.
+
+    `slink` links a section of a page. Its first argument is empty when the
+    section is on the same page (`{{slink||Causes}}`), and there is no entity to
+    point at in that case, so only the label survives.
+    """
+    parts = [p.strip() for p in match.group(1).split("|")]
+    page = parts[0] if parts else ""
+    label = next((p for p in parts[1:] if p), page)
+    if not page:
+        return label
+    if not keep_links:
+        return label
+    return f"[[{page}|{label}]]" if label != page else f"[[{page}]]"
+
+
+def _clean_behaviour_templates(text: str, *, keep_links: bool = False) -> str:
+    """Replace domain templates in prose with readable text.
+
+    With `keep_links`, a template that names another entity becomes a
+    `[[Target|Label]]` wikilink rather than bare text, so the renderer can turn
+    it into a real link. Decision 13: a name printed as plain text is a dead end
+    where a jump should be. Callers that want a short plain fragment, such as a
+    cause qualifier, leave it off.
+    """
     # {{hp|N...}} -> N
     text = re.sub(r"\{\{hp\|([^|}]+)[^}]*\}\}", r"\1", text, flags=re.IGNORECASE)
     # {{hunger|N...}} -> N
     text = re.sub(r"\{\{hunger\|([^|}]+)[^}]*\}\}", r"\1", text, flags=re.IGNORECASE)
     # {{cmd|N}} -> /N
     text = re.sub(r"\{\{cmd\|([^|}]+)[^}]*\}\}", r"/\1", text, flags=re.IGNORECASE)
+    # {{frac|13|16}} -> 13/16, {{frac|1|13|16}} -> 1 13/16
+    text = re.sub(r"(\d*)\{\{frac\|([^}]+)\}\}", _fraction_text, text, flags=re.IGNORECASE)
+    # {{slink|Conduit|Conduit Power}} -> a link, or its label
+    text = re.sub(
+        r"\{\{slink\|([^}]*)\}\}",
+        lambda m: _section_link(m, keep_links=keep_links),
+        text,
+        flags=re.IGNORECASE,
+    )
     # Strip edition templates
     text = strip_edition_markers(text)
-    # Strip common footnote/annotation templates
+    # {{cd|hideParticles}} -> hideParticles, the wiki's inline code markup
+    text = re.sub(r"\{\{cd\|([^|}]+)[^}]*\}\}", r"\1", text, flags=re.IGNORECASE)
+    # {{w|relative luminance}} -> its label. This links Wikipedia, not an entity
+    # of this build, so it becomes plain text rather than a wikilink.
     text = re.sub(
-        r"\{\{(?:upcoming|info needed|verify|bug|fn|fnlist)[^}]*\}\}",
+        r"\{\{w\|([^}]+)\}\}",
+        lambda m: [p.strip() for p in m.group(1).split("|") if p.strip()][-1],
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Strip common footnote/annotation templates. `until` is a version marker
+    # and `hungerbar` is an image, so neither says anything on this page.
+    text = re.sub(
+        r"\{\{(?:upcoming|info needed|verify|bug|fn|fnlist|until|hungerbar)[^}]*\}\}",
         "",
         text,
         flags=re.IGNORECASE,
     )
-    # Resolve link templates to their display text or title
+    text = _tidy_spacing(text)
+    # Resolve link templates to a wikilink, or to their display text
     text = re.sub(
         r"\{\{(?:ItemLink|BlockLink|EntityLink|EffectLink|EnchantmentLink|EnvLink|BiomeLink)\|([^|}]+)(?:\|([^|}]+))?\}\}",
-        lambda m: _link_display_text(m.group(1), m.group(2)),
+        lambda m: _link_markup(m.group(1), m.group(2), keep_links=keep_links),
         text,
         flags=re.IGNORECASE,
     )
@@ -303,7 +397,11 @@ def _extract_behaviour(wikitext: str, *, title: str) -> str | None:
         ):
             continue
 
-        cleaned = clean_text(strip_markup(_clean_behaviour_templates(line)))
+        cleaned = _tidy_spacing(
+            clean_text(
+                strip_markup(_clean_behaviour_templates(line, keep_links=True), keep_links=True)
+            )
+        )
         cleaned = re.sub(r"^[,;:\s]+", "", cleaned)
         if cleaned and cleaned[0].islower():
             cleaned = cleaned[0].upper() + cleaned[1:]
@@ -315,7 +413,10 @@ def _extract_behaviour(wikitext: str, *, title: str) -> str | None:
 
     for p in paragraphs:
         if p and not p.startswith("!") and not p.startswith("Due to"):
-            kept = _drop_other_edition_sentences(p)
+            # Tidy again on the assembled paragraph: joining two lines with a
+            # space is its own way of stranding punctuation, when the source
+            # broke a line right before a period.
+            kept = _tidy_spacing(_drop_other_edition_sentences(p))
             if kept:
                 return kept
     return None
@@ -389,8 +490,12 @@ def _parse_raw_cells(row_str: str) -> list[tuple[str, int]]:
     return parsed
 
 
-def _clean_cell_value(cell_text: str) -> str | None:
-    """Strip markup and drop Bedrock edition lines from a table cell."""
+def _clean_cell_value(cell_text: str, *, keep_links: bool = False) -> str | None:
+    """Strip markup and drop Bedrock edition lines from a table cell.
+
+    With `keep_links`, a name that points at another entity survives as a
+    `[[Target|Label]]` wikilink instead of being flattened into plain text.
+    """
     if not cell_text or not cell_text.strip():
         return None
     lines = split_lines(cell_text)
@@ -399,8 +504,10 @@ def _clean_cell_value(cell_text: str) -> str | None:
     for sc in scopes:
         if sc.edition is Edition.BEDROCK:
             continue
-        line_clean = _clean_behaviour_templates(strip_edition_markers(sc.line))
-        cleaned = clean_text(strip_markup(line_clean))
+        line_clean = _clean_behaviour_templates(
+            strip_edition_markers(sc.line), keep_links=keep_links
+        )
+        cleaned = _tidy_spacing(clean_text(strip_markup(line_clean, keep_links=keep_links)))
         if cleaned:
             kept.append(cleaned)
     if not kept:
@@ -564,7 +671,7 @@ def parse_effect_page(title: str, text: str) -> EffectPageFacts:
             length_raw = row_cells[length_col_idx] if length_col_idx is not None else ""
             length = _clean_cell_value(length_raw)
             notes_raw = row_cells[notes_col_idx] if notes_col_idx is not None else ""
-            note = _clean_cell_value(notes_raw)
+            note = _clean_cell_value(notes_raw, keep_links=True)
 
             # Assemble extra notes from non-standard columns
             extra_notes: list[str] = []

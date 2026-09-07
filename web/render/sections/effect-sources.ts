@@ -1,6 +1,7 @@
 import type { EffectLink, EffectSource, EffectSources } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
 import { entityLink } from "../link.js";
+import { appendWikiText } from "../wikilinks.js";
 
 function renderSourceItem(source: EffectSource, ctx: RenderContext): HTMLElement {
   const container = document.createElement("span");
@@ -64,7 +65,7 @@ export function renderEffectSources(section: EffectSources, ctx: RenderContext):
   if (section.behaviour) {
     const behaviourP = document.createElement("p");
     behaviourP.className = "effect-behaviour";
-    behaviourP.textContent = section.behaviour;
+    appendWikiText(behaviourP, section.behaviour, ctx);
     container.append(behaviourP);
   }
 
@@ -128,7 +129,11 @@ export function renderEffectSources(section: EffectSources, ctx: RenderContext):
 
       const tdNotes = document.createElement("td");
       tdNotes.className = "effect-source-notes";
-      tdNotes.textContent = src.note ?? "—";
+      if (src.note) {
+        appendWikiText(tdNotes, src.note, ctx);
+      } else {
+        tdNotes.textContent = "—";
+      }
 
       row.append(tdSource, tdPotency, tdLength, tdNotes);
       tbody.append(row);

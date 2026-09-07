@@ -537,6 +537,17 @@ canvas,
     color 0.1s ease;
 }
 
+/* A link inside a sentence. The standalone form's horizontal padding reads as a
+   word space when text follows immediately, which turns "[[parrot]]s" into
+   "parrot s" and "[[Bogged]]." into "Bogged ." The vertical padding stays, so
+   the hover and focus box still has room. */
+.entity-link-prose {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .entity-link:hover {
   background: rgba(138, 180, 248, 0.12);
   text-decoration: underline;
