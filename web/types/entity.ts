@@ -435,14 +435,31 @@ export interface HarvestDrop {
   silkTouch?: boolean;
 }
 /**
- * Every source of a status effect. The payload of this section arrives in Phase 6.
+ * Every source of a status effect, its category, and what it does.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "effectSources".
  */
 export interface EffectSources {
   type: "EffectSources";
-  [k: string]: unknown;
+  category: "positive" | "negative" | "neutral";
+  behaviour?: string;
+  sources: EffectSource[];
+  removedBy: EffectLink[];
+}
+/**
+ * One source that grants or inflicts a status effect.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "effectSource".
+ */
+export interface EffectSource {
+  name: string;
+  ref?: EntityRef;
+  qualifier?: string;
+  potency?: string;
+  length?: string;
+  note?: string;
 }
 /**
  * How the player earns an advancement, and the parent chain, mirroring `pipeline.enrich.advancement.WikiAdvancement`.

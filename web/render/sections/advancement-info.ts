@@ -1,19 +1,7 @@
 import type { AdvancementInfo } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
-import { createIconElement } from "../icon.js";
 import { entityLink } from "../link.js";
-
-/**
- * Resolves a wiki link target (e.g. "Parrot", "Sculk Sensor") to an IndexEntry.
- */
-function resolveWikiLink(target: string, ctx: RenderContext) {
-  const direct = ctx.lookup(target);
-  if (direct) {
-    return direct;
-  }
-  const namespaced = `minecraft:${target.toLowerCase().replace(/\s+/g, "_")}`;
-  return ctx.lookup(namespaced);
-}
+import { appendWikiText } from "../wikilinks.js";
 
 /**
  * Parses description text, converting [[Target|Label]] into real entity links
@@ -22,63 +10,7 @@ function resolveWikiLink(target: string, ctx: RenderContext) {
 function renderParsedDescription(rawText: string, ctx: RenderContext): HTMLElement {
   const p = document.createElement("p");
   p.className = "advancement-description";
-
-  const WIKI_LINK_REGEX = /\[\[(?:([^|\]]+)\|)?([^\]]+)\]\]/g;
-
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = WIKI_LINK_REGEX.exec(rawText)) !== null) {
-    // Text before the match
-    if (match.index > lastIndex) {
-      p.append(document.createTextNode(rawText.slice(lastIndex, match.index)));
-    }
-
-    const rawLabel = match[2] ?? "";
-    const target = match[1] ? match[1].trim() : rawLabel.trim();
-    const label = rawLabel.trim();
-
-    const entry = resolveWikiLink(target, ctx);
-    if (entry) {
-      const link = document.createElement("a");
-      link.href = "#";
-      link.className = "entity-link";
-      link.setAttribute("role", "button");
-      link.dataset["id"] = entry.id;
-
-      const icon = createIconElement(entry.i);
-      link.append(icon);
-
-      const labelSpan = document.createElement("span");
-      labelSpan.className = "entity-name";
-      labelSpan.textContent = label;
-      link.append(labelSpan);
-
-      link.addEventListener("click", (e) => {
-        e.preventDefault();
-        ctx.openRef(entry.id);
-      });
-
-      link.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          ctx.openRef(entry.id);
-        }
-      });
-
-      p.append(link);
-    } else {
-      p.append(document.createTextNode(label));
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Trailing text
-  if (lastIndex < rawText.length) {
-    p.append(document.createTextNode(rawText.slice(lastIndex)));
-  }
-
+  appendWikiText(p, rawText, ctx);
   return p;
 }
 

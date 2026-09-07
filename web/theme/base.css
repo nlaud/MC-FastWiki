@@ -537,6 +537,17 @@ canvas,
     color 0.1s ease;
 }
 
+/* A link inside a sentence. The standalone form's horizontal padding reads as a
+   word space when text follows immediately, which turns "[[parrot]]s" into
+   "parrot s" and "[[Bogged]]." into "Bogged ." The vertical padding stays, so
+   the hover and focus box still has room. */
+.entity-link-prose {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .entity-link:hover {
   background: rgba(138, 180, 248, 0.12);
   text-decoration: underline;
@@ -1818,4 +1829,131 @@ canvas,
    * letters, which is far worse than the scrollbar it removes.
    */
   overflow-x: auto;
+}
+
+/* EffectSources */
+.effect-sources-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.effect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.effect-category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+.effect-category-badge.category-positive {
+  background: rgba(129, 201, 149, 0.15);
+  border: 1px solid #81c995;
+  color: #81c995;
+}
+
+.effect-category-badge.category-negative {
+  background: rgba(242, 139, 130, 0.15);
+  border: 1px solid #f28b82;
+  color: #f28b82;
+}
+
+.effect-category-badge.category-neutral {
+  background: rgba(138, 180, 248, 0.15);
+  border: 1px solid #8ab4f8;
+  color: #8ab4f8;
+}
+
+.effect-behaviour {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #ccc;
+}
+
+.effect-removed-by {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+
+.effect-removed-by-label {
+  color: #888;
+  font-weight: 500;
+}
+
+.effect-sources-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.effect-sources-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.effect-sources-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.effect-sources-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.effect-sources-table tr:last-child td {
+  border-bottom: none;
+}
+
+.effect-source-name-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.effect-source-qualifier {
+  font-size: 0.75rem;
+  color: #888;
+  font-style: italic;
+}
+
+.effect-source-potency,
+.effect-source-length {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.effect-source-notes {
+  color: #aaa;
+  font-size: 0.75rem;
 }

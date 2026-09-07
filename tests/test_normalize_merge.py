@@ -50,6 +50,7 @@ from pipeline.normalize.entity import (
 from pipeline.normalize.merge import (
     MergeResult,
     _maybe_ref,
+    _potion_variant_ref,
     block_drops_from_producers,
     merge_entities,
     write_report,
@@ -1485,3 +1486,56 @@ def test_block_drops_from_producers_keys_drops_by_the_block() -> None:
         HarvestDrop(id="minecraft:diamond", count=1, silk_touch=False),
         HarvestDrop(id="minecraft:diamond_ore", count=1, silk_touch=True),
     )
+
+
+class _NamedDraft:
+    """The one attribute `_potion_variant_ref` reads off a draft."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+_POTION_DRAFTS = {
+    "minecraft:potion/swiftness": _NamedDraft("Potion of Swiftness"),
+    "minecraft:potion/long_swiftness": _NamedDraft("Potion of Swiftness (Long)"),
+    "minecraft:potion/strong_swiftness": _NamedDraft("Potion of Swiftness (Strong)"),
+    "minecraft:potion": _NamedDraft("Potion"),
+    "minecraft:splash_potion": _NamedDraft("Splash Potion"),
+}
+
+
+@pytest.mark.parametrize(
+    ("qualifier", "expected_id"),
+    [
+        (None, "minecraft:potion/swiftness"),
+        ("(extended)", "minecraft:potion/long_swiftness"),
+        ("II", "minecraft:potion/strong_swiftness"),
+    ],
+)
+def test_a_potion_row_links_to_its_own_variant(qualifier: str | None, expected_id: str) -> None:
+    """A Causes row resolves to the potion it names, not to the generic potion item.
+
+    The join table maps every "Potion of X" display name onto `minecraft:potion`,
+    so all 45 potion rows of the 26.2 build linked to one page and carried a name
+    that page does not have. That is the dead end Decision 13 exists to prevent.
+    """
+    ref = _potion_variant_ref("Potion of Swiftness", qualifier, _POTION_DRAFTS)
+    assert ref is not None
+    assert ref.id == expected_id
+    assert ref.name == _POTION_DRAFTS[expected_id].name
+
+
+def test_a_splash_or_lingering_row_keeps_its_generic_item() -> None:
+    """Only base potions have a per-variant entity to target.
+
+    `pipeline.obtain.brewing` documents why the splash and lingering *items* are
+    the right reference: no splash or lingering potion entity exists to point at.
+    """
+    assert _potion_variant_ref("Splash Potion of Swiftness", None, _POTION_DRAFTS) is None
+    assert _potion_variant_ref("Beacon", "set to Speed", _POTION_DRAFTS) is None
+
+
+def test_an_unknown_potion_variant_does_not_invent_a_reference() -> None:
+    """A qualifier with no variant suffix resolves to nothing rather than guessing."""
+    assert _potion_variant_ref("Potion of Swiftness", "(nonsense)", _POTION_DRAFTS) is None
+    assert _potion_variant_ref("Potion of Nothing", None, _POTION_DRAFTS) is None

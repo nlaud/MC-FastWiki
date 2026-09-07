@@ -895,15 +895,64 @@
         }
       }
     },
+    "effectSource": {
+      "title": "EffectSource",
+      "description": "One source that grants or inflicts a status effect.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "qualifier": {
+          "type": "string"
+        },
+        "potency": {
+          "type": "string"
+        },
+        "length": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
     "effectSources": {
       "title": "EffectSources",
-      "description": "Every source of a status effect. The payload of this section arrives in Phase 6.",
+      "description": "Every source of a status effect, its category, and what it does.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": ["type", "category", "sources", "removedBy"],
       "properties": {
         "type": {
           "const": "EffectSources"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["positive", "negative", "neutral"]
+        },
+        "behaviour": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effectSource"
+          },
+          "default": []
+        },
+        "removedBy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effectLink"
+          },
+          "default": []
         }
       }
     },

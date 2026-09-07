@@ -34,6 +34,7 @@ from pipeline.cli import CliError
 from pipeline.cli.build import CURATED_DIRECTORY, BuildOptions, run_build
 from pipeline.enrich.advancement import COLUMNS as ADVANCEMENT_COLUMNS
 from pipeline.enrich.droptable import COLUMNS as DROPTABLE_COLUMNS
+from pipeline.enrich.effect import EFFECT_PAGE_TITLES
 from pipeline.enrich.resource_location import COLUMNS as RESOURCE_LOCATION_COLUMNS
 from pipeline.enrich.spawn_table import COLUMNS as SPAWN_TABLE_COLUMNS
 from pipeline.enrich.sprite import COLUMNS as SPRITE_COLUMNS
@@ -460,6 +461,29 @@ def _build_fixtures() -> dict[str, bytes]:
                 ]
             },
         }
+    ).encode("utf-8")
+
+    effect_pages = []
+    for pid, title in enumerate(EFFECT_PAGE_TITLES, start=10):
+        slug = title.lower().replace(" ", "_")
+        content = (
+            f"{{{{Infobox effect\n| title = {title}\n| type = Positive\n| id = {slug}\n}}}}\n"
+            f"{title} effect description.\n\n"
+            f"== Effects ==\n{title} effect behaviour.\n\n"
+            f"== Causes ==\n"
+            f'{{| class="wikitable"\n! Cause\n! Potency\n! Length\n! Notes\n'
+            f"|-\n| {{{{ItemLink|Apple}}}}\n| I\n| 1:00\n| Test note.\n|}}\n"
+        )
+        effect_pages.append(
+            {
+                "pageid": pid,
+                "ns": 0,
+                "title": title,
+                "revisions": [{"slots": {"main": {"content": content}}}],
+            }
+        )
+    fixtures[build_wikitext_url(EFFECT_PAGE_TITLES)] = json.dumps(
+        {"batchcomplete": True, "query": {"pages": effect_pages}}
     ).encode("utf-8")
 
     return fixtures
