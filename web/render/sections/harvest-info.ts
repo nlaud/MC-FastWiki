@@ -41,12 +41,12 @@ function dropTarget(drop: HarvestDrop): EntityRef | ItemAmount {
 }
 
 /**
- * Renders one drop as a link, tagged with the same "requires silk touch" badge
- * the Obtaining tree below already uses for the identical condition.
+ * Renders one drop as a link, tagged with a "requires silk touch" or "requires shears"
+ * badge when gated.
  */
 function renderDrop(drop: HarvestDrop, ctx: RenderContext): HTMLElement {
   const link = entityLink(dropTarget(drop), ctx);
-  if (!drop.silkTouch) {
+  if (!drop.gate) {
     return link;
   }
 
@@ -54,7 +54,7 @@ function renderDrop(drop: HarvestDrop, ctx: RenderContext): HTMLElement {
   wrapper.className = "harvest-drop";
   const badge = document.createElement("span");
   badge.className = "sources-note-badge";
-  badge.textContent = "requires silk touch";
+  badge.textContent = drop.gate === "silk_touch" ? "requires silk touch" : "requires shears";
   wrapper.append(link, badge);
   return wrapper;
 }
@@ -140,10 +140,10 @@ export function renderHarvestInfo(section: HarvestInfo, ctx: RenderContext): HTM
     const dropsValue = document.createElement("span");
     dropsValue.className = "harvest-value harvest-drops";
 
-    // Silk-touch drops sort last, so the drop a player gets by simply breaking
-    // the block reads first.
+    // Gated drops (silk touch, shears) sort last, so the drop a player gets by
+    // simply breaking the block reads first.
     const ordered = [...drops].sort(
-      (a, b) => Number(a.silkTouch ?? false) - Number(b.silkTouch ?? false),
+      (a, b) => Number(a.gate !== undefined) - Number(b.gate !== undefined),
     );
     for (const drop of ordered) {
       dropsValue.append(renderDrop(drop, ctx));

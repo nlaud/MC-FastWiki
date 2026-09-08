@@ -7,6 +7,7 @@ import type {
   DropTable,
   Entity,
   FoodInfo,
+  GenerationInfo,
   HarvestInfo,
   RecipeTree,
   SpawnInfo,
@@ -21,6 +22,7 @@ import { renderAdvancementInfo } from "./sections/advancement-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
 import { renderFoodInfo } from "./sections/food-info.js";
+import { renderGenerationInfo } from "./sections/generation-info.js";
 import { renderHarvestInfo } from "./sections/harvest-info.js";
 import { formatOdds, renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
@@ -96,13 +98,15 @@ describe("Section renderers with real committed build data", () => {
       }
     }
 
-    const block0Raw = fs.readFileSync(
-      path.resolve(process.cwd(), "data/dist/entities/block-0.json"),
-      "utf8",
-    );
     blocksById = new Map<string, Entity>();
-    for (const entity of (JSON.parse(block0Raw) as { entities: Entity[] }).entities) {
-      blocksById.set(entity.id, entity);
+    for (let i = 0; i <= 5; i++) {
+      const raw = fs.readFileSync(
+        path.resolve(process.cwd(), `data/dist/entities/block-${i.toString()}.json`),
+        "utf8",
+      );
+      for (const entity of (JSON.parse(raw) as { entities: Entity[] }).entities) {
+        blocksById.set(entity.id, entity);
+      }
     }
 
     const obtainRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/obtain.json"), "utf8");
@@ -743,8 +747,8 @@ describe("Section renderers with real committed build data", () => {
         tier: "iron",
         dropsWithoutTool: false,
         drops: [
-          { id: "minecraft:diamond_ore", name: "Diamond Ore", count: 1, silkTouch: true },
-          { id: "minecraft:diamond", name: "Diamond", count: 1, silkTouch: false },
+          { id: "minecraft:diamond_ore", name: "Diamond Ore", count: 1, gate: "silk_touch" },
+          { id: "minecraft:diamond", name: "Diamond", count: 1 },
         ],
       };
       const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
@@ -768,6 +772,19 @@ describe("Section renderers with real committed build data", () => {
       );
     });
 
+    it("badges drops requiring shears", () => {
+      const harvestSection: HarvestInfo = {
+        type: "HarvestInfo",
+        tools: [],
+        tier: "wooden",
+        dropsWithoutTool: true,
+        drops: [{ id: "minecraft:vine", name: "Vines", count: 1, gate: "shears" }],
+      };
+      const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
+      const badge = requireItem(el.querySelector(".sources-note-badge"), "shears badge");
+      expect(badge.textContent).toBe("requires shears");
+    });
+
     it("prints a drop count above one and omits it at one", () => {
       const harvestSection: HarvestInfo = {
         type: "HarvestInfo",
@@ -775,8 +792,8 @@ describe("Section renderers with real committed build data", () => {
         tier: "iron",
         dropsWithoutTool: false,
         drops: [
-          { id: "minecraft:redstone", name: "Redstone Dust", count: 4, silkTouch: false },
-          { id: "minecraft:diamond", name: "Diamond", count: 1, silkTouch: false },
+          { id: "minecraft:redstone", name: "Redstone Dust", count: 4 },
+          { id: "minecraft:diamond", name: "Diamond", count: 1 },
         ],
       };
       const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
@@ -797,6 +814,74 @@ describe("Section renderers with real committed build data", () => {
       const el = requireItem(renderHarvestInfo(harvestSection, ctx), "HarvestInfo element");
 
       expect(el.querySelector(".harvest-drops")).toBeNull();
+    });
+
+    it("renders drops with silk touch and shears badges, sorting gated drops last", () => {
+      const section: HarvestInfo = {
+        type: "HarvestInfo",
+        tools: ["pickaxe"],
+        tier: "wooden",
+        dropsWithoutTool: false,
+        drops: [
+          { id: "minecraft:stone", name: "Stone", gate: "silk_touch", count: 1 },
+          { id: "minecraft:vine", name: "Vines", gate: "shears", count: 1 },
+          { id: "minecraft:cobblestone", name: "Cobblestone", count: 1 },
+        ],
+      };
+      const el = renderHarvestInfo(section, ctx);
+      const dropsContainer = requireItem(el.querySelector(".harvest-drops"), "drops container");
+
+      // The ungated cobblestone must sort first, followed by the gated drops
+      const renderedChildren = Array.from(dropsContainer.children);
+      expect(renderedChildren).toHaveLength(3);
+
+      const firstChild = requireItem(renderedChildren[0], "first drop");
+      const secondChild = requireItem(renderedChildren[1], "second drop");
+      const thirdChild = requireItem(renderedChildren[2], "third drop");
+
+      // First child should be ungated link (Cobblestone)
+      expect(firstChild.textContent).toBe("Cobblestone");
+      expect(firstChild.querySelector(".sources-note-badge")).toBeNull();
+
+      // Second and third children are wrappers with badge
+      expect(secondChild.querySelector(".sources-note-badge")?.textContent).toBe(
+        "requires silk touch",
+      );
+      expect(thirdChild.querySelector(".sources-note-badge")?.textContent).toBe("requires shears");
+    });
+
+    it("renders real committed stone HarvestInfo with ungated and silk touch drops", () => {
+      const stone = requireItem(blocksById.get("minecraft:stone"), "Stone block");
+      const harvestSection = requireItem(
+        stone.sections.find((s): s is HarvestInfo => s.type === "HarvestInfo"),
+        "Stone HarvestInfo",
+      );
+      const el = renderHarvestInfo(harvestSection, ctx);
+
+      const dropsContainer = requireItem(el.querySelector(".harvest-drops"), "drops container");
+      const text = dropsContainer.textContent;
+      expect(text).toContain("Cobblestone");
+      expect(text).toContain("Stone");
+      expect(text).toContain("requires silk touch");
+
+      // Verify ordering: Cobblestone before Stone
+      const links = Array.from(dropsContainer.querySelectorAll("a, span")).map(
+        (n) => n.textContent,
+      );
+      const cobbleIndex = links.findIndex((t) => t.includes("Cobblestone"));
+      const stoneIndex = links.findIndex((t) => t.includes("Stone"));
+      expect(cobbleIndex).toBeLessThan(stoneIndex);
+    });
+
+    it("renders real committed glow_lichen HarvestInfo with shears badge", () => {
+      const lichen = requireItem(blocksById.get("minecraft:glow_lichen"), "Glow Lichen block");
+      const harvestSection = requireItem(
+        lichen.sections.find((s): s is HarvestInfo => s.type === "HarvestInfo"),
+        "Glow Lichen HarvestInfo",
+      );
+      const el = renderHarvestInfo(harvestSection, ctx);
+      const badge = el.querySelector(".sources-note-badge");
+      expect(badge?.textContent).toBe("requires shears");
     });
   });
 
@@ -1267,6 +1352,387 @@ describe("Section renderers with real committed build data", () => {
       };
       const section = { type: "RecipeTree", root: emptyTree } as unknown as RecipeTree;
       expect(renderRecipeTree(section, ctx)).toBeNull();
+    });
+  });
+
+  describe("GenerationInfo", () => {
+    it("renders dimension, height range, and attempts per chunk", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 320,
+            attemptsPerChunk: 4,
+            biomeCount: 2,
+            allBiomesOfDimension: false,
+            biomes: [
+              { id: "minecraft:plains", name: "Plains" },
+              { id: "minecraft:forest", name: "Forest" },
+            ],
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      expect(el.querySelector(".section-title")?.textContent).toBe("Generation");
+
+      const rows = Array.from(el.querySelectorAll(".generation-row"));
+      const dimRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Dimension",
+      );
+      expect(dimRow?.querySelector(".generation-value")?.textContent).toBe("Overworld");
+
+      const heightRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Height",
+      );
+      expect(heightRow?.querySelector(".generation-value")?.textContent).toBe("Y -64 to 320");
+
+      const attemptsRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Attempts / chunk",
+      );
+      expect(attemptsRow?.querySelector(".generation-value")?.textContent).toBe("4");
+    });
+
+    it("renders peak height when densestY is present", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 16,
+            densestY: -64,
+            biomeCount: 55,
+            allBiomesOfDimension: true,
+            biomes: [],
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      const rows = Array.from(el.querySelectorAll(".generation-row"));
+      const heightRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Height",
+      );
+      expect(heightRow?.querySelector(".generation-value")?.textContent).toBe(
+        "Y -64 to 16 (peak: Y -64)",
+      );
+    });
+
+    it("renders allBiomesOfDimension text without individual links", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "nether",
+            minY: 10,
+            maxY: 118,
+            biomeCount: 5,
+            allBiomesOfDimension: true,
+            biomes: [],
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      const biomesValue = el.querySelector(".generation-biomes");
+      expect(biomesValue?.textContent).toBe("All The Nether biomes (5)");
+      expect(biomesValue?.querySelectorAll("a")).toHaveLength(0);
+    });
+
+    it("renders inline links when biome count is 6 or fewer", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: 0,
+            maxY: 100,
+            biomeCount: 2,
+            allBiomesOfDimension: false,
+            biomes: [
+              { id: "minecraft:swamp", name: "Swamp" },
+              { id: "minecraft:mangrove_swamp", name: "Mangrove Swamp" },
+            ],
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      const biomesContainer = requireItem(
+        el.querySelector(".generation-biomes"),
+        "biomes container",
+      );
+      expect(biomesContainer.querySelector("details")).toBeNull();
+      const links = biomesContainer.querySelectorAll("a");
+      expect(links).toHaveLength(2);
+      expect(requireItem(links[0], "first biome link").textContent).toBe("Swamp");
+      expect(requireItem(links[1], "second biome link").textContent).toBe("Mangrove Swamp");
+    });
+
+    it("renders collapsible details when biome count is greater than 6", () => {
+      const biomes = [
+        "Cherry Grove",
+        "Frozen Peaks",
+        "Grove",
+        "Jagged Peaks",
+        "Meadow",
+        "Snowy Slopes",
+        "Stony Peaks",
+      ].map((name) => ({ id: `minecraft:${name.toLowerCase().replace(/ /g, "_")}`, name }));
+
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 63,
+            biomeCount: 7,
+            allBiomesOfDimension: false,
+            biomes,
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      const details = requireItem(
+        el.querySelector(".generation-biomes-details"),
+        "details element",
+      );
+      expect(details.querySelector("summary")?.textContent).toBe("7 biomes");
+      expect(details.querySelectorAll("a")).toHaveLength(7);
+    });
+
+    it("renders a vein size row for a single vein with veinSize", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 0,
+            biomeCount: 55,
+            allBiomesOfDimension: true,
+            biomes: [],
+            veins: [
+              {
+                feature: "minecraft:ore_tuff",
+                minY: -64,
+                maxY: 0,
+                tries: 2,
+                veinSize: 64,
+              },
+            ],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      expect(el.querySelector(".generation-veins-table")).toBeNull();
+
+      const rows = Array.from(el.querySelectorAll(".generation-row"));
+      const sizeRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Vein size",
+      );
+      expect(sizeRow?.querySelector(".generation-value")?.textContent).toBe("Up to 64 blocks");
+    });
+
+    it("renders a veins table when multiple veins exist", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 16,
+            densestY: -64,
+            biomeCount: 55,
+            allBiomesOfDimension: true,
+            biomes: [],
+            veins: [
+              {
+                feature: "minecraft:ore_diamond",
+                minY: -64,
+                maxY: 16,
+                densestY: -64,
+                tries: 7,
+                veinSize: 4,
+              },
+              {
+                feature: "minecraft:ore_diamond_large",
+                minY: -64,
+                maxY: 16,
+                densestY: -64,
+                chunkChance: 9,
+                veinSize: 12,
+              },
+            ],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+      const table = requireItem(el.querySelector(".generation-veins-table"), "veins table");
+      const headers = Array.from(table.querySelectorAll("th")).map((th) => th.textContent);
+      expect(headers).toEqual(["Feature", "Height", "Rate", "Size"]);
+
+      const rows = Array.from(table.querySelectorAll("tbody tr"));
+      expect(rows).toHaveLength(2);
+
+      const row1 = requireItem(rows[0], "first vein row");
+      const row1Cells = Array.from(row1.querySelectorAll("td")).map((td) => td.textContent);
+      expect(row1Cells).toEqual([
+        "ore diamond",
+        "Y -64 to 16 (peak: Y -64)",
+        "7 / chunk",
+        "Up to 4",
+      ]);
+
+      const row2 = requireItem(rows[1], "second vein row");
+      const row2Cells = Array.from(row2.querySelectorAll("td")).map((td) => td.textContent);
+      expect(row2Cells).toEqual([
+        "ore diamond large",
+        "Y -64 to 16 (peak: Y -64)",
+        "1 in 9 chunks",
+        "Up to 12",
+      ]);
+    });
+
+    it("titles each dimension when a block generates in more than one", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            minY: -64,
+            maxY: 320,
+            attemptsPerChunk: 15,
+            biomeCount: 55,
+            allBiomesOfDimension: true,
+            biomes: [],
+            veins: [],
+          },
+          {
+            dimension: "nether",
+            minY: 5,
+            maxY: 41,
+            attemptsPerChunk: 2,
+            biomeCount: 4,
+            allBiomesOfDimension: false,
+            biomes: [{ id: "minecraft:nether_wastes", name: "Nether Wastes" }],
+            veins: [],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+
+      // Each dimension reads as its own titled block, and neither band is lost.
+      const titles = Array.from(el.querySelectorAll(".generation-scope-title")).map(
+        (h) => h.textContent,
+      );
+      expect(titles).toEqual(["Overworld", "The Nether"]);
+      expect(el.querySelectorAll(".generation-scope")).toHaveLength(2);
+      expect(el.textContent).toContain("Y -64 to 320");
+      expect(el.textContent).toContain("Y 5 to 41");
+
+      // The dimension is the heading, so it is not repeated as a row.
+      const rows = Array.from(el.querySelectorAll(".generation-row"));
+      expect(
+        rows.some((r) => r.querySelector(".generation-label")?.textContent === "Dimension"),
+      ).toBe(false);
+    });
+
+    it("says Surface rather than a band for a heightmap-placed feature", () => {
+      const section: GenerationInfo = {
+        type: "GenerationInfo",
+        scopes: [
+          {
+            dimension: "overworld",
+            surfaceOnly: true,
+            biomeCount: 1,
+            allBiomesOfDimension: false,
+            biomes: [{ id: "minecraft:taiga", name: "Taiga" }],
+            veins: [
+              { feature: "minecraft:patch_berry_common", surface: true, chunkChance: 32 },
+              { feature: "minecraft:patch_berry_rare", surface: true, chunkChance: 384 },
+            ],
+          },
+        ],
+      };
+      const el = renderGenerationInfo(section, ctx);
+
+      const rows = Array.from(el.querySelectorAll(".generation-row"));
+      const heightRow = rows.find(
+        (r) => r.querySelector(".generation-label")?.textContent === "Height",
+      );
+      expect(heightRow?.querySelector(".generation-value")?.textContent).toBe("Surface");
+
+      // No band means no invented Y numbers anywhere in the section.
+      expect(el.textContent).not.toContain("Y -64");
+
+      // A rarity-gated vein with no attempt count still states its rarity.
+      const cells = Array.from(el.querySelectorAll(".generation-veins-table tbody tr")).map((r) =>
+        Array.from(r.querySelectorAll("td")).map((td) => td.textContent),
+      );
+      expect(cells).toEqual([
+        ["patch berry common", "Surface", "1 in 32 chunks", "—"],
+        ["patch berry rare", "Surface", "1 in 384 chunks", "—"],
+      ]);
+    });
+
+    it("renders real committed gravel GenerationInfo in both of its dimensions", () => {
+      const gravel = requireItem(blocksById.get("minecraft:gravel"), "Gravel block");
+      const genSection = requireItem(
+        gravel.sections.find((s): s is GenerationInfo => s.type === "GenerationInfo"),
+        "Gravel GenerationInfo",
+      );
+      const el = renderGenerationInfo(genSection, ctx);
+
+      const titles = Array.from(el.querySelectorAll(".generation-scope-title")).map(
+        (h) => h.textContent,
+      );
+      expect(titles).toEqual(["Overworld", "The Nether"]);
+      expect(el.textContent).toContain("Y 5 to 41");
+    });
+
+    it("renders real committed diamond_ore GenerationInfo from build data", () => {
+      const diamondOre = requireItem(blocksById.get("minecraft:diamond_ore"), "Diamond Ore block");
+      const genSection = requireItem(
+        diamondOre.sections.find((s): s is GenerationInfo => s.type === "GenerationInfo"),
+        "Diamond Ore GenerationInfo",
+      );
+      const el = renderGenerationInfo(genSection, ctx);
+
+      // Overworld dimension, peak -64, 13 attempts/chunk, all biomes
+      expect(el.textContent).toContain("Overworld");
+      expect(el.textContent).toContain("Y -64 to 16 (peak: Y -64)");
+      expect(el.textContent).toContain("13");
+      expect(el.textContent).toContain("All Overworld biomes (55)");
+
+      // Veins table with 4 rows
+      const table = requireItem(el.querySelector(".generation-veins-table"), "veins table");
+      const rows = table.querySelectorAll("tbody tr");
+      expect(rows).toHaveLength(4);
+    });
+
+    it("renders real committed lily_pad GenerationInfo with <= 6 biomes", () => {
+      const lilyPad = requireItem(blocksById.get("minecraft:lily_pad"), "Lily Pad block");
+      const genSection = requireItem(
+        lilyPad.sections.find((s): s is GenerationInfo => s.type === "GenerationInfo"),
+        "Lily Pad GenerationInfo",
+      );
+      const el = renderGenerationInfo(genSection, ctx);
+
+      const biomesContainer = requireItem(
+        el.querySelector(".generation-biomes"),
+        "biomes container",
+      );
+      expect(biomesContainer.querySelector("details")).toBeNull();
+      const links = biomesContainer.querySelectorAll("a");
+      expect(links).toHaveLength(2);
+      expect(requireItem(links[0], "first biome link").textContent).toBe("Mangrove Swamp");
+      expect(requireItem(links[1], "second biome link").textContent).toBe("Swamp");
     });
   });
 });

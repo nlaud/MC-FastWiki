@@ -1084,6 +1084,137 @@ canvas,
 }
 
 /* ---------------------------------------------------------------------------
+   GenerationInfo section
+   --------------------------------------------------------------------------- */
+.generation-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * One block of rows per dimension. Only gravel and the two mushrooms have more
+ * than one, and those are the only pages where the dimension reads as a heading
+ * above its rows rather than as a row inside them.
+ */
+.generation-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.generation-scope-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.generation-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.generation-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.generation-label {
+  color: #888;
+  min-width: 140px;
+}
+
+.generation-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.generation-biomes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.generation-biomes-details summary {
+  cursor: pointer;
+  color: #8ab4f8;
+  user-select: none;
+}
+
+.generation-biomes-details summary:hover {
+  text-decoration: underline;
+}
+
+.generation-biomes-list {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.generation-veins-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.generation-veins-title {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.generation-veins-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.generation-veins-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid #2a2a2a;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  background: #202020;
+}
+
+.generation-veins-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #222;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.generation-veins-table tr:last-child td {
+  border-bottom: none;
+}
+
+.vein-feature-name {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #bbb;
+}
+
+/* ---------------------------------------------------------------------------
    RecipeTree section (Obtaining) - Workstation Tree & Sources
    --------------------------------------------------------------------------- */
 .recipe-tree-section {

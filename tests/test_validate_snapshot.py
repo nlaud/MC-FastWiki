@@ -141,6 +141,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "FoodInfo": 45,
         "HarvestInfo": 861,
         "EffectSources": 39,
+        "GenerationInfo": 52,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.

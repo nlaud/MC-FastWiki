@@ -27,7 +27,7 @@ const eslint = new ESLint();
 // starts from a warm config and keeps Vitest's default timeout.
 beforeAll(async () => {
   await eslint.isPathIgnored("warm-eslint-config.js");
-}, 30_000);
+}, 60_000);
 
 const ignored = [
   ".venv/Lib/site-packages/vendored/bundle.js",

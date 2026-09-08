@@ -156,6 +156,10 @@ from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
 from pipeline.extract.food import extract_food
+from pipeline.extract.generation import (
+    GenerationReport,
+    extract_generation,
+)
 from pipeline.extract.harvest import extract_block_harvest
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
@@ -201,6 +205,7 @@ from pipeline.validate import ValidationError, ValidationReport, validate_build
 
 __all__ = [
     "CURATED_DIRECTORY",
+    "GENERATION_REPORT_NAME",
     "OBTAIN_REPORT_NAME",
     "PAGES_WITHOUT_INFOBOX_REPORT_NAME",
     "VALIDATION_REPORT_NAME",
@@ -235,6 +240,10 @@ OBTAIN_REPORT_NAME = "obtain-report.json"
 # stage module either -- it is stage 7.5's own report, gathered here the same
 # way `obtain-report.json` gathers stage 3b/4b's.
 VALIDATION_REPORT_NAME = "validation.json"
+
+# Features skipped by `pipeline.extract.generation` during natural generation
+# extraction are reported to `data/reports/generation-report.json`.
+GENERATION_REPORT_NAME = "generation-report.json"
 
 
 class ObtainReport(BaseModel, frozen=True):
@@ -322,6 +331,7 @@ class BuildOutcome(BaseModel, frozen=True):
     emit_report: EmitReport
     obtain_report: ObtainReport
     validation_report: ValidationReport
+    generation_report: GenerationReport | None = None
 
 
 def _offline_transport(cache: ContentCache) -> Transport:
@@ -400,6 +410,7 @@ def _write_reports(
     emit_report: EmitReport,
     obtain_report: ObtainReport,
     validation_report: ValidationReport,
+    generation_report: GenerationReport,
     pages_without_infobox: Sequence[str],
 ) -> tuple[Path, ...]:
     """Write every stage report into `reports_root`, and return the paths written.
@@ -408,11 +419,11 @@ def _write_reports(
     basename -- `DEFAULT_REPORT_PATH.name` -- rooted at `reports_root` rather
     than at each module's own `data/reports/` default, so a `--reports` flag
     redirects every one of them without this function knowing anything about
-    their internal shape. `pages_without_infobox`, `obtain_report`, and
-    `validation_report` are not the report of any stage module either, so
-    each gets its own small file, written the same way `emit.write.
-    write_report` and its siblings write theirs: indented JSON, sorted keys,
-    one trailing newline.
+    their internal shape. `pages_without_infobox`, `obtain_report`,
+    `validation_report`, and `generation_report` are not the report of any stage
+    module either, so each gets its own small file, written the same way
+    `emit.write.write_report` and its siblings write theirs: indented JSON,
+    sorted keys, one trailing newline.
     """
     reconciliation_path = reports_root / RECONCILE_REPORT_PATH.name
     merge_path = reports_root / MERGE_REPORT_PATH.name
@@ -421,6 +432,7 @@ def _write_reports(
     pages_without_infobox_path = reports_root / PAGES_WITHOUT_INFOBOX_REPORT_NAME
     obtain_report_path = reports_root / OBTAIN_REPORT_NAME
     validation_report_path = reports_root / VALIDATION_REPORT_NAME
+    generation_report_path = reports_root / GENERATION_REPORT_NAME
 
     write_reconcile_report(reconciliation_report, reconciliation_path)
     write_merge_report(merge_report, merge_path)
@@ -440,6 +452,10 @@ def _write_reports(
     validation_report_path.write_text(
         json.dumps(validation_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    generation_document = generation_report.model_dump(mode="json")
+    generation_report_path.write_text(
+        json.dumps(generation_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     return (
         reconciliation_path,
@@ -449,6 +465,7 @@ def _write_reports(
         pages_without_infobox_path,
         obtain_report_path,
         validation_report_path,
+        generation_report_path,
     )
 
 
@@ -554,18 +571,28 @@ def run_build(
     food_index = extract_food(item_components)
     files = fetch_data_files(
         data_tag,
-        groups=("advancement", "loot_table", "recipe", "tags"),
+        groups=(
+            "advancement",
+            "loot_table",
+            "recipe",
+            "tags",
+            "worldgen/biome",
+            "worldgen/configured_feature",
+            "worldgen/placed_feature",
+        ),
         cache=store,
         transport=mcmeta_transport,
     )
     advancement_ids = extract_advancement_ids(files)
     classification = classify_entity_types(files, registries)
     harvest_index = extract_block_harvest(files)
+    gen_result = extract_generation(files)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
         f"{len(food_index)} items that can be eaten, "
-        f"{len(harvest_index)} blocks with harvest requirements"
+        f"{len(harvest_index)} blocks with harvest requirements, "
+        f"{len(gen_result.blocks)} blocks with generation facts"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
@@ -730,6 +757,7 @@ def run_build(
         harvest_index=harvest_index,
         block_drops=block_drops_from_producers(loot_result.producers),
         effect_index=effect_index,
+        generation_index=gen_result.blocks,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
@@ -862,6 +890,7 @@ def run_build(
         emit_report=emit_report,
         obtain_report=obtain_report,
         validation_report=validation_report,
+        generation_report=gen_result.report,
         pages_without_infobox=without_box,
     )
     report(f"reports: wrote {len(report_paths)} files to {options.reports}")
@@ -881,4 +910,5 @@ def run_build(
         emit_report=emit_report,
         obtain_report=obtain_report,
         validation_report=validation_report,
+        generation_report=gen_result.report,
     )

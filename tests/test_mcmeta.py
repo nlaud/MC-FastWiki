@@ -573,8 +573,16 @@ def test_every_summary_path_passes_the_pinned_path_rule() -> None:
 
 
 def test_the_data_groups_cover_the_rest_of_phase_one() -> None:
-    """The other four payload groups of Phase 1 live on the `data` branch."""
-    assert DATA_GROUPS == ("advancement", "loot_table", "recipe", "tags")
+    """The payload groups that live on the `data` branch."""
+    assert DATA_GROUPS == (
+        "advancement",
+        "loot_table",
+        "recipe",
+        "tags",
+        "worldgen/biome",
+        "worldgen/configured_feature",
+        "worldgen/placed_feature",
+    )
 
 
 def test_the_summary_fetcher_reads_the_pinned_raw_url(tmp_path: Path) -> None:
