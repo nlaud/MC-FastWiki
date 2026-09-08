@@ -1,6 +1,7 @@
 import type { RenderContext } from "../render/context.js";
 import { renderEntity } from "../render/entity.js";
 import { createIconElement } from "../render/icon.js";
+import { entryIconKey } from "../render/entry-icon.js";
 import { computeLayout } from "./layout.js";
 import type { WindowState } from "./state.js";
 
@@ -35,7 +36,7 @@ export function createWindowElement(
   const headerLeft = document.createElement("div");
   headerLeft.className = "window-header-left";
 
-  const icon = createIconElement(windowState.entry.i);
+  const icon = createIconElement(entryIconKey(windowState.entry));
   const title = document.createElement("h2");
   title.className = "window-title";
   title.textContent = windowState.entry.n;

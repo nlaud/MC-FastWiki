@@ -1215,6 +1215,103 @@ canvas,
 }
 
 /* ---------------------------------------------------------------------------
+   EnchantInfo section
+   --------------------------------------------------------------------------- */
+.enchant-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.enchant-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.enchant-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.enchant-label {
+  color: #888;
+  min-width: 170px;
+  flex-shrink: 0;
+}
+
+.enchant-value {
+  color: #e0e0e0;
+  font-weight: 500;
+  flex: 1;
+}
+
+.enchant-conflicts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.enchant-applicable {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.enchant-items-group {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.enchant-items-list {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.enchant-flags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.enchant-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.enchant-badge.badge-treasure {
+  color: #fdd663;
+  background: rgba(253, 214, 99, 0.15);
+  border: 1px solid rgba(253, 214, 99, 0.35);
+}
+
+.enchant-badge.badge-curse {
+  color: #f28b82;
+  background: rgba(242, 139, 130, 0.15);
+  border: 1px solid rgba(242, 139, 130, 0.35);
+}
+
+.enchant-badge.badge-untradeable {
+  color: #888;
+  background: rgba(136, 136, 136, 0.15);
+  border: 1px solid rgba(136, 136, 136, 0.35);
+}
+
+/* ---------------------------------------------------------------------------
    RecipeTree section (Obtaining) - Workstation Tree & Sources
    --------------------------------------------------------------------------- */
 .recipe-tree-section {

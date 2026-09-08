@@ -117,6 +117,7 @@ from pipeline.normalize import NormalizeError
 __all__ = [
     "ENTITY_ID_PATTERN",
     "AdvancementInfo",
+    "ApplicableItems",
     "BreedingInfo",
     "BreedingItem",
     "ChestLoot",
@@ -129,6 +130,8 @@ __all__ = [
     "EffectSource",
     "EffectSources",
     "EnchantInfo",
+    "EnchantRarity",
+    "EnchantSlot",
     "Entity",
     "EntityDraft",
     "EntityKind",
@@ -806,13 +809,47 @@ class ChestLoot(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     type: Literal["ChestLoot"] = "ChestLoot"
 
 
-class EnchantInfo(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
+EnchantSlot = Literal[
+    "any",
+    "armor",
+    "feet",
+    "hand",
+    "head",
+    "legs",
+    "mainhand",
+    "offhand",
+]
+
+EnchantRarity = Literal["common", "uncommon", "rare", "very_rare"]
+
+
+class ApplicableItems(BaseModel, frozen=True, populate_by_name=True):
+    """The group of items an enchantment can be applied to."""
+
+    group: str = Field(min_length=1)
+    items: tuple[EntityRef, ...] = ()
+
+
+class EnchantInfo(BaseModel, frozen=True, populate_by_name=True):
     """Levels, applicable items, costs, and the exclusive set.
 
-    The payload of this section arrives in Phase 6c.
+    Carries max level, anvil cost, table cost ranges, applicable items, exclusive
+    set, and classification flags (treasure, curse, tradeable).
     """
 
     type: Literal["EnchantInfo"] = "EnchantInfo"
+    max_level: int = Field(ge=1, le=5, alias="maxLevel")
+    weight: int = Field(ge=1)
+    rarity: EnchantRarity
+    anvil_cost: int = Field(ge=0, alias="anvilCost")
+    slots: tuple[EnchantSlot, ...] = ()
+    cost_ranges: tuple[IntegerRange, ...] = Field(alias="costRanges")
+    supported_items: ApplicableItems = Field(alias="supportedItems")
+    primary_items: ApplicableItems | None = Field(default=None, alias="primaryItems")
+    exclusive_set: tuple[EntityRef, ...] = Field(default=(), alias="exclusiveSet")
+    treasure: bool = False
+    curse: bool = False
+    tradeable: bool = True
 
 
 class VeinInfo(BaseModel, frozen=True, populate_by_name=True):

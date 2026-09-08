@@ -154,13 +154,14 @@ SUMMARY_PAYLOADS: Mapping[str, str] = {
 # branch sit under this prefix.
 ARCHIVE_NAMESPACE_ROOT = "data/minecraft"
 
-# The groups of the `data` branch that Phase 1 reads. `datapacks/` also holds
+# The groups of the `data` branch that this pipeline reads. `datapacks/` also holds
 # recipes and tags, and it is left out on purpose: it holds the experimental
 # trade rebalance pack, which is not the vanilla game. The prefix test below
 # excludes it, because its path is `data/minecraft/datapacks/...` rather than
 # `data/minecraft/tags/...`.
 DATA_GROUPS = (
     "advancement",
+    "enchantment",
     "loot_table",
     "recipe",
     "tags",
@@ -172,8 +173,8 @@ DATA_GROUPS = (
 # How many bytes of archive this module reads before it stops.
 #
 # The whole `data` branch is 9.1 MB of files in 9,030 members today, which is
-# 9.6 MB of archive once each member's header block is counted, and the four
-# groups above are 2.9 MB of that. 256 MB leaves room for many years of growth
+# 9.6 MB of archive once each member's header block is counted, and the groups
+# above are roughly 3 MB of that. 256 MB leaves room for many years of growth
 # and still fails a gzip bomb long before it fills the memory of a CI runner.
 # The reader adds up every member as it walks the headers in order, so it stops
 # part-way through a bomb rather than after it.

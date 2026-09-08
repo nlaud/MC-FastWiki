@@ -73,8 +73,60 @@ Neither is needed now that the graph comes from data files.
 
 ## Phase 6c — Additional entity kinds
 
-- [ ] **Enchantments** (43, Tier A) — max level, applicable items, anvil cost, enchanting table
-      cost range, and `exclusive_set` so the page answers "can I combine Sharpness and Smite"
+### Enchantments: done
+
+All 43 enchantment pages carry an `EnchantInfo` section, built entirely from Tier A.
+`pipeline/extract/enchantment.py` reads `data/minecraft/enchantment/` and the enchantment tags, which
+cost no new fetch because the `data` archive was already downloaded and only `DATA_GROUPS` had to name
+the group.
+The section states max level, rarity from `weight`, anvil cost, equipment slots, the modified
+enchantment level range per level, the applicable items, the exclusive set, and the treasure, curse and
+tradeable flags.
+
+The cost figures are the modified enchantment level, not the 1 to 30 number on the table slot, and the
+row is labelled that way on purpose.
+Naming it an XP cost would be the plausible-looking wrong answer.
+
+`primary_items` renders as its own row only for the 5 enchantments whose table set differs from their
+anvil set: Bane of Arthropods, Fire Aspect, Sharpness, Smite, and Thorns.
+The other 38 render one row, because stating two identical lists would imply a distinction the data
+does not make.
+An `exclusive_set` tag lists the enchantment itself, so the extractor removes it; without that,
+Sharpness conflicts with Sharpness.
+
+Every applicable item is drawn as a link, with no disclosure to open first.
+The plan approved a collapsing disclosure and it was built that way, then reversed after seeing it:
+a link the reader can see is a jump they can take, and a click that only reveals links is a step
+between the question and the answer.
+The widest case is Curse of Vanishing at 92 items, which wraps inside a half-width window with no
+horizontal overflow.
+The group label spells the last segment of the tag rather than printing it, so a row reads
+"Mining loot (28 items)" instead of `enchantable/mining_loot`.
+
+Two things are left out on purpose.
+The reverse lookup, opening Diamond Pickaxe to see what goes on it, is a separate pass: it needs its
+own section type and renderer and would attach a list to roughly 150 item entities.
+The `effects` block is not read at all, because rendering it means interpreting 30 effect types of a
+game-internals format and the wiki blurb already states what an enchantment does.
+
+### Enchantment icons: a kind, not an identity
+
+`web/render/entry-icon.ts` draws the Enchanted Book frame for any enchantment that resolves no icon of
+its own, which is all 43 of them.
+This is the fallback the Phase 8 potion bullet below prescribes, and it holds more exactly here: the
+game draws every enchanted book with one identical texture, so there is no per-enchantment art being
+approximated, because there is none.
+The icon therefore says "this row is an enchantment" and does not claim to tell Fortune from
+Efficiency.
+
+`ICON_RULES["enchantment"]` keeps `has_icons=False` and the registry stays an exemption in the icon
+report, because the pipeline's record of what the wiki publishes is still correct.
+The wiki does publish a `DungeonsEnchantmentSprite` family and it is the trap rather than the answer:
+it is Minecraft Dungeons artwork, a dozen of its names collide with Java Edition's, and
+`VANILLA_FAMILIES` already excludes every `Dungeons*` family.
+Picking a representative tool per enchantment, a diamond pickaxe for Fortune, was rejected as the guess
+Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
+
 - [ ] **Villager professions** — searching `librarian` opens a page listing that profession's
       trades grouped by level (Novice through Master). The `trade` bucket carries profession,
       level, quantities, price multiplier, max uses, and XP. **Keep `java_probability`, drop
@@ -111,7 +163,8 @@ Neither is needed now that the graph comes from data files.
 - [ ] Structure generates in a biome → link, both directions
 - [ ] Structure → its chests → the items in them
 - [ ] Trade → the item traded; item → the professions that sell it
-- [ ] Enchantment → the items that accept it
+- [x] Enchantment → the items that accept it. Rendered on the enchantment page; the item-page reverse
+      lookup is deferred, per the Phase 6c record above
 - [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
       The named cases this bullet was written for are resolved: `Potato`, `Pufferfish (item)`,
       `Arrow of Poison` and `Music Disc <Song>` all carry an `itemRef` now, through the rules

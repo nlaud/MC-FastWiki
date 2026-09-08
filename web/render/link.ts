@@ -1,6 +1,7 @@
 import type { EntityRef, IntegerRange, ItemAmount } from "../types/entity.js";
 import type { RenderContext } from "./context.js";
 import { createIconElement } from "./icon.js";
+import { entryIconKey } from "./entry-icon.js";
 
 /**
  * Type guard to check if the target is an ItemAmount.
@@ -97,7 +98,7 @@ export function entityLink(target: EntityRef | ItemAmount, ctx: RenderContext): 
   link.dataset["id"] = ref.id;
 
   appendQuantity(link, quantityStr);
-  link.append(createIconElement(entry.i));
+  link.append(createIconElement(entryIconKey(entry)));
   appendName(link, ref.name || displayName);
   appendNote(link, note);
 

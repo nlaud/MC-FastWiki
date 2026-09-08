@@ -576,6 +576,7 @@ def test_the_data_groups_cover_the_rest_of_phase_one() -> None:
     """The payload groups that live on the `data` branch."""
     assert DATA_GROUPS == (
         "advancement",
+        "enchantment",
         "loot_table",
         "recipe",
         "tags",
