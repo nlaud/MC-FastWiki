@@ -89,6 +89,7 @@ expected, ordinary event, not a shape fault.
 """
 
 import json
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,8 @@ TYPE_TO_METHOD: Mapping[str, ObtainMethod] = {
     "minecraft:barter": ObtainMethod.BARTERING,
     "minecraft:gift": ObtainMethod.GIFT,
 }
+
+_WIKI_LINK = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 
 # The container entry types that hold more entries, verified live on
 # `diamond_ore.json`. `minecraft:group` and `minecraft:sequence` were not
@@ -747,7 +750,25 @@ def producers_from_drop_index(
             )
             continue
         item_id = _resolve(drop.item, join_table=join_table, kinds=_ITEM_KINDS)
-        if item_id is None:
+        if item_id is not None:
+            target_ids = [item_id]
+        else:
+            target_ids = []
+            for note in drop.notes:
+                links = [m.group(1).strip() for m in _WIKI_LINK.finditer(note.content)]
+                if not links:
+                    continue
+                resolved_links = [
+                    _resolve(link, join_table=join_table, kinds=_ITEM_KINDS) for link in links
+                ]
+                if all(r is not None for r in resolved_links):
+                    target_ids = [r for r in resolved_links if r is not None]
+                    break
+                if any(r is not None for r in resolved_links):
+                    target_ids = []
+                    break
+
+        if not target_ids:
             unresolved.append(
                 UnresolvedTradeOrDrop(
                     table="droptable", subject=drop.item, reason="the item name did not resolve"
@@ -758,18 +779,19 @@ def producers_from_drop_index(
         # panel that shows one number. The wiki records every level, and
         # `MobDrop.at_looting` is how a later looting-tier display reads them.
         count, odds = _drop_odds(drop.at_looting(0))
-        producers.append(
-            Producer(
-                method=ObtainMethod.MOB_LOOT,
-                output=ProducerOutput(item=item_id, count=count),
-                inputs=(),
-                source_id=f"droptable/{drop.page}",
-                note=f"dropped by {drop.mob}",
-                chance=odds[0],
-                count_max=odds[1],
-                per_attempt=odds[2],
+        for target_id in target_ids:
+            producers.append(
+                Producer(
+                    method=ObtainMethod.MOB_LOOT,
+                    output=ProducerOutput(item=target_id, count=count),
+                    inputs=(),
+                    source_id=f"droptable/{drop.page}",
+                    note=f"dropped by {drop.mob}",
+                    chance=odds[0],
+                    count_max=odds[1],
+                    per_attempt=odds[2],
+                )
             )
-        )
     return tuple(producers), tuple(unresolved)
 
 

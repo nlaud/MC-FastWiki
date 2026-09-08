@@ -110,7 +110,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2128
+    assert snapshot.total == 2141
     assert snapshot.by_kind == {
         "block": 1195,
         "item": 540,
@@ -120,16 +120,19 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "enchantment": 43,
         "effect": 39,
         "entity": 28,
+        "profession": 13,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2128)
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2141)
     # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2097, "blurb": 1971, "icon": 2036}
+    # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2110, "blurb": 1984, "icon": 2049}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
         # to `<item>`. 169 before Potato trade disambiguation resolved onto
-        # minecraft:potato.
-        "TradeTable": 170,
+        # minecraft:potato. 170 before 13 villager professions and Wandering
+        # Trader mob trades attached.
+        "TradeTable": 184,
         "StatBlock": 93,
         "DropTable": 65,
         "SpawnInfo": 53,
@@ -143,15 +146,17 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "EffectSources": 39,
         "GenerationInfo": 52,
         "EnchantInfo": 43,
+        "ProfessionInfo": 13,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.
     # 4268 before 6 unhandled recipe types added 43 producers.
     # 4311 before curated one-off producers added 14 producers.
-    assert snapshot.obtain_producer_count == 4325
+    # 4325 before 12 creeper-dropped music discs were expanded.
+    assert snapshot.obtain_producer_count == 4337
     # 1914 before Local Brewery (InvSprite:Potion) and Ominous Banner (BlockSprite:ominous-banner)
-    # joined the atlas.
-    assert snapshot.atlas_icon_count == 1916
+    # joined the atlas. 1916 before 13 profession icons joined the atlas.
+    assert snapshot.atlas_icon_count == 1929
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:

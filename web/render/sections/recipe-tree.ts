@@ -762,7 +762,23 @@ export function renderRecipeTree(
     return Boolean(inputId && isOreSmelt(inputId));
   });
 
-  const tradeTableSection = entity?.sections.find((s): s is TradeTable => s.type === "TradeTable");
+  // A TradeTable means two different things depending on whose page carries
+  // it, and only one of them belongs under "Obtaining".
+  //
+  // On an item or block page it lists the trades that GIVE this thing, which is
+  // a way of getting it, so the Sources panel embeds it and groups it by the
+  // profession selling it.
+  //
+  // On a seller's own page -- the 13 professions, and the wandering trader,
+  // which is a mob because the `villager_profession` registry does not list it
+  // -- the same section lists what that seller OFFERS. Embedding it here would
+  // answer "how do I obtain a wandering trader" with the trader's own shop, and
+  // would print all 97 rows a second time directly below the Trades section
+  // that already showed them.
+  const isSellerPage = entity?.kind === "profession" || entity?.kind === "mob";
+  const tradeTableSection = isSellerPage
+    ? undefined
+    : entity?.sections.find((s): s is TradeTable => s.type === "TradeTable");
 
   const hasTreeContent = rootNode.producers.length > 0;
   const fallbackGraph = section.graph ?? { schemaVersion: 1, producers: {} };

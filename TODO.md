@@ -12,7 +12,7 @@ reasoning survives even after the choice is made.
 
 `pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
 and mob-drop tables.
-That covers 14 methods and 4311 producers (12 loot-table families read, closing 27 gaps).
+That covers 14 methods and 4337 producers (12 loot-table families read, closing 27 gaps).
 Every producer whose outcome is a draw rather than a certainty also carries its odds - the chance,
 the stack range, and the expected yield per chest, catch, barter, shear, brush or kill.
 A producer only carries them where the source states them: an entry under `minecraft:alternatives`
@@ -21,9 +21,14 @@ probability no loot table writes down, so both forfeit the three fields rather t
 Decision 11 planned the opposite approach and was overtaken by what shipped; read that entry for
 why the reversal happened and what it costs.
 
-What is left is the set of ways to get an item that no adapter reads.
-`data/reports/obtain-report.json` lists 286 items with no producer of any kind.
-274 of those are correctly empty and always will be: 139 placed-block states (`potted_*`,
+Nothing is left. `data/reports/obtain-report.json` lists 276 items with no producer of any kind,
+and every one of them is correctly empty and always will be.
+The count read 286 before the music disc note was expanded, and the breakdown below read 274 with
+"the other 12" named as the discs. Both figures were wrong, and the groups are recounted here so the
+correction survives: only 10 discs had no producer, because `music_disc_13` and `music_disc_cat`
+already had chest-loot ones, and the empty groups summed to 276 rather than 274 because the
+placed-block states were undercounted by two.
+The groups are: 141 placed-block states (`potted_*`,
 `*_wall_sign`, crop stages, plus `suspicious_sand` and `suspicious_gravel` which break to nothing),
 88 spawn eggs, 22 technical and fluid blocks, 18 creative or operator blocks, and 7 `infested_*` blocks
 (their loot tables drop the host stone when broken with silk touch, spawn silverfish otherwise, and no
@@ -32,7 +37,7 @@ vanilla recipe, trade, or drop produces them; they are world-generation-only for
 Nobody obtains a `potted_cactus` - the pot and the cactus are the obtainable things, and the potted
 state is what the world holds after you combine them.
 
-The other 12 are the music discs, and they are the only real gap left in this phase.
+The 12 music discs were the last real gap, and they are closed. See the entry below.
 
 The recipe-type cause is closed.
 `pipeline/obtain/recipes.py` now reads eleven recipe types rather than six, and the 43 recipes it
@@ -61,11 +66,23 @@ survives: the 3 sherds are not vault-only, because decorated pots carrying them 
 trial chambers at 1/13 per pot, and `filled_map` needed nothing because `minecraft:map_cloning`
 already produces it.
 
-The 12 music discs are **not** an adapter gap.
-The creeper drop row names `Music Disc`, which is the display name of all 23 discs, so it correctly
-refuses to resolve to one.
-Reading the wikitext note beside that row, which lists the discs by name, is what would fix it.
-See Decision 20.
+The 12 music discs are resolved, and this phase now has no gap left in it.
+The creeper drop row names `Music Disc`, which is the display name of all 23 discs.
+Reading and expanding the note beside that row (`random_disc`), which lists the 12
+skeleton-killed creeper drop discs by name, produces obtain producers for all 12 discs,
+reducing `items_with_no_producer` from 286 to 276.
+See Decision 25.
+
+One claim the earlier version of this bullet made was wrong and is recorded here so the reversal
+survives: it said the fix meant "reading the wikitext note beside that row", which implied a new
+page wikitext fetch.
+It needed none.
+The note already arrives inside the `droptable` bucket row the build reads on every run, and
+`pipeline/enrich/droptable.py` was already parsing it into a `DropNote` for its conditions.
+The whole change is one branch in `pipeline/obtain/loot.py`.
+The count was wrong too: 12 discs are named in the note, but only 10 lacked a producer, because
+`music_disc_13` and `music_disc_cat` already carried chest-loot producers and gained a fourth
+rather than their first.
 
 Two things the earlier version of this phase asked for are dropped on purpose: fetching each item
 page's rendered `Obtaining` section, and rate-limiting one request per item page.
@@ -127,7 +144,7 @@ it is Minecraft Dungeons artwork, a dozen of its names collide with Java Edition
 Picking a representative tool per enchantment, a diamond pickaxe for Fortune, was rejected as the guess
 Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 
-- [ ] **Villager professions** — searching `librarian` opens a page listing that profession's
+- [x] **Villager professions** — searching `librarian` opens a page listing that profession's
       trades grouped by level (Novice through Master). The `trade` bucket carries profession,
       level, quantities, price multiplier, max uses, and XP. **Keep `java_probability`, drop
       `bedrock_probability`**
@@ -162,7 +179,7 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 - [ ] Mob spawns in a biome → the biome is a link
 - [ ] Structure generates in a biome → link, both directions
 - [ ] Structure → its chests → the items in them
-- [ ] Trade → the item traded; item → the professions that sell it
+- [x] Trade → the item traded; item → the professions that sell it
 - [x] Enchantment → the items that accept it. Rendered on the enchantment page; the item-page reverse
       lookup is deferred, per the Phase 6c record above
 - [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
@@ -566,6 +583,74 @@ New collections the added data makes nearly free:
     The dimension biome counts come from resolving `is_overworld`, `is_nether` and `is_end` rather
     than from the literals 55, 5 and 5, so a version that adds a biome cannot quietly turn "every
     biome" into "all but one".
+
+23. **Wandering Trader is a mob, not a profession entity, and is still a seller.**
+    The wiki `trade` bucket includes 97 trades for `Wandering Trader` alongside the 13 villager
+    professions. Wandering Trader is not in `villager_profession` (which only contains the 13
+    professions and `none`/`nitwit`). Because Wandering Trader is already an entity in `entity_type`,
+    its 97 trades attach directly to `minecraft:wandering_trader` under `TradeTable`. No duplicate
+    or synthetic 14th profession entity is created.
+
+    Being a mob does not stop it being a seller, and the first cut of this conflated the two.
+    `professionRef` names the seller a trade group belongs to, and leaving the trader out of that
+    map made it the one heading of fourteen that stayed dead text on every item page while every
+    sibling became a link, which is the exact fault the Phase 6c lint bullet exists to catch.
+    Its name now resolves to the mob, so all 366 trade rows on item and block pages carry a ref and
+    none prints a seller as plain text.
+
+    Two consequences on the trader's own page, both found by reading the rendered page rather than
+    by any test:
+
+    A trade table on the seller's own page groups by level alone, the same as a profession page.
+    Grouping it by seller printed a "Wandering Trader" heading under the window titled Wandering
+    Trader, and once the heading carried a ref it linked the reader to the page they were reading.
+
+    `renderRecipeTree` must not embed a seller's own trade table under Obtaining.
+    It embeds an item's `TradeTable` because there the section lists the trades that *give* that
+    item, which is a way to get it. On a seller's page the same section lists what that seller
+    *offers*, so embedding it answered "how do I obtain a wandering trader" with the trader's own
+    shop and printed all 97 rows a second time directly below the Trades section that had just
+    shown them. Suppressing it removes the page's spurious Obtaining section entirely.
+
+24. **Nitwit and none are excluded from profession entities.**
+    `minecraft:villager_profession` exposes 15 paths in 26.2: 13 professions that trade, plus `none`
+    and `nitwit`. Neither `none` nor `nitwit` has trades in the wiki's trade bucket. They are
+    excluded from the 13 profession entities so that profession entries in search and navigation
+    strictly represent trading professions.
+
+    The rule is "a profession the trade index knows", not a hand-written exclusion list, so a
+    release that gives the nitwit trades gives it a page without anyone editing a list.
+
+    `none` would fail on its own merits regardless: it has no sprite, and "Unemployed" redirects to
+    `Villager` rather than being a page, so it carries no `{{Infobox profession}}` and no blurb. An
+    entity ID of `minecraft:none` would name the absence of a thing.
+
+    `nitwit` is excluded by scope choice and not by the data, and that is worth recording because
+    the data would have supported it: it has its own page, its own `{{Infobox profession}}` reading
+    `workstation = None`, and its own sprite row. It is the one profession page this build could
+    produce and chooses not to. The parser still treats `workstation = None` as absence rather than
+    as a block named "None", but with the nitwit excluded that guard now protects a case no page in
+    the build reaches, and its test says so.
+
+25. **Music Disc mob drops expand to the 12 enumerated discs.**
+    Creeper's drop table names `Music Disc`, which previously refused to resolve because `Music Disc`
+    is the shared display name of 23 discs. Reading and expanding the wikitext note attached to that
+    drop (`random_disc`) resolves the exact 12 discs dropped by a skeleton-killed creeper: 13, cat,
+    blocks, chirp, far, mall, mellohi, stal, strad, ward, 11, and wait. Expanding this drop when all
+    12 resolve provides obtain producers for these 12 discs, reducing `items_with_no_producer` from
+    286 to 276.
+
+    **All or nothing, on purpose.** A note expands only when every link in it resolves to an item.
+    A note where some links resolve expands to nothing and the row is reported exactly as before,
+    because a partial expansion would put a creeper drop on some discs and not others with nothing
+    in the data to justify the split. A note where no link resolves is skipped rather than failing
+    the row, which is what lets the creeper's second note, `killed_by_skeleton`, be passed over: it
+    links mobs, not items, and the disc note is read instead.
+
+    The rule is deliberately general rather than a creeper special case, and it currently fires on
+    exactly one row because `Music Disc` is the only drop name left that resolves to nothing. The
+    one other unresolved droptable name, `Wool`, names the 16 coloured wools and its note does not
+    enumerate them, so it stays unresolved and is untouched by this.
 
 ## Still open
 

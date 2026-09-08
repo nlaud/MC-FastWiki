@@ -113,7 +113,8 @@
         "structure",
         "biome",
         "collection",
-        "entity"
+        "entity",
+        "profession"
       ]
     },
     "sourceTier": {
@@ -332,6 +333,9 @@
         },
         {
           "$ref": "#/$defs/linkList"
+        },
+        {
+          "$ref": "#/$defs/professionInfo"
         }
       ]
     },
@@ -1009,7 +1013,7 @@
     },
     "tradeTable": {
       "title": "TradeTable",
-      "description": "Villager and wandering trader trades, grouped by profession and level, mirroring `pipeline.enrich.trade.TradeIndex`. `professionRef` is expected to stay absent for now: villager profession entities arrive in Phase 6c, so there is nothing yet for the merge to link a profession name to. Only the Java probability is carried into `javaProbability`; `bedrock_probability` is dropped upstream in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.",
+      "description": "Villager and wandering trader trades, grouped by profession and level, mirroring `pipeline.enrich.trade.TradeIndex`. Only the Java probability is carried into `javaProbability`; `bedrock_probability` is dropped upstream in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.",
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],
@@ -1338,6 +1342,25 @@
       "properties": {
         "type": {
           "const": "LinkList"
+        }
+      }
+    },
+    "professionInfo": {
+      "title": "ProfessionInfo",
+      "description": "Villager profession details: workstation block and trade count.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tradeCount"],
+      "properties": {
+        "type": {
+          "const": "ProfessionInfo"
+        },
+        "workstation": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "tradeCount": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

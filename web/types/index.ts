@@ -17,7 +17,17 @@ export type EntityId = string;
  * via the `definition` "entityKind".
  */
 export type EntityKind =
-  "mob" | "item" | "block" | "effect" | "advancement" | "enchantment" | "structure" | "biome" | "collection" | "entity";
+  | "mob"
+  | "item"
+  | "block"
+  | "effect"
+  | "advancement"
+  | "enchantment"
+  | "structure"
+  | "biome"
+  | "collection"
+  | "entity"
+  | "profession";
 
 /**
  * data/dist/index.json, the whole Phase 4 search payload: one entry per searchable entity, sorted by `id`. Every key of an entry is short -- see `$defs.indexEntry` -- because this payload repeats them roughly 5,000 times and Phase 4 budgets 16 ms per keystroke against the whole file once it is loaded. `pipeline.emit.search_index` writes this file from the shard assignment `pipeline.emit.shard` already built, so the `s` field of every entry names a shard this same build also wrote.
@@ -59,7 +69,8 @@ export interface IndexEntry {
     | "structure"
     | "biome"
     | "collection"
-    | "entity";
+    | "entity"
+    | "profession";
   /**
    * Long form: `aliases`. Every extra search term of this entity, in the order `pipeline.normalize.aliases.generate_aliases` produced them. May be empty.
    */

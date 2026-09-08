@@ -264,6 +264,7 @@ def _build_fixtures() -> dict[str, bytes]:
         "mob_effect": [],
         "worldgen/biome": [],
         "enchantment": [],
+        "villager_profession": [],
     }
     summary_url = (
         f"https://raw.githubusercontent.com/{MCMETA_REPOSITORY}/{SUMMARY_SHA}/registries/data.json"

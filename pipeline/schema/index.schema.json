@@ -41,7 +41,8 @@
         "structure",
         "biome",
         "collection",
-        "entity"
+        "entity",
+        "profession"
       ]
     },
     "indexEntry": {

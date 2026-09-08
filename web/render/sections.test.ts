@@ -10,6 +10,7 @@ import type {
   FoodInfo,
   GenerationInfo,
   HarvestInfo,
+  ProfessionInfo,
   RecipeTree,
   SpawnInfo,
   StatBlock,
@@ -26,6 +27,8 @@ import { renderEnchantInfo } from "./sections/enchant-info.js";
 import { renderFoodInfo } from "./sections/food-info.js";
 import { renderGenerationInfo } from "./sections/generation-info.js";
 import { renderHarvestInfo } from "./sections/harvest-info.js";
+import { renderSection } from "./sections/index.js";
+import { renderProfessionInfo } from "./sections/profession-info.js";
 import { formatOdds, renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
@@ -457,6 +460,251 @@ describe("Section renderers with real committed build data", () => {
       toggleBtn.click();
       expect(el.querySelectorAll(".is-collapsed-row")).toHaveLength(0);
       expect(toggleBtn.textContent).toBe("Show less");
+    });
+
+    it("renders with groupByLevelOnly grouping by level and no collapse", () => {
+      const mockTradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [
+          {
+            profession: "Librarian",
+            level: "Novice",
+            wanted: [
+              {
+                name: "Paper",
+                ref: { id: "minecraft:paper", name: "Paper" },
+                quantity: { minimum: 24, maximum: 24 },
+              },
+            ],
+            given: {
+              name: "Emerald",
+              ref: { id: "minecraft:emerald", name: "Emerald" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+          {
+            profession: "Librarian",
+            level: "Master",
+            wanted: [
+              {
+                name: "Emerald",
+                ref: { id: "minecraft:emerald", name: "Emerald" },
+                quantity: { minimum: 20, maximum: 20 },
+              },
+            ],
+            given: {
+              name: "Name Tag",
+              ref: { id: "minecraft:name_tag", name: "Name Tag" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+        ],
+      };
+      const el = requireItem(
+        renderTradeTable(mockTradeSection, ctx, { groupByLevelOnly: true }),
+        "TradeTable element",
+      );
+      expect(el.querySelector(".trade-profession-title")).toBeNull();
+      const levelTitles = Array.from(el.querySelectorAll(".trade-level-title")).map(
+        (e) => e.textContent,
+      );
+      expect(levelTitles).toEqual(["Novice", "Master"]);
+      expect(el.querySelector(".show-more-btn")).toBeNull();
+      const headers = Array.from(el.querySelectorAll("th")).map((e) => e.textContent);
+      expect(headers).not.toContain("Level");
+    });
+
+    it("renders professionRef as an entityLink when present on a trade", () => {
+      const mockTradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [
+          {
+            profession: "Librarian",
+            professionRef: {
+              id: "minecraft:librarian",
+              name: "Librarian",
+            },
+            level: "Novice",
+            wanted: [
+              {
+                name: "Paper",
+                ref: { id: "minecraft:paper", name: "Paper" },
+                quantity: { minimum: 24, maximum: 24 },
+              },
+            ],
+            given: {
+              name: "Emerald",
+              ref: { id: "minecraft:emerald", name: "Emerald" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+        ],
+      };
+      const el = requireItem(renderTradeTable(mockTradeSection, ctx), "TradeTable element");
+      const profTitle = requireItem(el.querySelector(".trade-profession-title"), "prof title");
+      const link = requireItem(profTitle.querySelector(".entity-link"), "prof link");
+      expect(link.textContent).toContain("Librarian");
+    });
+  });
+
+  describe("ProfessionInfo", () => {
+    it("renders workstation link and trade count", () => {
+      const section: ProfessionInfo = {
+        type: "ProfessionInfo",
+        workstation: {
+          id: "minecraft:lectern",
+          name: "Lectern",
+        },
+        tradeCount: 15,
+      };
+      const el = requireItem(renderProfessionInfo(section, ctx), "ProfessionInfo element");
+      expect(el.classList.contains("profession-info-section")).toBe(true);
+
+      const wsLink = requireItem(
+        el.querySelector(".profession-workstation .entity-link"),
+        "workstation link",
+      );
+      expect(wsLink.textContent).toContain("Lectern");
+
+      const tradeCountVal = requireItem(
+        el.querySelector(".profession-trades-count .profession-field-value"),
+        "trade count value",
+      );
+      expect(tradeCountVal.textContent).toBe("15 total trades");
+    });
+
+    it("returns null if neither workstation nor tradeCount is provided", () => {
+      const section: ProfessionInfo = {
+        type: "ProfessionInfo",
+        tradeCount: 0,
+      };
+      expect(renderProfessionInfo(section, ctx)).toBeNull();
+    });
+  });
+
+  describe("renderSection with TradeTable", () => {
+    it("orders the wandering trader's ladder as the pipeline ranks it, not alphabetically", () => {
+      const trade = (level: string) => ({
+        profession: "Wandering Trader",
+        level,
+        wanted: [
+          {
+            name: "Emerald",
+            ref: { id: "minecraft:emerald", name: "Emerald" },
+            quantity: { minimum: 1, maximum: 1 },
+          },
+        ],
+        given: {
+          name: "Fern",
+          ref: { id: "minecraft:fern", name: "Fern" },
+          quantity: { minimum: 1, maximum: 1 },
+        },
+      });
+      // Fed in a deliberately wrong order, so passing means the renderer sorted
+      // rather than preserving input order.
+      const tradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [trade("Purchase"), trade("Special"), trade("Ordinary")],
+      };
+      const mobEntity = {
+        id: "minecraft:wandering_trader",
+        kind: "mob",
+        name: "Wandering Trader",
+        sections: [tradeSection],
+      } as unknown as Entity;
+      const el = renderSection(tradeSection, ctx, mobEntity);
+      const levels = Array.from(el?.querySelectorAll(".trade-level-title") ?? []).map(
+        (n) => n.textContent,
+      );
+      // Alphabetical order would put Purchase second. The wiki's order, which
+      // `pipeline/enrich/trade.py` already encodes, puts Special there.
+      expect(levels).toEqual(["Ordinary", "Special", "Purchase"]);
+    });
+
+    it("renders TradeTable with groupByLevelOnly for profession kind", () => {
+      const tradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [
+          {
+            profession: "Librarian",
+            level: "Novice",
+            wanted: [
+              {
+                name: "Paper",
+                ref: { id: "minecraft:paper", name: "Paper" },
+                quantity: { minimum: 24, maximum: 24 },
+              },
+            ],
+            given: {
+              name: "Emerald",
+              ref: { id: "minecraft:emerald", name: "Emerald" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+        ],
+      };
+      const professionEntity = {
+        id: "minecraft:librarian",
+        kind: "profession",
+        name: "Librarian",
+        sections: [tradeSection],
+      } as unknown as Entity;
+      const el = renderSection(tradeSection, ctx, professionEntity);
+      expect(el).not.toBeNull();
+      expect(el?.querySelector(".trade-level-title")?.textContent).toBe("Novice");
+      expect(el?.querySelector(".trade-profession-title")).toBeNull();
+    });
+
+    it("renders TradeTable with level grouping for mob kind, the seller's own page", () => {
+      const tradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [
+          {
+            profession: "Wandering Trader",
+            level: "Novice",
+            wanted: [
+              {
+                name: "Emerald",
+                ref: { id: "minecraft:emerald", name: "Emerald" },
+                quantity: { minimum: 1, maximum: 1 },
+              },
+            ],
+            given: {
+              name: "Fern",
+              ref: { id: "minecraft:fern", name: "Fern" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+        ],
+      };
+      const mobEntity = {
+        id: "minecraft:wandering_trader",
+        kind: "mob",
+        name: "Wandering Trader",
+        sections: [tradeSection],
+      } as unknown as Entity;
+      const el = renderSection(tradeSection, ctx, mobEntity);
+      expect(el).not.toBeNull();
+      // The window title already says "Wandering Trader", so the seller's own
+      // page groups by level and prints no seller heading. Printing one would
+      // repeat the title and link the reader back to this same page.
+      expect(el?.querySelector(".trade-level-title")?.textContent).toBe("Novice");
+      expect(el?.querySelector(".trade-profession-title")).toBeNull();
+    });
+
+    it("returns null for item kind (deferred to RecipeTree)", () => {
+      const tradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [],
+      };
+      const itemEntity = {
+        id: "minecraft:emerald",
+        kind: "item",
+        name: "Emerald",
+        sections: [tradeSection],
+      } as unknown as Entity;
+      const el = renderSection(tradeSection, ctx, itemEntity);
+      expect(el).toBeNull();
     });
   });
 
@@ -898,6 +1146,61 @@ describe("Section renderers with real committed build data", () => {
   });
 
   describe("renderRecipeTree", () => {
+    // A TradeTable on an item page lists the trades that GIVE that item, so the
+    // Sources pane embeds it. On a seller's own page the same section lists what
+    // that seller OFFERS, and embedding it there answered "how do I obtain a
+    // wandering trader" with the trader's own shop, printing all 97 rows a
+    // second time below the Trades section that had just shown them.
+    it("does not embed the trade table under Obtaining on a seller's own page", () => {
+      const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
+      const tradeSection: TradeTable = {
+        type: "TradeTable",
+        trades: [
+          {
+            profession: "Wandering Trader",
+            level: "Ordinary",
+            wanted: [
+              {
+                name: "Emerald",
+                ref: { id: "minecraft:emerald", name: "Emerald" },
+                quantity: { minimum: 1, maximum: 1 },
+              },
+            ],
+            given: {
+              name: "Fern",
+              ref: { id: "minecraft:fern", name: "Fern" },
+              quantity: { minimum: 1, maximum: 1 },
+            },
+          },
+        ],
+      };
+      const sellerEntity = {
+        id: "minecraft:wandering_trader",
+        kind: "mob",
+        name: "Wandering Trader",
+        sections: [section, tradeSection],
+      } as unknown as Entity;
+      const el = requireItem(renderRecipeTree(section, ctx, sellerEntity), "RecipeTree element");
+      expect(el.querySelector(".trade-table-embedded")).toBeNull();
+
+      // The same section on an item page still embeds, which is the behaviour
+      // the Emerald page depends on.
+      const itemEntity = {
+        id: "minecraft:emerald",
+        kind: "item",
+        name: "Emerald",
+        sections: [section, tradeSection],
+      } as unknown as Entity;
+      const itemEl = requireItem(renderRecipeTree(section, ctx, itemEntity), "RecipeTree element");
+      expect(itemEl.querySelector(".trade-table-embedded")).not.toBeNull();
+    });
+
     it("renders Obtaining heading with workstation tree and sources panes", () => {
       const tree = buildObtainTree("minecraft:iron_ingot", obtainGraph);
       const section = {

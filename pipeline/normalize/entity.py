@@ -154,6 +154,7 @@ __all__ = [
     "LootingDrop",
     "Measure",
     "ObtainList",
+    "ProfessionInfo",
     "Ratio",
     "RecipeTree",
     "RecipeTreeInput",
@@ -239,6 +240,7 @@ class EntityKind(StrEnum):
     BIOME = "biome"
     COLLECTION = "collection"
     ENTITY = "entity"
+    PROFESSION = "profession"
 
 
 class EntityRef(BaseModel, frozen=True, populate_by_name=True):
@@ -499,10 +501,9 @@ class JavaProbability(BaseModel, frozen=True, populate_by_name=True):
 class TradeEntry(BaseModel, frozen=True, populate_by_name=True):
     """One trade a profession offers at one level.
 
-    Mirrors `pipeline.enrich.trade.WikiTrade`. `profession_ref` is expected
-    to stay absent for now: villager profession entities arrive in Phase 6c,
-    so there is nothing yet for the merge to link a profession name to. Only
-    `java_probability` is carried; `bedrock_probability` is dropped upstream
+    Mirrors `pipeline.enrich.trade.WikiTrade`. `profession_ref` links to
+    the profession entity where one exists (for the 13 villager professions).
+    Only `java_probability` is carried; `bedrock_probability` is dropped upstream
     in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.
     """
 
@@ -910,6 +911,14 @@ class LinkList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
     type: Literal["LinkList"] = "LinkList"
 
 
+class ProfessionInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Villager profession details: workstation block and trade count."""
+
+    type: Literal["ProfessionInfo"] = "ProfessionInfo"
+    workstation: EntityRef | None = Field(default=None)
+    trade_count: int = Field(ge=0, alias="tradeCount")
+
+
 # The discriminated union. See the module docstring for why `discriminator`
 # rather than a plain `Union`.
 Section = Annotated[
@@ -927,7 +936,8 @@ Section = Annotated[
     | ChestLoot
     | EnchantInfo
     | GenerationInfo
-    | LinkList,
+    | LinkList
+    | ProfessionInfo,
     Field(discriminator="type"),
 ]
 
@@ -941,7 +951,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The fourteen `type` values a `sections.<Type>` provenance key may name,
+# The sixteen `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -961,6 +971,7 @@ _SECTION_TYPES = frozenset(
         "EnchantInfo",
         "GenerationInfo",
         "LinkList",
+        "ProfessionInfo",
     }
 )
 

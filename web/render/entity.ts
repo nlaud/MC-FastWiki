@@ -44,7 +44,11 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
         const sectionsContainer = document.createElement("div");
         sectionsContainer.className = "entity-sections";
         for (const section of entity.sections) {
-          if (section.type === "TradeTable") {
+          if (
+            section.type === "TradeTable" &&
+            entity.kind !== "profession" &&
+            entity.kind !== "mob"
+          ) {
             continue;
           }
           const el = renderSection(section, ctx, entity);
