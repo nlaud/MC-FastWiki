@@ -286,7 +286,7 @@
       }
     },
     "section": {
-      "description": "One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` and `harvestInfo` carry real, closed fields. The other five are still open payloads; each one's own description names the later phase that fills it in.",
+      "description": "One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo`, `harvestInfo`, `generationInfo`, and `enchantInfo` carry real, closed fields. The other three (`obtainList`, `chestLoot`, `linkList`) are still open payloads; each one's own description names the later phase that fills it in.",
       "oneOf": [
         {
           "$ref": "#/$defs/statBlock"
@@ -1086,15 +1086,125 @@
         }
       }
     },
+    "enchantSlot": {
+      "title": "EnchantSlot",
+      "description": "Equipment slot where an enchantment is active.",
+      "type": "string",
+      "enum": ["any", "armor", "feet", "hand", "head", "legs", "mainhand", "offhand"]
+    },
+    "enchantRarity": {
+      "title": "EnchantRarity",
+      "description": "Rarity of an enchantment derived from its weight.",
+      "type": "string",
+      "enum": ["common", "uncommon", "rare", "very_rare"]
+    },
+    "applicableItems": {
+      "title": "ApplicableItems",
+      "description": "The group of items an enchantment can be applied to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "items"],
+      "properties": {
+        "group": {
+          "description": "The item tag or group name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "items": {
+          "description": "Every item accepted by this group.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        }
+      }
+    },
     "enchantInfo": {
       "title": "EnchantInfo",
-      "description": "Levels, applicable items, costs, and the exclusive set. The payload of this section arrives in Phase 6c.",
+      "description": "Levels, applicable items, costs, and the exclusive set.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "maxLevel",
+        "weight",
+        "rarity",
+        "anvilCost",
+        "slots",
+        "costRanges",
+        "supportedItems",
+        "exclusiveSet",
+        "treasure",
+        "curse",
+        "tradeable"
+      ],
       "properties": {
         "type": {
           "const": "EnchantInfo"
+        },
+        "maxLevel": {
+          "description": "Maximum level of the enchantment (1 to 5).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "weight": {
+          "description": "Weight of the enchantment in the table selection pool (10, 5, 2, 1).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "rarity": {
+          "$ref": "#/$defs/enchantRarity"
+        },
+        "anvilCost": {
+          "description": "Base anvil modification cost multiplier (1, 2, 4, 8).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "slots": {
+          "description": "Equipment slots where this enchantment applies.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enchantSlot"
+          },
+          "default": []
+        },
+        "costRanges": {
+          "description": "Modified enchantment level ranges for each level from 1 to maxLevel.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/integerRange"
+          }
+        },
+        "supportedItems": {
+          "$ref": "#/$defs/applicableItems"
+        },
+        "primaryItems": {
+          "$ref": "#/$defs/applicableItems"
+        },
+        "exclusiveSet": {
+          "description": "Enchantments that cannot be combined with this one.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        },
+        "treasure": {
+          "description": "Whether this is a treasure enchantment, unavailable in the enchanting table.",
+          "type": "boolean",
+          "default": false
+        },
+        "curse": {
+          "description": "Whether this enchantment is a curse.",
+          "type": "boolean",
+          "default": false
+        },
+        "tradeable": {
+          "description": "Whether this enchantment can be traded from librarians.",
+          "type": "boolean",
+          "default": true
         }
       }
     },

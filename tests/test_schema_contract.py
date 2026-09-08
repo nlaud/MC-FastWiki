@@ -417,6 +417,7 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "foodInfo": FoodInfo,
     "harvestInfo": HarvestInfo,
     "generationInfo": GenerationInfo,
+    "enchantInfo": EnchantInfo,
 }
 
 

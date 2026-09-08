@@ -94,9 +94,10 @@ does not.
 ### The data half maps path for path
 
 `fetch_data_files` keys every file it returns by the path under `data/minecraft/`, such as
-`recipe/oak_stairs.json`. `DATA_GROUPS` names the seven groups that the pipeline reads:
+`recipe/oak_stairs.json`. `DATA_GROUPS` names the eight groups that the pipeline reads:
 
 - `advancement`
+- `enchantment`
 - `loot_table`
 - `recipe`
 - `tags`

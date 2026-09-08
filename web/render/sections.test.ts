@@ -5,6 +5,7 @@ import type {
   AdvancementInfo,
   BreedingInfo,
   DropTable,
+  EnchantInfo,
   Entity,
   FoodInfo,
   GenerationInfo,
@@ -21,6 +22,7 @@ import { buildObtainTree } from "./obtain-tree.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderDropTable } from "./sections/drop-table.js";
+import { renderEnchantInfo } from "./sections/enchant-info.js";
 import { renderFoodInfo } from "./sections/food-info.js";
 import { renderGenerationInfo } from "./sections/generation-info.js";
 import { renderHarvestInfo } from "./sections/harvest-info.js";
@@ -47,6 +49,7 @@ describe("Section renderers with real committed build data", () => {
   /** Every item entity of the committed build, across all item shards. */
   let itemsById: Map<string, Entity>;
   let blocksById: Map<string, Entity>;
+  let enchantmentsById: Map<string, Entity>;
   let obtainGraph: Obtain;
 
   beforeAll(() => {
@@ -107,6 +110,15 @@ describe("Section renderers with real committed build data", () => {
       for (const entity of (JSON.parse(raw) as { entities: Entity[] }).entities) {
         blocksById.set(entity.id, entity);
       }
+    }
+
+    enchantmentsById = new Map<string, Entity>();
+    const ench0Raw = fs.readFileSync(
+      path.resolve(process.cwd(), "data/dist/entities/enchantment-0.json"),
+      "utf8",
+    );
+    for (const entity of (JSON.parse(ench0Raw) as { entities: Entity[] }).entities) {
+      enchantmentsById.set(entity.id, entity);
     }
 
     const obtainRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/obtain.json"), "utf8");
@@ -1733,6 +1745,209 @@ describe("Section renderers with real committed build data", () => {
       expect(links).toHaveLength(2);
       expect(requireItem(links[0], "first biome link").textContent).toBe("Mangrove Swamp");
       expect(requireItem(links[1], "second biome link").textContent).toBe("Swamp");
+    });
+  });
+
+  describe("renderEnchantInfo", () => {
+    const enchantSectionOf = (id: string): EnchantInfo => {
+      const entity = requireItem(enchantmentsById.get(id), id);
+      const section = entity.sections.find((s): s is EnchantInfo => s.type === "EnchantInfo");
+      return requireItem(section, `${id} EnchantInfo`);
+    };
+
+    it("renders Fortune with max level, rarity, anvil cost, slot, cost ranges, and conflicts", () => {
+      const section = enchantSectionOf("minecraft:fortune");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Fortune EnchantInfo element");
+
+      expect(el.querySelector(".section-title")?.textContent).toBe("Enchantment");
+
+      // Max level: III (3)
+      expect(el.textContent).toContain("Max level");
+      expect(el.textContent).toContain("III (3)");
+
+      // Rarity
+      expect(el.textContent).toContain("Rare");
+
+      // Anvil cost
+      expect(el.textContent).toContain("Anvil cost");
+      expect(el.textContent).toContain("4");
+
+      // Slot
+      expect(el.textContent).toContain("Slot");
+      expect(el.textContent).toContain("Main hand");
+
+      // Cost ranges
+      expect(el.textContent).toContain("Modified enchantment level");
+      expect(el.textContent).toContain("I: 15–65, II: 24–74, III: 33–83");
+
+      // Incompatible with Silk Touch, and Fortune itself is excluded
+      const conflictRow = requireItem(
+        Array.from(el.querySelectorAll(".enchant-row")).find((r) =>
+          r.textContent.includes("Incompatible with"),
+        ),
+        "Incompatible row",
+      );
+      const conflictLinks = Array.from(conflictRow.querySelectorAll(".entity-link"));
+      expect(conflictLinks).toHaveLength(1);
+      expect(conflictLinks[0]?.textContent).toContain("Silk Touch");
+      expect(conflictRow.textContent).not.toContain("Fortune");
+
+      // Applicable items: single row since primaryItems is omitted
+      expect(el.textContent).toContain("Applicable items");
+      expect(el.textContent).not.toContain("Primary items");
+      expect(el.textContent).not.toContain("Supported items");
+
+      const applicable = requireItem(
+        el.querySelector(".enchant-applicable"),
+        "applicable items group",
+      );
+      // Every item link is drawn directly, with no disclosure to open first.
+      expect(applicable.querySelector("details")).toBeNull();
+      expect(applicable.querySelector(".enchant-items-group")?.textContent).toBe(
+        "Mining loot (28 items)",
+      );
+      expect(applicable.querySelectorAll(".entity-link")).toHaveLength(28);
+
+      // No Properties row (since not treasure, not curse, tradeable)
+      expect(el.querySelector(".enchant-flags")).toBeNull();
+    });
+
+    it("renders Sharpness with both primary and supported items and multiple conflicts", () => {
+      const section = enchantSectionOf("minecraft:sharpness");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Sharpness EnchantInfo element");
+
+      // Max level: V (5)
+      expect(el.textContent).toContain("V (5)");
+      expect(el.textContent).toContain("Common");
+
+      // 5 cost ranges
+      expect(el.textContent).toContain("I: 1–21, II: 12–32, III: 23–43, IV: 34–54, V: 45–65");
+
+      // Primary and Supported items both present
+      const rows = Array.from(el.querySelectorAll(".enchant-row"));
+      const primaryRow = requireItem(
+        rows.find((r) => r.textContent.includes("Primary items")),
+        "Primary items row",
+      );
+      const supportedRow = requireItem(
+        rows.find((r) => r.textContent.includes("Supported items")),
+        "Supported items row",
+      );
+
+      expect(primaryRow.querySelector(".enchant-items-group")?.textContent).toBe(
+        "Melee weapon (14 items)",
+      );
+      expect(supportedRow.querySelector(".enchant-items-group")?.textContent).toBe(
+        "Sharp weapon (21 items)",
+      );
+      expect(primaryRow.querySelectorAll(".entity-link")).toHaveLength(14);
+      expect(supportedRow.querySelectorAll(".entity-link")).toHaveLength(21);
+
+      // Conflicts: Bane of Arthropods, Breach, Density, Impaling, Smite (sharpness itself excluded)
+      const conflictRow = requireItem(
+        rows.find((r) => r.textContent.includes("Incompatible with")),
+        "Incompatible row",
+      );
+      const conflictLinks = Array.from(conflictRow.querySelectorAll(".entity-link"));
+      expect(conflictLinks).toHaveLength(5);
+      const conflictNames = conflictLinks.map((l) => l.textContent);
+      expect(conflictNames.some((n) => n.includes("Smite"))).toBe(true);
+      expect(conflictNames.some((n) => n.includes("Bane of Arthropods"))).toBe(true);
+      expect(conflictRow.textContent).not.toContain("Sharpness");
+    });
+
+    it("draws every item of both Thorns groups, with the tag path spelled as a label", () => {
+      const section = enchantSectionOf("minecraft:thorns");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Thorns EnchantInfo element");
+
+      const groups = Array.from(el.querySelectorAll(".enchant-applicable"));
+      expect(groups).toHaveLength(2);
+      // No disclosure anywhere: every link is visible without a click.
+      expect(el.querySelector("details")).toBeNull();
+
+      expect(groups[0]?.querySelector(".enchant-items-group")?.textContent).toBe(
+        "Chest armor (7 items)",
+      );
+      expect(groups[0]?.querySelectorAll(".entity-link")).toHaveLength(7);
+      expect(groups[1]?.querySelector(".enchant-items-group")?.textContent).toBe(
+        "Armor (29 items)",
+      );
+      expect(groups[1]?.querySelectorAll(".entity-link")).toHaveLength(29);
+    });
+
+    it("renders Flame with max level 1 as roman numeral I without numeric suffix, single item", () => {
+      const section = enchantSectionOf("minecraft:flame");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Flame EnchantInfo element");
+
+      // Max level: I (no "(1)")
+      const maxLvlRow = requireItem(
+        Array.from(el.querySelectorAll(".enchant-row")).find((r) =>
+          r.textContent.includes("Max level"),
+        ),
+        "Max level row",
+      );
+      expect(maxLvlRow.querySelector(".enchant-value")?.textContent).toBe("I");
+
+      // Single cost range rendered without level prefix
+      const costRow = requireItem(
+        Array.from(el.querySelectorAll(".enchant-row")).find((r) =>
+          r.textContent.includes("Modified enchantment level"),
+        ),
+        "Cost row",
+      );
+      expect(costRow.querySelector(".enchant-value")?.textContent).toBe("20–50");
+
+      // Supported items: 1 item -> "1 item" singular, drawn as a link directly
+      const applicable = requireItem(
+        el.querySelector(".enchant-applicable"),
+        "applicable items group",
+      );
+      expect(applicable.querySelector(".enchant-items-group")?.textContent).toBe("Bow (1 item)");
+      expect(applicable.querySelectorAll(".entity-link")).toHaveLength(1);
+
+      // No incompatible row
+      expect(el.textContent).not.toContain("Incompatible with");
+    });
+
+    it("renders Mending with treasure badge and single cost range", () => {
+      const section = enchantSectionOf("minecraft:mending");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Mending EnchantInfo element");
+
+      // Treasure badge
+      const treasureBadge = requireItem(el.querySelector(".badge-treasure"), "treasure badge");
+      expect(treasureBadge.textContent).toBe("Treasure");
+      expect(el.querySelector(".badge-curse")).toBeNull();
+
+      // Slot: Any
+      expect(el.textContent).toContain("Any");
+
+      // 1 cost range
+      expect(el.textContent).toContain("25–75");
+    });
+
+    it("renders Curse of Vanishing with Curse and Treasure badges", () => {
+      const section = enchantSectionOf("minecraft:vanishing_curse");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Vanishing Curse element");
+
+      const curseBadge = requireItem(el.querySelector(".badge-curse"), "curse badge");
+      expect(curseBadge.textContent).toBe("Curse");
+
+      const treasureBadge = requireItem(el.querySelector(".badge-treasure"), "treasure badge");
+      expect(treasureBadge.textContent).toBe("Treasure");
+    });
+
+    it("renders Wind Burst with Not tradeable and Treasure badges", () => {
+      const section = enchantSectionOf("minecraft:wind_burst");
+      const el = requireItem(renderEnchantInfo(section, ctx), "Wind Burst element");
+
+      const untradeableBadge = requireItem(
+        el.querySelector(".badge-untradeable"),
+        "untradeable badge",
+      );
+      expect(untradeableBadge.textContent).toBe("Not tradeable");
+
+      const treasureBadge = requireItem(el.querySelector(".badge-treasure"), "treasure badge");
+      expect(treasureBadge.textContent).toBe("Treasure");
     });
   });
 });

@@ -26,7 +26,7 @@ export type EntityKind =
  */
 export type SourceTier = "A" | "B" | "C";
 /**
- * One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo` and `harvestInfo` carry real, closed fields. The other five are still open payloads; each one's own description names the later phase that fills it in.
+ * One render block. The `type` field selects the renderer. Seven members -- `statBlock`, `spawnInfo`, `dropTable`, `recipeTree`, `tradeTable`, `advancementInfo`, `breedingInfo` -- plus `foodInfo`, `harvestInfo`, `generationInfo`, and `enchantInfo` carry real, closed fields. The other three (`obtainList`, `chestLoot`, `linkList`) are still open payloads; each one's own description names the later phase that fills it in.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "section".
@@ -68,6 +68,20 @@ export type HarvestTier = "wooden" | "stone" | "iron" | "diamond";
  * via the `definition` "harvestGate".
  */
 export type HarvestGate = "silk_touch" | "shears";
+/**
+ * Rarity of an enchantment derived from its weight.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "enchantRarity".
+ */
+export type EnchantRarity = "common" | "uncommon" | "rare" | "very_rare";
+/**
+ * Equipment slot where an enchantment is active.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "enchantSlot".
+ */
+export type EnchantSlot = "any" | "armor" | "feet" | "hand" | "head" | "legs" | "mainhand" | "offhand";
 
 /**
  * One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.
@@ -534,14 +548,68 @@ export interface ChestLoot {
   [k: string]: unknown;
 }
 /**
- * Levels, applicable items, costs, and the exclusive set. The payload of this section arrives in Phase 6c.
+ * Levels, applicable items, costs, and the exclusive set.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "enchantInfo".
  */
 export interface EnchantInfo {
   type: "EnchantInfo";
-  [k: string]: unknown;
+  /**
+   * Maximum level of the enchantment (1 to 5).
+   */
+  maxLevel: number;
+  /**
+   * Weight of the enchantment in the table selection pool (10, 5, 2, 1).
+   */
+  weight: number;
+  rarity: EnchantRarity;
+  /**
+   * Base anvil modification cost multiplier (1, 2, 4, 8).
+   */
+  anvilCost: number;
+  /**
+   * Equipment slots where this enchantment applies.
+   */
+  slots: EnchantSlot[];
+  /**
+   * Modified enchantment level ranges for each level from 1 to maxLevel.
+   */
+  costRanges: IntegerRange[];
+  supportedItems: ApplicableItems;
+  primaryItems?: ApplicableItems;
+  /**
+   * Enchantments that cannot be combined with this one.
+   */
+  exclusiveSet: EntityRef[];
+  /**
+   * Whether this is a treasure enchantment, unavailable in the enchanting table.
+   */
+  treasure: boolean;
+  /**
+   * Whether this enchantment is a curse.
+   */
+  curse: boolean;
+  /**
+   * Whether this enchantment can be traded from librarians.
+   */
+  tradeable: boolean;
+}
+/**
+ * The group of items an enchantment can be applied to.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "applicableItems".
+ */
+export interface ApplicableItems {
+  /**
+   * The item tag or group name.
+   */
+  group: string;
+  /**
+   * Every item accepted by this group.
+   */
+  items: EntityRef[];
 }
 /**
  * Where a block, a structure, or a biome generates. Carries one scope per dimension the block generates in, because the band, the attempt count and the biome list are all facts about one dimension: gravel and the two mushrooms generate in the overworld and the nether at once.

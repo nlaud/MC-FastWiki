@@ -219,6 +219,7 @@ from pipeline.enrich.resource_location import (
     alternative_registry_id,
 )
 from pipeline.enrich.sprite import SpriteIndex
+from pipeline.extract.enchantment import EnchantIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
 from pipeline.extract.generation import BlockGeneration
@@ -229,6 +230,7 @@ from pipeline.normalize.aliases import AliasStrength, generate_aliases
 from pipeline.normalize.curated import CuratedData, StaleDocument
 from pipeline.normalize.entity import (
     AdvancementInfo,
+    ApplicableItems,
     BreedingInfo,
     BreedingItem,
     DamageValue,
@@ -239,6 +241,7 @@ from pipeline.normalize.entity import (
     EffectLink,
     EffectSource,
     EffectSources,
+    EnchantInfo,
     Entity,
     EntityDraft,
     EntityKind,
@@ -1414,6 +1417,7 @@ def merge_entities(
     block_drops: Mapping[str, Sequence[HarvestDrop]] | None = None,
     effect_index: enrich_effect.EffectIndex | None = None,
     generation_index: Mapping[str, BlockGeneration] | None = None,
+    enchant_index: EnchantIndex | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1999,6 +2003,97 @@ def merge_entities(
                 continue
 
             target_draft.add_section_first(effect_section, SourceTier.B)
+
+    if enchant_index is not None:
+        def _resolve_item_refs(
+            item_ids: Sequence[str], *, enchant_id: str
+        ) -> tuple[EntityRef, ...]:
+            refs: list[EntityRef] = []
+            for item_id in item_ids:
+                item_draft = drafts.get(item_id)
+                if item_draft is not None:
+                    refs.append(EntityRef(id=item_id, name=item_draft.name))
+                else:
+                    unplaced.append(
+                        UnplacedRow(
+                            table="enchantment",
+                            subject=item_id,
+                            reason=(
+                                f"item {item_id} in applicability group of {enchant_id} "
+                                "is not an enumerated entity"
+                            ),
+                        )
+                    )
+                    refs.append(EntityRef(id=item_id, name=item_id))
+            return tuple(sorted(refs, key=lambda r: r.name))
+
+        for enchant_id, enchant_facts in enchant_index.items():
+            enchant_draft = drafts.get(enchant_id)
+            if enchant_draft is None:
+                unplaced.append(
+                    UnplacedRow(
+                        table="enchantment",
+                        subject=enchant_id,
+                        reason=(
+                            "the enchantment is defined in mcmeta and this build does not "
+                            "enumerate it as an entity"
+                        ),
+                    )
+                )
+                continue
+
+            supported_refs = _resolve_item_refs(
+                enchant_facts.supported_items, enchant_id=enchant_id
+            )
+            primary_refs = (
+                _resolve_item_refs(enchant_facts.primary_items, enchant_id=enchant_id)
+                if enchant_facts.primary_items is not None
+                else None
+            )
+
+            exclusive_refs: list[EntityRef] = []
+            for conflict_id in enchant_facts.exclusive_set:
+                conflict_draft = drafts.get(conflict_id)
+                if conflict_draft is not None:
+                    exclusive_refs.append(EntityRef(id=conflict_id, name=conflict_draft.name))
+                else:
+                    unplaced.append(
+                        UnplacedRow(
+                            table="enchantment",
+                            subject=conflict_id,
+                            reason=(
+                                f"conflicting enchantment {conflict_id} of {enchant_id} "
+                                "is not an enumerated entity"
+                            ),
+                        )
+                    )
+                    exclusive_refs.append(EntityRef(id=conflict_id, name=conflict_id))
+
+            enchant_section = EnchantInfo(
+                max_level=enchant_facts.max_level,
+                weight=enchant_facts.weight,
+                rarity=enchant_facts.rarity,
+                anvil_cost=enchant_facts.anvil_cost,
+                slots=enchant_facts.slots,
+                cost_ranges=enchant_facts.cost_ranges,
+                supported_items=ApplicableItems(
+                    group=enchant_facts.supported_items_group,
+                    items=supported_refs,
+                ),
+                primary_items=(
+                    ApplicableItems(
+                        group=enchant_facts.primary_items_group,
+                        items=primary_refs,
+                    )
+                    if enchant_facts.primary_items_group is not None and primary_refs is not None
+                    else None
+                ),
+                exclusive_set=tuple(sorted(exclusive_refs, key=lambda r: r.name)),
+                treasure=enchant_facts.treasure,
+                curse=enchant_facts.curse,
+                tradeable=enchant_facts.tradeable,
+            )
+            enchant_draft.add_section(enchant_section, SourceTier.A)
 
     # --- Curated overrides: the last field-level write before `.build()` ---
 

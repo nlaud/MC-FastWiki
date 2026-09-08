@@ -303,6 +303,18 @@ def _build_fixtures() -> dict[str, bytes]:
         }
     ).encode("utf-8")
 
+    enchantment_json = json.dumps(
+        {
+            "max_level": 1,
+            "weight": 10,
+            "anvil_cost": 1,
+            "slots": ["mainhand"],
+            "min_cost": {"base": 1, "per_level_above_first": 0},
+            "max_cost": {"base": 10, "per_level_above_first": 0},
+            "supported_items": ["minecraft:stick"],
+        }
+    ).encode("utf-8")
+
     data_url = MCMETA_ARCHIVE_URL.format(repository=MCMETA_REPOSITORY, commit_sha=DATA_SHA)
     fixtures[data_url] = _tar_gz(
         {
@@ -310,6 +322,7 @@ def _build_fixtures() -> dict[str, bytes]:
             "data/minecraft/loot_table/entities/creeper.json": b"{}",
             "data/minecraft/recipe/dummy.json": recipe_json,
             "data/minecraft/loot_table/blocks/dummy.json": block_loot_json,
+            "data/minecraft/enchantment/dummy.json": enchantment_json,
             "data/minecraft/tags/block/mineable/pickaxe.json": b'{"values":["minecraft:stone"]}',
             "data/minecraft/tags/block/mineable/axe.json": b'{"values":[]}',
             "data/minecraft/tags/block/mineable/shovel.json": b'{"values":[]}',

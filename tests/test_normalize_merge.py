@@ -35,6 +35,7 @@ from pipeline.enrich.resource_location import JoinTable, parse_resource_location
 from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
+from pipeline.extract.enchantment import EnchantIndex, EnchantmentFacts
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.fetch.extracts import ExtractReport, PageExtract
@@ -42,9 +43,11 @@ from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
 from pipeline.normalize.entity import (
     BreedingInfo,
+    EnchantInfo,
     EntityKind,
     HarvestDrop,
     HarvestInfo,
+    IntegerRange,
     SourceTier,
 )
 from pipeline.normalize.merge import (
@@ -1550,3 +1553,123 @@ def test_an_unknown_potion_variant_does_not_invent_a_reference() -> None:
     """A qualifier with no variant suffix resolves to nothing rather than guessing."""
     assert _potion_variant_ref("Potion of Swiftness", "(nonsense)", _POTION_DRAFTS) is None
     assert _potion_variant_ref("Potion of Nothing", None, _POTION_DRAFTS) is None
+
+
+def test_enchant_info_attached_to_enchantment() -> None:
+    test_registries = {
+        "entity_type": ["creeper"],
+        "block": [],
+        "item": ["diamond_pickaxe"],
+        "mob_effect": [],
+        "worldgen/biome": [],
+        "enchantment": ["fortune", "silk_touch"],
+    }
+    test_join_table = parse_resource_locations(
+        [
+            rl_row("Creeper", "creeper", "entity"),
+            rl_row("Fortune", "fortune", "enchantment"),
+            rl_row("Silk Touch", "silk_touch", "enchantment"),
+            rl_row("Diamond Pickaxe", "diamond_pickaxe", "item"),
+        ]
+    )
+    enchant_index = EnchantIndex(
+        by_id={
+            "minecraft:fortune": EnchantmentFacts(
+                id="minecraft:fortune",
+                max_level=3,
+                anvil_cost=4,
+                weight=2,
+                rarity="rare",
+                slots=("mainhand",),
+                cost_ranges=(
+                    IntegerRange(minimum=15, maximum=65),
+                    IntegerRange(minimum=24, maximum=74),
+                    IntegerRange(minimum=33, maximum=83),
+                ),
+                supported_items_group="enchantable/mining_loot",
+                supported_items=("minecraft:diamond_pickaxe",),
+                primary_items_group=None,
+                primary_items=None,
+                exclusive_set=("minecraft:silk_touch",),
+                treasure=False,
+                curse=False,
+                tradeable=True,
+            )
+        }
+    )
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=(),
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        enchant_index=enchant_index,
+    )
+    fortune = next(e for e in result.entities if e.id == "minecraft:fortune")
+    assert len(fortune.sections) == 1
+    sec = fortune.sections[0]
+    assert isinstance(sec, EnchantInfo)
+    assert sec.max_level == 3
+    assert sec.rarity == "rare"
+    assert sec.anvil_cost == 4
+    assert len(sec.supported_items.items) == 1
+    assert sec.supported_items.items[0].id == "minecraft:diamond_pickaxe"
+    assert sec.supported_items.items[0].name == "Diamond Pickaxe"
+    assert len(sec.exclusive_set) == 1
+    assert sec.exclusive_set[0].id == "minecraft:silk_touch"
+    assert sec.exclusive_set[0].name == "Silk Touch"
+    assert fortune.source_tiers["sections.EnchantInfo"] == SourceTier.A
+
+
+def test_enchant_info_unplaced_recorded() -> None:
+    test_registries = {
+        "entity_type": ["creeper"],
+        "block": [],
+        "item": [],
+        "mob_effect": [],
+        "worldgen/biome": [],
+        "enchantment": [],
+    }
+    test_join_table = parse_resource_locations([rl_row("Creeper", "creeper", "entity")])
+    enchant_index = EnchantIndex(
+        by_id={
+            "minecraft:ghost_enchant": EnchantmentFacts(
+                id="minecraft:ghost_enchant",
+                max_level=1,
+                anvil_cost=1,
+                weight=10,
+                rarity="common",
+                slots=("any",),
+                cost_ranges=(IntegerRange(minimum=1, maximum=10),),
+                supported_items_group="group",
+                supported_items=("minecraft:ghost_item",),
+                exclusive_set=("minecraft:ghost_conflict",),
+            )
+        }
+    )
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=(),
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        enchant_index=enchant_index,
+    )
+    unplaced = [r for r in result.report.unplaced if r.table == "enchantment"]
+    assert len(unplaced) == 1
+    assert unplaced[0].subject == "minecraft:ghost_enchant"
+

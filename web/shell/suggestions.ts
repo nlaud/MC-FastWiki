@@ -1,4 +1,5 @@
 import { createIconElement } from "../render/icon.js";
+import { entryIconKey } from "../render/entry-icon.js";
 import type { IndexEntry } from "../types/index.js";
 
 export interface SuggestionsProps {
@@ -34,7 +35,7 @@ export function renderSuggestions(container: HTMLElement, props: SuggestionsProp
     const left = document.createElement("div");
     left.className = "suggestion-left";
 
-    const icon = createIconElement(entry.i);
+    const icon = createIconElement(entryIconKey(entry));
     const name = document.createElement("span");
     name.className = "suggestion-name";
     name.textContent = entry.n;

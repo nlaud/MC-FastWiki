@@ -3,6 +3,7 @@ import type {
   BreedingInfo,
   DropTable,
   EffectSources,
+  EnchantInfo,
   Entity,
   FoodInfo,
   GenerationInfo,
@@ -17,6 +18,7 @@ import { renderAdvancementInfo } from "./advancement-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
 import { renderDropTable } from "./drop-table.js";
 import { renderEffectSources } from "./effect-sources.js";
+import { renderEnchantInfo } from "./enchant-info.js";
 import { renderFoodInfo } from "./food-info.js";
 import { renderGenerationInfo } from "./generation-info.js";
 import { renderHarvestInfo } from "./harvest-info.js";
@@ -42,6 +44,7 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   RecipeTree: (s, ctx, entity) => renderRecipeTree(s as RecipeTree, ctx, entity),
   EffectSources: (s, ctx) => renderEffectSources(s as EffectSources, ctx),
   GenerationInfo: (s, ctx) => renderGenerationInfo(s as GenerationInfo, ctx),
+  EnchantInfo: (s, ctx) => renderEnchantInfo(s as EnchantInfo, ctx),
 };
 
 /**

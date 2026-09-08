@@ -154,6 +154,7 @@ from pipeline.enrich.spawn_table import fetch_spawn_tables
 from pipeline.enrich.sprite import fetch_sprite_index
 from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
+from pipeline.extract.enchantment import extract_enchantments
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
 from pipeline.extract.food import extract_food
 from pipeline.extract.generation import (
@@ -573,6 +574,7 @@ def run_build(
         data_tag,
         groups=(
             "advancement",
+            "enchantment",
             "loot_table",
             "recipe",
             "tags",
@@ -587,12 +589,14 @@ def run_build(
     classification = classify_entity_types(files, registries)
     harvest_index = extract_block_harvest(files)
     gen_result = extract_generation(files)
+    enchant_index = extract_enchantments(files)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
         f"{len(food_index)} items that can be eaten, "
         f"{len(harvest_index)} blocks with harvest requirements, "
-        f"{len(gen_result.blocks)} blocks with generation facts"
+        f"{len(gen_result.blocks)} blocks with generation facts, "
+        f"{len(enchant_index)} enchantments"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
@@ -758,6 +762,7 @@ def run_build(
         block_drops=block_drops_from_producers(loot_result.producers),
         effect_index=effect_index,
         generation_index=gen_result.blocks,
+        enchant_index=enchant_index,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 
