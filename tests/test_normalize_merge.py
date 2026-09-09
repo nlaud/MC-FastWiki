@@ -31,6 +31,7 @@ from pipeline.enrich.droptable import DropIndex, LootingDrop, MobDrop
 from pipeline.enrich.droptable import Ratio as DropRatio
 from pipeline.enrich.infobox import EntityInfobox, HealthValue, InfoboxReport
 from pipeline.enrich.infobox import Measure as InfoboxMeasure
+from pipeline.enrich.profession_infobox import ProfessionInfobox
 from pipeline.enrich.resource_location import JoinTable, parse_resource_locations
 from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
@@ -48,7 +49,9 @@ from pipeline.normalize.entity import (
     HarvestDrop,
     HarvestInfo,
     IntegerRange,
+    ProfessionInfo,
     SourceTier,
+    TradeTable,
 )
 from pipeline.normalize.merge import (
     MergeResult,
@@ -158,51 +161,49 @@ ENTITY_CLASSIFICATION = EntityClassification(
 
 ADVANCEMENT_IDS = ("story/root", "story/mine_stone", "adventure/nothing_here")
 
-JOIN_TABLE = parse_resource_locations(
-    [
-        rl_row("Creeper", "creeper", "entity"),
-        rl_row("Chicken", "chicken", "entity"),
-        rl_row("Raw Chicken", "chicken", "item"),
-        rl_row("Gunpowder", "gunpowder", "item"),
-        rl_row("Emerald", "emerald", "item"),
-        rl_row("Jungle", "jungle", "biome"),
-        rl_row("Widget", "widget_a", "item"),
-        rl_row("Widget", "widget_b", "item"),
-        # An `item` row and no `entity` row, for an ID that sits in both
-        # registries. The wiki documents boats as items on one `Boat` page.
-        rl_row("Acacia Boat", "acacia_boat", "item"),
-        # Both registries carry a row, and only the item's row names the ID.
-        # `entity_type` has precedence; the name match must beat it.
-        rl_row("Ender Pearl", "ender_pearl", "item"),
-        rl_row("Thrown Ender Pearl", "ender_pearl", "entity"),
-        rl_row("Wheat Crops", "wheat", "block"),
-        rl_row("Wheat", "wheat", "item"),
-        # Two names for one ID, neither of which normalises to `jigsaw` and
-        # neither of which is shared with another ID. Every tie-break in
-        # `_own_row` declines this on purpose, so the entity has no page.
-        rl_row("Jigsaw Block", "jigsaw", "item"),
-        rl_row("Jigsaw structure Jigsaw", "jigsaw", "item"),
-        # poplar_boat and mystery_thing carry no row at all -- the D1 shape.
-        # Every potion page shares one registry_id, `minecraft:potion` --
-        # this is the one row for `awkward`; `long_weakness` gets none.
-        rl_row("Awkward Potion", "potion", "item"),
-    ]
-)
+JOIN_ROWS = [
+    rl_row("Creeper", "creeper", "entity"),
+    rl_row("Chicken", "chicken", "entity"),
+    rl_row("Raw Chicken", "chicken", "item"),
+    rl_row("Gunpowder", "gunpowder", "item"),
+    rl_row("Emerald", "emerald", "item"),
+    rl_row("Jungle", "jungle", "biome"),
+    rl_row("Widget", "widget_a", "item"),
+    rl_row("Widget", "widget_b", "item"),
+    # An `item` row and no `entity` row, for an ID that sits in both
+    # registries. The wiki documents boats as items on one `Boat` page.
+    rl_row("Acacia Boat", "acacia_boat", "item"),
+    # Both registries carry a row, and only the item's row names the ID.
+    # `entity_type` has precedence; the name match must beat it.
+    rl_row("Ender Pearl", "ender_pearl", "item"),
+    rl_row("Thrown Ender Pearl", "ender_pearl", "entity"),
+    rl_row("Wheat Crops", "wheat", "block"),
+    rl_row("Wheat", "wheat", "item"),
+    # Two names for one ID, neither of which normalises to `jigsaw` and
+    # neither of which is shared with another ID. Every tie-break in
+    # `_own_row` declines this on purpose, so the entity has no page.
+    rl_row("Jigsaw Block", "jigsaw", "item"),
+    rl_row("Jigsaw structure Jigsaw", "jigsaw", "item"),
+    # poplar_boat and mystery_thing carry no row at all -- the D1 shape.
+    # Every potion page shares one registry_id, `minecraft:potion` --
+    # this is the one row for `awkward`; `long_weakness` gets none.
+    rl_row("Awkward Potion", "potion", "item"),
+]
+JOIN_TABLE = parse_resource_locations(JOIN_ROWS)
 
-SPRITE_INDEX = parse_sprite_files(
-    [
-        sprite_row("EntitySprite", "creeper"),
-        sprite_row("EntitySprite", "chicken"),
-        sprite_row("InvSprite", "Gunpowder"),
-        sprite_row("BiomeSprite", "jungle"),
-        # The id route, which needs no wiki row at all. This is what gave
-        # `acacia_boat` a Tier B field while its name lookup was failing.
-        sprite_row("EntitySprite", "acacia-boat"),
-        # emerald and poplar_boat get no sprite at all -- both should be
-        # reported missing, since `item` is not exempt. `efficiency` also
-        # gets none, and must NOT be reported, since `enchantment` is exempt.
-    ]
-)
+SPRITE_ROWS = [
+    sprite_row("EntitySprite", "creeper"),
+    sprite_row("EntitySprite", "chicken"),
+    sprite_row("InvSprite", "Gunpowder"),
+    sprite_row("BiomeSprite", "jungle"),
+    # The id route, which needs no wiki row at all. This is what gave
+    # `acacia_boat` a Tier B field while its name lookup was failing.
+    sprite_row("EntitySprite", "acacia-boat"),
+    # emerald and poplar_boat get no sprite at all -- both should be
+    # reported missing, since `item` is not exempt. `efficiency` also
+    # gets none, and must NOT be reported, since `enchantment` is exempt.
+]
+SPRITE_INDEX = parse_sprite_files(SPRITE_ROWS)
 
 INFOBOX_REPORT = InfoboxReport.build(
     [
@@ -1672,4 +1673,114 @@ def test_enchant_info_unplaced_recorded() -> None:
     unplaced = [r for r in result.report.unplaced if r.table == "enchantment"]
     assert len(unplaced) == 1
     assert unplaced[0].subject == "minecraft:ghost_enchant"
+
+
+def test_profession_entities_merged_with_workstation_and_trades() -> None:
+    test_registries = dict(REGISTRIES)
+    test_registries["villager_profession"] = ["librarian"]
+    test_registries["block"] = [*REGISTRIES["block"], "lectern"]
+
+    extra_rows = [
+        rl_row("Lectern", "lectern", "block"),
+        rl_row("Librarian", "librarian", "entity"),
+    ]
+    test_join_table = parse_resource_locations([*JOIN_ROWS, *extra_rows])
+    test_sprites = parse_sprite_files([*SPRITE_ROWS, sprite_row("EntitySprite", "librarian")])
+    infoboxes = {"Librarian": ProfessionInfobox(page="Librarian", workstation="Lectern")}
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=ADVANCEMENT_IDS,
+        join_table=test_join_table,
+        sprite_index=test_sprites,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        profession_infoboxes=infoboxes,
+    )
+
+    librarian = result.by_id["minecraft:librarian"]
+    assert librarian.kind is EntityKind.PROFESSION
+    assert librarian.name == "Librarian"
+    assert librarian.wiki_url == "https://minecraft.wiki/w/Librarian"
+    assert librarian.icon == "EntitySprite:librarian"
+
+    prof_info = next(s for s in librarian.sections if isinstance(s, ProfessionInfo))
+    assert prof_info.trade_count == 3
+    assert prof_info.workstation is not None
+    assert prof_info.workstation.id == "minecraft:lectern"
+    assert prof_info.workstation.name == "Lectern"
+
+    trade_table = next(s for s in librarian.sections if isinstance(s, TradeTable))
+    assert len(trade_table.trades) == 3
+    assert all(t.profession == "Librarian" for t in trade_table.trades)
+    assert all(
+        t.profession_ref is not None and t.profession_ref.id == "minecraft:librarian"
+        for t in trade_table.trades
+    )
+
+    emerald = result.by_id["minecraft:emerald"]
+    emerald_trade_table = next(s for s in emerald.sections if isinstance(s, TradeTable))
+    assert emerald_trade_table.trades[0].profession_ref is not None
+    assert emerald_trade_table.trades[0].profession_ref.id == "minecraft:librarian"
+    assert emerald_trade_table.trades[0].profession_ref.name == "Librarian"
+
+
+def test_wandering_trader_trades_attached_to_mob() -> None:
+    test_registries = dict(REGISTRIES)
+    test_registries["entity_type"] = [*REGISTRIES["entity_type"], "wandering_trader"]
+
+    extra_rows = [
+        rl_row("Wandering Trader", "wandering_trader", "entity"),
+    ]
+    test_join_table = parse_resource_locations([*JOIN_ROWS, *extra_rows])
+    classification = EntityClassification(
+        by_path=dict(ENTITY_CLASSIFICATION.by_path, wandering_trader=EntityClass.SPAWN_EGG)
+    )
+    wt_trade = WikiTrade(
+        profession="Wandering Trader",
+        page="Wandering Trader",
+        wiki_url="https://minecraft.wiki/w/Wandering_Trader",
+        level="",
+        wanted=(TradeItem(item="Emerald", quantity=WikiIntegerRange(minimum=1, maximum=1)),),
+        given=TradeItem(item="Wheat", quantity=WikiIntegerRange(minimum=1, maximum=1)),
+        java_probability=Probability(text="100%", low=1.0, high=1.0),
+        max_trades=None,
+        villager_xp=None,
+        price_multiplier=None,
+    )
+    trade_index = TradeIndex.build([wt_trade])
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=ADVANCEMENT_IDS,
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=trade_index,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=classification,
+    )
+
+    wt = result.by_id["minecraft:wandering_trader"]
+    assert wt.kind is EntityKind.MOB
+    trade_table = next(s for s in wt.sections if isinstance(s, TradeTable))
+    assert len(trade_table.trades) == 1
+    assert trade_table.trades[0].profession == "Wandering Trader"
+    # The trader is not a villager profession, so its trades live on the mob
+    # page rather than on a profession entity. It is still the seller a trade
+    # group is named after, so `profession_ref` names it, and every item page
+    # that sells what it sells gets a link instead of the one dead heading in a
+    # list of fourteen. The renderer suppresses the heading on this page alone,
+    # where it would link back to the page being read.
+    wt_ref = trade_table.trades[0].profession_ref
+    assert wt_ref is not None
+    assert wt_ref.id == "minecraft:wandering_trader"
 

@@ -17,7 +17,17 @@ export type EntityId = string;
  * via the `definition` "entityKind".
  */
 export type EntityKind =
-  "mob" | "item" | "block" | "effect" | "advancement" | "enchantment" | "structure" | "biome" | "collection" | "entity";
+  | "mob"
+  | "item"
+  | "block"
+  | "effect"
+  | "advancement"
+  | "enchantment"
+  | "structure"
+  | "biome"
+  | "collection"
+  | "entity"
+  | "profession";
 /**
  * The tier that produced one field. A is vanilla game data from mcmeta. B is the Minecraft Wiki. C is a curated override. A later tier wins.
  *
@@ -46,7 +56,8 @@ export type Section =
   | ChestLoot
   | EnchantInfo
   | GenerationInfo
-  | LinkList;
+  | LinkList
+  | ProfessionInfo;
 /**
  * The tool that breaks a block, from the mineable tags.
  *
@@ -502,7 +513,7 @@ export interface AdvancementInfo {
   background?: string;
 }
 /**
- * Villager and wandering trader trades, grouped by profession and level, mirroring `pipeline.enrich.trade.TradeIndex`. `professionRef` is expected to stay absent for now: villager profession entities arrive in Phase 6c, so there is nothing yet for the merge to link a profession name to. Only the Java probability is carried into `javaProbability`; `bedrock_probability` is dropped upstream in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.
+ * Villager and wandering trader trades, grouped by profession and level, mirroring `pipeline.enrich.trade.TradeIndex`. Only the Java probability is carried into `javaProbability`; `bedrock_probability` is dropped upstream in `pipeline.enrich.trade`, per non-negotiable 1 of CLAUDE.md.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "tradeTable".
@@ -721,4 +732,15 @@ export interface VeinInfo {
 export interface LinkList {
   type: "LinkList";
   [k: string]: unknown;
+}
+/**
+ * Villager profession details: workstation block and trade count.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "professionInfo".
+ */
+export interface ProfessionInfo {
+  type: "ProfessionInfo";
+  workstation?: EntityRef;
+  tradeCount: number;
 }

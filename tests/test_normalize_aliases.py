@@ -386,3 +386,30 @@ def test_a_candidate_that_matches_nothing_is_dropped() -> None:
 def test_an_empty_query_matches_nothing() -> None:
     ranked = rank_candidates("", (RankingCandidate(id="minecraft:a", name="Stone"),))
     assert ranked == ()
+
+
+def test_profession_generates_villager_prefix_and_suffix() -> None:
+    aliases = dict(
+        generate_aliases(
+            entity_id="minecraft:librarian",
+            kind=EntityKind.PROFESSION,
+            name="Librarian",
+        )
+    )
+    assert aliases["villager librarian"] == AliasStrength.FULL_PHRASE
+    assert aliases["librarian villager"] == AliasStrength.FULL_PHRASE
+
+
+def test_profession_with_workstation_generates_cross_link_aliases() -> None:
+    aliases = dict(
+        generate_aliases(
+            entity_id="minecraft:librarian",
+            kind=EntityKind.PROFESSION,
+            name="Librarian",
+            workstation="minecraft:lectern",
+        )
+    )
+    assert aliases["villager librarian"] == AliasStrength.FULL_PHRASE
+    assert aliases["librarian villager"] == AliasStrength.FULL_PHRASE
+    assert aliases["lectern villager"] == AliasStrength.CROSS_LINK
+    assert aliases["villager lectern"] == AliasStrength.CROSS_LINK

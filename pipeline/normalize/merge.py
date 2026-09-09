@@ -211,6 +211,7 @@ from pipeline.enrich import effect as enrich_effect
 from pipeline.enrich import infobox as enrich_infobox
 from pipeline.enrich import spawn_table as enrich_spawn_table
 from pipeline.enrich import trade as enrich_trade
+from pipeline.enrich.profession_infobox import ProfessionInfobox
 from pipeline.enrich.resource_location import (
     NAMESPACE,
     JoinTable,
@@ -224,6 +225,7 @@ from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
 from pipeline.extract.generation import BlockGeneration
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
+from pipeline.extract.profession import ProfessionIndex, extract_professions
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.aliases import AliasStrength, generate_aliases
@@ -260,6 +262,7 @@ from pipeline.normalize.entity import (
     LabelledValue,
     LootingDrop,
     Measure,
+    ProfessionInfo,
     Ratio,
     Section,
     SizeValue,
@@ -323,6 +326,15 @@ _REGISTRY_KIND: Mapping[str, EntityKind] = {
     "worldgen/biome": EntityKind.BIOME,
     "enchantment": EntityKind.ENCHANTMENT,
 }
+
+
+# The wandering trader, named once for the three places that need it. The
+# `trade` bucket groups its 97 trades under a `profession` column, but the
+# `villager_profession` registry does not list it, so it is a mob here and not
+# a profession entity: its trades attach to the mob page it already has, and
+# its name resolves to that mob wherever a trade group is headed by a seller.
+WANDERING_TRADER_ID = f"{NAMESPACE}:wandering_trader"
+WANDERING_TRADER_NAME = "Wandering Trader"
 
 
 def _entity_type_kind(entity_class: EntityClass) -> EntityKind:
@@ -1109,15 +1121,17 @@ def _convert_probability(value: enrich_trade.Probability) -> JavaProbability:
 
 
 def _convert_trade_entry(
-    trade: enrich_trade.WikiTrade, join_table: JoinTable, by_id: Mapping[str, object]
+    trade: enrich_trade.WikiTrade,
+    join_table: JoinTable,
+    by_id: Mapping[str, object],
+    *,
+    profession_refs: Mapping[str, EntityRef] | None = None,
 ) -> TradeEntry:
     max_trades = trade.max_trades
+    pref = profession_refs.get(trade.profession) if profession_refs else None
     return TradeEntry(
         profession=trade.profession,
-        # Villager profession entities arrive in Phase 6c; nothing exists yet
-        # for this to resolve a profession name to, per the schema's own
-        # `professionRef` note.
-        profession_ref=None,
+        profession_ref=pref,
         level=trade.level,
         wanted=tuple(_convert_item_amount(item, join_table, by_id) for item in trade.wanted),
         given=_convert_item_amount(trade.given, join_table, by_id),
@@ -1418,6 +1432,8 @@ def merge_entities(
     effect_index: enrich_effect.EffectIndex | None = None,
     generation_index: Mapping[str, BlockGeneration] | None = None,
     enchant_index: EnchantIndex | None = None,
+    profession_index: ProfessionIndex | None = None,
+    profession_infoboxes: Mapping[str, ProfessionInfobox] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1698,6 +1714,104 @@ def merge_entities(
 
         drafts[entity_id] = draft
 
+    # --- Villager Professions, enumerated separately ------------------------
+    #
+    # The 13 villager professions known to the trade index enumerate here,
+    # mirroring potions and advancements.
+    if profession_index is None:
+        profession_index = extract_professions(
+            registries.get("villager_profession", ()),
+            trade_index.by_profession.keys(),
+        )
+
+    profession_refs = {
+        entry.trade_name: EntityRef(id=entry.id, name=entry.name)
+        for entry in profession_index.entries
+    }
+
+    # The wandering trader is not a villager profession -- the `villager_
+    # profession` registry does not list it, which is why its 97 trades attach
+    # to the mob page it already has rather than to a profession entity of its
+    # own. It is still one of the seller names the `trade` bucket groups by, so
+    # it still heads a group on every item page that sells what it sells. Left
+    # out of this map it was the one heading among fourteen that stayed dead
+    # text while every sibling became a link, which is exactly the fault the
+    # Phase 6c lint bullet exists to catch. `professionRef` names the seller a
+    # trade group belongs to, and for this group that seller is a mob.
+    if WANDERING_TRADER_ID in drafts:
+        profession_refs[WANDERING_TRADER_NAME] = EntityRef(
+            id=WANDERING_TRADER_ID, name=drafts[WANDERING_TRADER_ID].name
+        )
+
+    for prof_entry in profession_index.entries:
+        entity_id = prof_entry.id
+        kind = EntityKind.PROFESSION
+        override = curated.overrides.get(entity_id)
+        if override is not None and override.kind is not None:
+            kind = override.kind
+
+        draft = EntityDraft(
+            id=entity_id, kind=kind, name=prof_entry.name, tier=SourceTier.A
+        )
+        draft.set("name", prof_entry.name, SourceTier.B)
+        wiki_page = prof_entry.page_title.replace(" ", "_")
+        draft.set("wikiUrl", f"https://minecraft.wiki/w/{wiki_page}", SourceTier.B)
+
+        blurb = blurbs.get(prof_entry.page_title)
+        if blurb is not None:
+            draft.set("blurb", blurb, SourceTier.B)
+        else:
+            missing_blurbs.append(MissingBlurb(id=entity_id, page=prof_entry.page_title))
+
+        if override is not None and override.icon is not None:
+            draft.set("icon", override.icon, SourceTier.C)
+        else:
+            icon_key, routes, exempt = _resolve_entity_icon(
+                entity_id, ("profession",), join_table, sprite_index
+            )
+            if icon_key is not None:
+                draft.set("icon", icon_key, SourceTier.B)
+            else:
+                missing_icons.append(MissingIconEntity(id=entity_id, routes_tried=routes))
+
+        prof_box = profession_infoboxes.get(prof_entry.page_title) if profession_infoboxes else None
+        workstation_ref: EntityRef | None = None
+        if prof_box is not None and prof_box.workstation:
+            workstation_ref = _maybe_ref(
+                prof_box.workstation, "block", join_table, drafts
+            ) or _maybe_ref(prof_box.workstation, "item", join_table, drafts)
+
+        prof_trades = trade_index.by_profession.get(prof_entry.trade_name, ())
+        draft.add_section(
+            ProfessionInfo(workstation=workstation_ref, trade_count=len(prof_trades)),
+            SourceTier.B,
+        )
+
+        if prof_trades:
+            converted_trades = tuple(
+                _convert_trade_entry(t, join_table, drafts, profession_refs=profession_refs)
+                for t in prof_trades
+            )
+            draft.add_section(TradeTable(trades=converted_trades), SourceTier.B)
+
+        curated_aliases = curated.aliases.get(entity_id, ())
+        ws_name = (
+            workstation_ref.name
+            if workstation_ref is not None
+            else (prof_box.workstation if prof_box else None)
+        )
+        for alias, strength in generate_aliases(
+            entity_id=entity_id,
+            kind=kind,
+            name=prof_entry.name,
+            curated=curated_aliases,
+            workstation=ws_name,
+        ):
+            alias_tier = SourceTier.C if strength is AliasStrength.CURATED else SourceTier.A
+            draft.add_aliases([alias], alias_tier)
+
+        drafts[entity_id] = draft
+
     # --- SpawnInfo, DropTable, TradeTable: forward resolution from Tier B ---
 
     def attach(target: str, section: Section, *, table: str, subject: str) -> None:
@@ -1767,13 +1881,30 @@ def merge_entities(
         names_by_target.setdefault(target, []).append(item_name)
 
     for target, target_trades in trades_by_target.items():
-        trades = tuple(_convert_trade_entry(trade, join_table, drafts) for trade in target_trades)
+        trades = tuple(
+            _convert_trade_entry(trade, join_table, drafts, profession_refs=profession_refs)
+            for trade in target_trades
+        )
         attach(
             target,
             TradeTable(trades=trades),
             table="trade",
             subject=", ".join(names_by_target[target]),
         )
+
+    if WANDERING_TRADER_NAME in trade_index.by_profession:
+        wt_trades = trade_index.by_profession[WANDERING_TRADER_NAME]
+        if WANDERING_TRADER_ID in drafts:
+            converted_wt_trades = tuple(
+                _convert_trade_entry(t, join_table, drafts, profession_refs=profession_refs)
+                for t in wt_trades
+            )
+            attach(
+                WANDERING_TRADER_ID,
+                TradeTable(trades=converted_wt_trades),
+                table="trade",
+                subject=WANDERING_TRADER_NAME,
+            )
 
     if breeding_index is not None:
         for mob_name, mob_breeding in breeding_index.by_mob.items():
@@ -2118,6 +2249,7 @@ def merge_entities(
     counts = {registry: len(registries[registry]) for registry in _REGISTRY_PRECEDENCE}
     counts["advancement"] = len(advancement_ids)
     counts["potion"] = len(registries.get("potion", ()))
+    counts["profession"] = len(profession_index)
     counts["entities"] = len(entities)
     # The per-kind breakdown of the 158 entity_type IDs, once the
     # classification, the demotion, and any curated override have all run.

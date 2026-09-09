@@ -149,6 +149,7 @@ from pipeline.enrich.effect import fetch_effects, verify_effect_sources
 from pipeline.enrich.infobox import DEFAULT_REPORT_PATH as INFOBOX_REPORT_PATH
 from pipeline.enrich.infobox import InfoboxReport, parse_infoboxes, select_infobox_pages
 from pipeline.enrich.infobox import write_report as write_infobox_report
+from pipeline.enrich.profession_infobox import parse_profession_infoboxes
 from pipeline.enrich.resource_location import JoinTable, fetch_join_table
 from pipeline.enrich.spawn_table import fetch_spawn_tables
 from pipeline.enrich.sprite import fetch_sprite_index
@@ -162,6 +163,7 @@ from pipeline.extract.generation import (
     extract_generation,
 )
 from pipeline.extract.harvest import extract_block_harvest
+from pipeline.extract.profession import extract_professions
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
@@ -691,10 +693,23 @@ def run_build(
     )
 
     # --- 5. Tier B page text ------------------------------------------------------
-    pages = sorted({entry.page for entry in join_table.entries})
+    profession_index = extract_professions(
+        registries.get("villager_profession", ()),
+        trade_index.by_profession.keys(),
+    )
+    pages = sorted(
+        {entry.page for entry in join_table.entries}
+        | {entry.page_title for entry in profession_index.entries}
+    )
     extract_report = fetch_page_extracts(
         pages, revision=version, cache=store, transport=network_transport
     )
+
+    profession_pages = [entry.page_title for entry in profession_index.entries]
+    profession_wikitext = fetch_page_wikitext(
+        profession_pages, revision=version, cache=store, transport=network_transport
+    )
+    profession_infoboxes = parse_profession_infoboxes(profession_wikitext.contents())
 
     mob_pages = _select_mob_pages(
         registries=registries.get("entity_type", ()),
@@ -723,7 +738,9 @@ def run_build(
         f"tier B page text: {len(extract_report.extracts)} blurbs, "
         f"{len(mob_pages)} mob pages selected, {len(with_box)} infoboxes parsed, "
         f"{len(without_box)} mob pages with no infobox template, "
-        f"{len(breeding_index.by_mob)} mobs with breeding data"
+        f"{len(breeding_index.by_mob)} mobs with breeding data, "
+        f"{len(profession_index.entries)} professions, "
+        f"{len(profession_infoboxes)} profession infoboxes parsed"
     )
     report(
         f"tier B effects: {len(effect_index.by_title)} status effects parsed, "
@@ -763,6 +780,8 @@ def run_build(
         effect_index=effect_index,
         generation_index=gen_result.blocks,
         enchant_index=enchant_index,
+        profession_index=profession_index,
+        profession_infoboxes=profession_infoboxes,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 

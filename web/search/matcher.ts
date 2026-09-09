@@ -12,11 +12,12 @@ const KIND_PRIORITY: Record<EntityKind, number> = {
   block: 2,
   effect: 3,
   enchantment: 4,
-  biome: 5,
-  structure: 6,
-  collection: 7,
-  advancement: 8,
-  entity: 9,
+  profession: 5,
+  biome: 6,
+  structure: 7,
+  collection: 8,
+  advancement: 9,
+  entity: 10,
 };
 
 interface PreppedEntry {

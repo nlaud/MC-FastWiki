@@ -189,6 +189,11 @@ body {
   flex-shrink: 0;
 }
 
+.entity-kind-badge.profession {
+  background: #1e3820;
+  color: #81c995;
+}
+
 .entity-blurb {
   margin: 0;
   font-size: 0.95rem;
@@ -795,6 +800,41 @@ canvas,
   font-size: 0.8rem;
   color: #888;
   text-align: right;
+}
+
+.trade-level-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trade-level-title {
+  margin: 4px 0 2px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+/* ProfessionInfo section */
+.profession-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profession-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.profession-field-label {
+  color: #888;
+}
+
+.profession-field-value {
+  color: #e0e0e0;
 }
 
 /* SpawnInfo biomes */

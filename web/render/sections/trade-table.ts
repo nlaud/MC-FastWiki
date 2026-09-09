@@ -2,12 +2,30 @@ import type { TradeTable } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
 import { entityLink } from "../link.js";
 
+/**
+ * The display rank of a trade level, mirroring `LEVEL_ORDER` in
+ * `pipeline/enrich/trade.py`.
+ *
+ * `level` names two different ladders. Villagers climb Novice through Master.
+ * The wandering trader has Ordinary, Special and Purchase instead, and that is
+ * the order the wiki presents them in, not alphabetical order. Listing only the
+ * five villager levels here left the trader's three to fall through to the
+ * `?? 99` default and sort by name, which put Purchase above Special and
+ * silently disagreed with the pipeline that had already ranked them.
+ *
+ * An unknown level still sorts after every known one rather than being dropped,
+ * for the reason `level_rank` gives: a level this project has not seen is a new
+ * label, not a reason to lose a trade.
+ */
 const LEVEL_ORDER: Record<string, number> = {
   Novice: 1,
   Apprentice: 2,
   Journeyman: 3,
   Expert: 4,
   Master: 5,
+  Ordinary: 6,
+  Special: 7,
+  Purchase: 8,
 };
 
 interface TradeItem {
@@ -17,13 +35,15 @@ interface TradeItem {
 
 export interface TradeTableOptions {
   withoutTitle?: boolean;
+  groupByLevelOnly?: boolean;
 }
 
 /**
  * Renders a TradeTable section:
- * - Grouped by profession, then by level in game order (Novice through Master)
- * - Wanted and given items link through their ref
- * - Collapses past 6 rows with a "Show all N trades" button
+ * - When groupByLevelOnly is true (professions): grouped by level (Novice through Master) with h4 level headings, no row collapse.
+ * - Otherwise (items / mobs): grouped by profession, then by level in game order (Novice through Master), collapsing past 6 rows.
+ * - Wanted and given items link through their ref.
+ * - Profession headers link through professionRef if present.
  */
 export function renderTradeTable(
   section: TradeTable,
@@ -44,6 +64,105 @@ export function renderTradeTable(
     title.className = "section-title";
     title.textContent = "Trades";
     container.append(title);
+  }
+
+  if (options.groupByLevelOnly) {
+    const byLevel = new Map<string, TradeTable["trades"]>();
+    for (const trade of section.trades) {
+      const list = byLevel.get(trade.level) ?? [];
+      list.push(trade);
+      byLevel.set(trade.level, list);
+    }
+
+    const sortedLevels = Array.from(byLevel.keys()).sort((a, b) => {
+      const ordA = LEVEL_ORDER[a] ?? 99;
+      const ordB = LEVEL_ORDER[b] ?? 99;
+      if (ordA !== ordB) {
+        return ordA - ordB;
+      }
+      return a.localeCompare(b);
+    });
+
+    const groupsContainer = document.createElement("div");
+    groupsContainer.className = "trade-groups trade-level-groups";
+
+    for (const level of sortedLevels) {
+      const items = byLevel.get(level);
+      if (!items || items.length === 0) {
+        continue;
+      }
+
+      const levelGroup = document.createElement("div");
+      levelGroup.className = "trade-level-group";
+
+      const levelHeader = document.createElement("h4");
+      levelHeader.className = "trade-level-title";
+      levelHeader.textContent = level;
+      levelGroup.append(levelHeader);
+
+      const table = document.createElement("table");
+      table.className = "data-table trade-table";
+
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      for (const h of ["Wanted", "", "Given", "Chance"]) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headerRow.append(th);
+      }
+      thead.append(headerRow);
+      table.append(thead);
+
+      const tbody = document.createElement("tbody");
+      for (const trade of items) {
+        const tr = document.createElement("tr");
+
+        // Wanted items
+        const wantedTd = document.createElement("td");
+        wantedTd.className = "trade-wanted-cell";
+        if (trade.wanted && trade.wanted.length > 0) {
+          for (const [i, wantedItem] of trade.wanted.entries()) {
+            if (i > 0) {
+              const plus = document.createElement("span");
+              plus.className = "trade-plus";
+              plus.textContent = " + ";
+              wantedTd.append(plus);
+            }
+            wantedTd.append(entityLink(wantedItem, ctx));
+          }
+        } else {
+          wantedTd.textContent = "—";
+        }
+        tr.append(wantedTd);
+
+        // Arrow
+        const arrowTd = document.createElement("td");
+        arrowTd.className = "trade-arrow-cell";
+        arrowTd.textContent = "→";
+        tr.append(arrowTd);
+
+        // Given item
+        const givenTd = document.createElement("td");
+        givenTd.className = "trade-given-cell";
+        givenTd.append(entityLink(trade.given, ctx));
+        tr.append(givenTd);
+
+        // Chance
+        const chanceTd = document.createElement("td");
+        chanceTd.className = "trade-chance-cell";
+        chanceTd.textContent = trade.javaProbability?.text ?? "—";
+        tr.append(chanceTd);
+
+        tbody.append(tr);
+      }
+
+      table.append(tbody);
+      levelGroup.append(table);
+      groupsContainer.append(levelGroup);
+    }
+
+    container.append(groupsContainer);
+    return container;
   }
 
   // Group by profession, then sort by level
@@ -90,7 +209,12 @@ export function renderTradeTable(
 
     const profHeader = document.createElement("h4");
     profHeader.className = "trade-profession-title";
-    profHeader.textContent = profession;
+    const profRef = items[0]?.trade.professionRef;
+    if (profRef) {
+      profHeader.append(entityLink(profRef, ctx));
+    } else {
+      profHeader.textContent = profession;
+    }
     profGroup.append(profHeader);
 
     const table = document.createElement("table");

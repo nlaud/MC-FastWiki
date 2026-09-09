@@ -42,6 +42,7 @@ from pipeline.normalize.entity import (
     HarvestInfo,
     LinkList,
     ObtainList,
+    ProfessionInfo,
     RecipeTree,
     SourceTier,
     SpawnInfo,
@@ -71,6 +72,7 @@ SECTION_TYPES = {
     "EnchantInfo",
     "GenerationInfo",
     "LinkList",
+    "ProfessionInfo",
 }
 
 # `pipeline.normalize.entity.EntityKind` is the source of truth for this
@@ -89,6 +91,7 @@ ENTITY_KINDS = {
     "biome",
     "collection",
     "entity",
+    "profession",
 }
 
 SCHEMA_NAMES = schema_names()
@@ -401,6 +404,7 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "enchantInfo": EnchantInfo,
     "generationInfo": GenerationInfo,
     "linkList": LinkList,
+    "professionInfo": ProfessionInfo,
 }
 
 # Decision D2's seven sections, plus `foodInfo` and `harvestInfo`: the schema closes these with
@@ -418,6 +422,7 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "harvestInfo": HarvestInfo,
     "generationInfo": GenerationInfo,
     "enchantInfo": EnchantInfo,
+    "professionInfo": ProfessionInfo,
 }
 
 

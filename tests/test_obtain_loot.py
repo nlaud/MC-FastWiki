@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from pipeline.enrich import IntegerRange
-from pipeline.enrich.droptable import DropIndex, LootingDrop, MobDrop, Ratio
+from pipeline.enrich.droptable import DropIndex, DropNote, LootingDrop, MobDrop, Ratio
 from pipeline.enrich.resource_location import JoinTable, ResourceLocation
 from pipeline.enrich.trade import TradeIndex, TradeItem, WikiTrade
 from pipeline.obtain import ObtainError
@@ -755,13 +755,13 @@ def resource(name: str, path: str, kind: str) -> ResourceLocation:
     )
 
 
-def mob_drop(mob: str, item: str) -> MobDrop:
+def mob_drop(mob: str, item: str, notes: tuple[DropNote, ...] = ()) -> MobDrop:
     return MobDrop(
         mob=mob,
         item=item,
         page=mob,
         wiki_url=f"https://minecraft.wiki/w/{mob}",
-        notes=(),
+        notes=notes,
         by_looting_level=(),
     )
 
@@ -935,6 +935,73 @@ def test_a_name_that_is_a_variant_group_is_still_reported_rather_than_guessed_at
 
     assert producers == ()
     assert [u.subject for u in unresolved] == ["Any color Wool"]
+
+
+def test_unresolved_drop_expands_when_note_enumerates_resolvable_items() -> None:
+    """The Creeper's "Music Disc" drop enumerates 12 discs in its random_disc note."""
+    disc_resources = [
+        resource("Music Disc 13", "music_disc_13", "item"),
+        resource("Music Disc cat", "music_disc_cat", "item"),
+        resource("Music Disc blocks", "music_disc_blocks", "item"),
+        resource("Music Disc chirp", "music_disc_chirp", "item"),
+        resource("Music Disc far", "music_disc_far", "item"),
+        resource("Music Disc mall", "music_disc_mall", "item"),
+        resource("Music Disc mellohi", "music_disc_mellohi", "item"),
+        resource("Music Disc stal", "music_disc_stal", "item"),
+        resource("Music Disc strad", "music_disc_strad", "item"),
+        resource("Music Disc ward", "music_disc_ward", "item"),
+        resource("Music Disc 11", "music_disc_11", "item"),
+        resource("Music Disc wait", "music_disc_wait", "item"),
+    ]
+    table = join_table(resource("Creeper", "creeper", "entity"), *disc_resources)
+    note_content = (
+        "The disc is randomly selected from [[Music Disc 13|13]], [[Music Disc cat|cat]], "
+        "[[Music Disc blocks|blocks]], [[Music Disc chirp|chirp]], [[Music Disc far|far]], "
+        "[[Music Disc mall|mall]], [[Music Disc mellohi|mellohi]], [[Music Disc stal|stal]], "
+        "[[Music Disc strad|strad]], [[Music Disc ward|ward]], [[Music Disc 11|11]], and "
+        "[[Music Disc wait|wait]]."
+    )
+    drops = DropIndex.build(
+        [
+            mob_drop(
+                "Creeper",
+                "Music Disc",
+                notes=(DropNote(name="random_disc", content=note_content),),
+            )
+        ]
+    )
+    producers, unresolved = producers_from_drop_index(drops, join_table=table)
+
+    assert unresolved == ()
+    assert len(producers) == 12
+    assert {p.output.item for p in producers} == {
+        f"minecraft:{r.resource_location}" for r in disc_resources
+    }
+    assert all(p.note == "dropped by Creeper" for p in producers)
+
+
+def test_unresolved_drop_does_not_expand_if_any_enumerated_link_fails() -> None:
+    """If one link in the note fails to resolve, expand none and report the drop."""
+    table = join_table(
+        resource("Creeper", "creeper", "entity"),
+        resource("Music Disc 13", "music_disc_13", "item"),
+    )
+    note_content = "[[Music Disc 13|13]], [[Unknown Disc]]"
+    drops = DropIndex.build(
+        [
+            mob_drop(
+                "Creeper",
+                "Music Disc",
+                notes=(DropNote(name="random_disc", content=note_content),),
+            )
+        ]
+    )
+    producers, unresolved = producers_from_drop_index(drops, join_table=table)
+
+    assert producers == ()
+    assert len(unresolved) == 1
+    assert unresolved[0].subject == "Music Disc"
+    assert unresolved[0].reason == "the item name did not resolve"
 
 
 # --- Odds: chance, count_max and per_attempt --------------------------------

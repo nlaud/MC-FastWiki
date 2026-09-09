@@ -241,6 +241,7 @@ def generate_aliases(
     kind: EntityKind,
     name: str,
     curated: Sequence[str] = (),
+    workstation: str | None = None,
 ) -> tuple[tuple[str, AliasStrength], ...]:
     """Return the `(alias, strength)` pairs of one entity, strongest first.
 
@@ -293,6 +294,15 @@ def generate_aliases(
         proposals.append((f"{effect_words} potion", AliasStrength.FULL_PHRASE))
     if kind is EntityKind.ENCHANTMENT:
         proposals.extend((level, AliasStrength.SEGMENT) for level in _level_aliases(path))
+    if kind is EntityKind.PROFESSION:
+        spaced = path.replace("_", " ")
+        proposals.append((f"villager {spaced}", AliasStrength.FULL_PHRASE))
+        proposals.append((f"{spaced} villager", AliasStrength.FULL_PHRASE))
+        if workstation:
+            ws = workstation.split(":", 1)[-1].replace("_", " ").strip()
+            if ws:
+                proposals.append((f"{ws} villager", AliasStrength.CROSS_LINK))
+                proposals.append((f"villager {ws}", AliasStrength.CROSS_LINK))
     proposals.extend((segment, AliasStrength.SEGMENT) for segment in _segments(path))
 
     best: dict[str, AliasStrength] = {}

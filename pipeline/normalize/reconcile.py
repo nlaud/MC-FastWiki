@@ -195,6 +195,7 @@ ICON_RULES: Mapping[str, IconRule] = {
     "mob_effect": IconRule(registry="mob_effect", id_families=("EffectSprite",)),
     "worldgen/biome": IconRule(registry="worldgen/biome", id_families=("BiomeSprite",)),
     "enchantment": IconRule(registry="enchantment", has_icons=False),
+    "profession": IconRule(registry="villager_profession", id_families=("EntitySprite",)),
 }
 
 
@@ -517,7 +518,8 @@ def reconcile(
     counts: dict[str, RegistryCounts] = {}
 
     for registry_name, rule in ICON_RULES.items():
-        ids = registries.get(registry_name)
+        lookup = rule.registry if rule.registry in registries else registry_name
+        ids = registries.get(lookup)
         if ids is None:
             raise NormalizeError(
                 f"{registry_name!r} is a registry that ICON_RULES names, and this mcmeta "
