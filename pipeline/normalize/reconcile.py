@@ -160,6 +160,10 @@ EXEMPT_REASONS: Mapping[str, str] = {
         "family this project reads, and the one that resolved did so by coincidence against an "
         "unrelated icon of the same short name. The wiki has no enchantment sprite family."
     ),
+    "worldgen/structure": (
+        "measured 2026-09-08: across all 20,013 rows of the spritefile bucket there is no "
+        "structure sprite family; hits on structure names are village maps or villager entities."
+    ),
 }
 
 # The chains measured live on 2026-08-30, over mcmeta `26.2`'s registries and
@@ -196,6 +200,7 @@ ICON_RULES: Mapping[str, IconRule] = {
     "worldgen/biome": IconRule(registry="worldgen/biome", id_families=("BiomeSprite",)),
     "enchantment": IconRule(registry="enchantment", has_icons=False),
     "profession": IconRule(registry="villager_profession", id_families=("EntitySprite",)),
+    "worldgen/structure": IconRule(registry="worldgen/structure", has_icons=False),
 }
 
 

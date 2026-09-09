@@ -1,10 +1,11 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-maintained structure and interaction attribution for non-chest loot tables in Java Edition 26.2. Structure names describe the location, mob, or block in Title Case, and container describes the specific interaction target, gift, or tool. `ref` is the registry id of the one entity or block a player interacts with, present only where the source is a single thing with a page of its own, so a renderer can draw the label as a link.",
+  "note": "Hand-maintained structure and interaction attribution for non-chest loot tables in Java Edition 26.2. Structure names describe the location, mob, or block in Title Case, and container describes the specific interaction target, gift, or tool. structureRef links to the structure entity where the source is a worldgen/structure member. ref is the registry id of the one entity or block a player interacts with, present only where the source is a single thing with a page of its own, so a renderer can draw the label as a link.",
   "sources": {
     "loot_table/archaeology/desert_pyramid.json": {
       "structure": "Desert Pyramid",
-      "container": "Suspicious Sand"
+      "container": "Suspicious Sand",
+      "structureRef": "minecraft:desert_pyramid"
     },
     "loot_table/archaeology/desert_well.json": {
       "structure": "Desert Well",
@@ -12,19 +13,23 @@
     },
     "loot_table/archaeology/ocean_ruin_cold.json": {
       "structure": "Ocean Ruins (Cold)",
-      "container": "Suspicious Gravel"
+      "container": "Suspicious Gravel",
+      "structureRef": "minecraft:ocean_ruin_cold"
     },
     "loot_table/archaeology/ocean_ruin_warm.json": {
       "structure": "Ocean Ruins (Warm)",
-      "container": "Suspicious Sand"
+      "container": "Suspicious Sand",
+      "structureRef": "minecraft:ocean_ruin_warm"
     },
     "loot_table/archaeology/trail_ruins_common.json": {
       "structure": "Trail Ruins",
-      "container": "Suspicious Gravel (Common)"
+      "container": "Suspicious Gravel (Common)",
+      "structureRef": "minecraft:trail_ruins"
     },
     "loot_table/archaeology/trail_ruins_rare.json": {
       "structure": "Trail Ruins",
-      "container": "Suspicious Gravel (Rare)"
+      "container": "Suspicious Gravel (Rare)",
+      "structureRef": "minecraft:trail_ruins"
     },
     "loot_table/brush/armadillo.json": {
       "structure": "Armadillo",

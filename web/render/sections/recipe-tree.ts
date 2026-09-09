@@ -3,7 +3,7 @@ import type { IndexEntry } from "../../types/index.js";
 import type { Obtain, ObtainProducer } from "../../types/obtain.js";
 import { loadObtain } from "../../search/load.js";
 import type { RenderContext } from "../context.js";
-import { entityLink } from "../link.js";
+import { entityLink, proseEntityLink } from "../link.js";
 import {
   type ObtainNode,
   type TreeInput,
@@ -164,7 +164,7 @@ function appendOdds(li: HTMLElement, producer: ObtainProducer): void {
  */
 export function getChestSourceLabel(
   sourceId: string,
-  sources?: Record<string, { s?: string; c?: string; structure?: string; container?: string }>,
+  sources?: Record<string, CuratedSourceRow>,
 ): string {
   const curated = sources?.[sourceId];
   if (curated) {
@@ -186,6 +186,107 @@ export function getChestSourceLabel(
 }
 
 export const getSourceLabel = getChestSourceLabel;
+
+/**
+ * A curated `obtain.json` source row, as the sources panel reads it.
+ */
+export interface CuratedSourceRow {
+  s?: string;
+  c?: string;
+  structure?: string;
+  container?: string;
+  ref?: string;
+  structureRef?: string[];
+}
+
+/**
+ * Fills `label` with a chest source's text, linking whatever really is a page.
+ *
+ * Three shapes, in falling order of how precisely the link answers the question
+ * the label asks.
+ *
+ * `ref` wins when it is there, because it names the single thing a player
+ * interacts with -- the piglin they barter with, the sheep they shear -- and a
+ * link on the whole label goes exactly there.
+ *
+ * Otherwise `structureRef` names where the container generates. One resolved id
+ * means the structure half of `Ancient City - Ice Box Chest` becomes the link
+ * and the container half stays text, so the click lands on the page that
+ * answers "where do I find this" and not on a page named after a chest.
+ *
+ * Several resolved ids mean the label cannot become one link honestly. A
+ * village armorer chest generates in all five villages, and a ruined portal
+ * chest in all seven portals; picking one would be a guess, and linking the
+ * word `Village` to a `minecraft:village` page would be a link to a page that
+ * does not exist. So the label stays text and the variants follow it as their
+ * own links, which is the same answer the structure page gives read backwards.
+ *
+ * An id the search index does not hold is dropped rather than drawn, so a ref
+ * naming something unshipped degrades to the plain text this rendered before
+ * instead of to a dead click.
+ */
+export function appendChestSourceLabel(
+  label: HTMLElement,
+  sourceId: string,
+  curated: CuratedSourceRow | undefined,
+  ctx: RenderContext,
+): void {
+  const labelText = getChestSourceLabel(sourceId, curated ? { [sourceId]: curated } : undefined);
+
+  const ref = curated?.ref;
+  if (ref && ctx.lookup(ref)) {
+    label.append(entityLink({ id: ref, name: labelText }, ctx));
+    return;
+  }
+
+  const resolved = (curated?.structureRef ?? [])
+    .map((id) => ({ id, entry: ctx.lookup(id) }))
+    .filter(
+      (candidate): candidate is { id: string; entry: IndexEntry } => candidate.entry !== null,
+    );
+
+  if (resolved.length === 0) {
+    label.textContent = labelText;
+    return;
+  }
+
+  const structureName = curated?.structure ?? curated?.s;
+  const containerName = curated?.container ?? curated?.c;
+
+  if (resolved.length === 1) {
+    const only = resolved[0];
+    if (only && structureName) {
+      label.append(entityLink({ id: only.id, name: structureName }, ctx));
+      if (containerName && containerName !== structureName) {
+        const rest = document.createElement("span");
+        rest.className = "sources-chest-container";
+        rest.textContent = ` - ${containerName}`;
+        label.append(rest);
+      }
+      return;
+    }
+  }
+
+  label.textContent = labelText;
+  const variants = document.createElement("span");
+  variants.className = "sources-structure-variants";
+  // Each separator is bound to the name that *follows* it and wraps with it, so
+  // a list too long for one line breaks as `... Snowy Village` / `· Taiga
+  // Village` rather than leaving a dangling `·` at the end of the first line.
+  for (const [index, candidate] of resolved.entries()) {
+    const item = document.createElement("span");
+    item.className = "sources-structure-variant";
+    if (index > 0) {
+      const sep = document.createElement("span");
+      sep.className = "sources-structure-separator";
+      sep.textContent = "·";
+      item.append(sep);
+    }
+    item.append(proseEntityLink({ id: candidate.id, name: candidate.entry.n }, ctx));
+    variants.append(item);
+  }
+  label.append(variants);
+}
 
 /**
  * The documented display order of acquisition groups in the Sources panel.
@@ -213,12 +314,7 @@ interface SourcesData {
   producersByMethod: Map<string, ObtainProducer[]>;
   oreSmelts: ObtainProducer[];
   tradeTableSection?: TradeTable | undefined;
-  sourcesMap?:
-    | Record<
-        string,
-        { s?: string; c?: string; structure?: string; container?: string; ref?: string }
-      >
-    | undefined;
+  sourcesMap?: Record<string, CuratedSourceRow> | undefined;
 }
 
 function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement | null {
@@ -431,20 +527,7 @@ function renderSourcesPanel(data: SourcesData, ctx: RenderContext): HTMLElement 
               ? "sources-chest-label"
               : `sources-${groupConfig.method}-label`;
           label.className = `sources-source-label ${labelClass}`;
-          const labelText = getChestSourceLabel(p.src, data.sourcesMap);
-
-          // Link the label when the curated row names one entity or block a
-          // page exists for -- the piglin you barter with, the sheep you
-          // shear. `entityLink` falls back to plain text when the id is not in
-          // the search index, so a ref naming something unshipped degrades to
-          // exactly what this rendered before rather than to a dead link.
-          const ref = data.sourcesMap?.[p.src]?.ref;
-          const refEntry = ref ? ctx.lookup(ref) : null;
-          if (ref && refEntry) {
-            label.append(entityLink({ id: ref, name: labelText }, ctx));
-          } else {
-            label.textContent = labelText;
-          }
+          appendChestSourceLabel(label, p.src, data.sourcesMap?.[p.src], ctx);
           li.append(label);
           appendOdds(li, p);
 
@@ -730,8 +813,7 @@ export interface RecipeTreeSectionData extends RecipeTree {
    * pre-built tree never visited. See `renderBranch`.
    */
   graph?: Obtain | undefined;
-  sources?:
-    Record<string, { s?: string; c?: string; structure?: string; container?: string }> | undefined;
+  sources?: Record<string, CuratedSourceRow> | undefined;
 }
 
 /**

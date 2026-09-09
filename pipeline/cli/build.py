@@ -164,6 +164,7 @@ from pipeline.extract.generation import (
 )
 from pipeline.extract.harvest import extract_block_harvest
 from pipeline.extract.profession import extract_professions
+from pipeline.extract.structure import extract_structures
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
 from pipeline.fetch.cache import DEFAULT_CACHE_ROOT, ContentCache
@@ -180,6 +181,7 @@ from pipeline.normalize.merge import (
     MergeReport,
     block_drops_from_producers,
     merge_entities,
+    resolve_structure_pages,
 )
 from pipeline.normalize.merge import write_report as write_merge_report
 from pipeline.normalize.reconcile import DEFAULT_REPORT_PATH as RECONCILE_REPORT_PATH
@@ -583,6 +585,8 @@ def run_build(
             "worldgen/biome",
             "worldgen/configured_feature",
             "worldgen/placed_feature",
+            "worldgen/structure",
+            "worldgen/structure_set",
         ),
         cache=store,
         transport=mcmeta_transport,
@@ -592,13 +596,15 @@ def run_build(
     harvest_index = extract_block_harvest(files)
     gen_result = extract_generation(files)
     enchant_index = extract_enchantments(files)
+    struct_index = extract_structures(files)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
         f"{len(food_index)} items that can be eaten, "
         f"{len(harvest_index)} blocks with harvest requirements, "
         f"{len(gen_result.blocks)} blocks with generation facts, "
-        f"{len(enchant_index)} enchantments"
+        f"{len(enchant_index)} enchantments, "
+        f"{len(struct_index)} structures"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
@@ -612,7 +618,9 @@ def run_build(
         for producer in loot_result.producers
         if producer.method is ObtainMethod.CHEST_LOOT
     }
-    verify_chest_sources(chest_tables, curated_chests)
+    verify_chest_sources(
+        chest_tables, curated_chests, extracted_structures=struct_index.structures.keys()
+    )
     loot_methods = {
         ObtainMethod.BRUSHING,
         ObtainMethod.FISHING,
@@ -626,7 +634,9 @@ def run_build(
         for producer in loot_result.producers
         if producer.method in loot_methods
     }
-    verify_loot_sources(loot_tables, curated_loot)
+    verify_loot_sources(
+        loot_tables, curated_loot, extracted_structures=struct_index.structures.keys()
+    )
     method_counts = Counter(p.method for p in loot_result.producers)
     method_summary = ", ".join(
         f"{m.value}={method_counts[m]}"
@@ -697,9 +707,19 @@ def run_build(
         registries.get("villager_profession", ()),
         trade_index.by_profession.keys(),
     )
+    # A structure's page is not always one the join table lists as that
+    # structure's own page: the village fallback resolves three ids to
+    # `Village`, which the bucket only ever files under a *variant's* display
+    # name. Asking `resolve_structure_pages` for the same answer the merge will
+    # use is what keeps those three from carrying a `wikiUrl` to prose their
+    # entity never fetched.
+    structure_pages = {
+        page for _, page in resolve_structure_pages(struct_index, join_table).values()
+    }
     pages = sorted(
         {entry.page for entry in join_table.entries}
         | {entry.page_title for entry in profession_index.entries}
+        | structure_pages
     )
     extract_report = fetch_page_extracts(
         pages, revision=version, cache=store, transport=network_transport
@@ -782,6 +802,9 @@ def run_build(
         enchant_index=enchant_index,
         profession_index=profession_index,
         profession_infoboxes=profession_infoboxes,
+        structure_index=struct_index,
+        curated_chests=curated_chests,
+        loot_producers=loot_result.producers,
     )
     report(f"normalize: {len(result.entities)} entities merged")
 

@@ -94,7 +94,7 @@ does not.
 ### The data half maps path for path
 
 `fetch_data_files` keys every file it returns by the path under `data/minecraft/`, such as
-`recipe/oak_stairs.json`. `DATA_GROUPS` names the eight groups that the pipeline reads:
+`recipe/oak_stairs.json`. `DATA_GROUPS` names the ten groups that the pipeline reads:
 
 - `advancement`
 - `enchantment`
@@ -104,6 +104,8 @@ does not.
 - `worldgen/biome`
 - `worldgen/configured_feature`
 - `worldgen/placed_feature`
+- `worldgen/structure`
+- `worldgen/structure_set`
 
 The generator writes that same tree under `generated/data/minecraft/`, so no path changes here.
 

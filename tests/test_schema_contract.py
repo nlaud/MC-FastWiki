@@ -47,6 +47,7 @@ from pipeline.normalize.entity import (
     SourceTier,
     SpawnInfo,
     StatBlock,
+    StructureInfo,
     TradeTable,
 )
 from pipeline.schema import SCHEMA_DIR, SCHEMA_SUFFIX, load_schema, schema_names, schema_paths
@@ -73,6 +74,7 @@ SECTION_TYPES = {
     "GenerationInfo",
     "LinkList",
     "ProfessionInfo",
+    "StructureInfo",
 }
 
 # `pipeline.normalize.entity.EntityKind` is the source of truth for this
@@ -405,6 +407,7 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "generationInfo": GenerationInfo,
     "linkList": LinkList,
     "professionInfo": ProfessionInfo,
+    "structureInfo": StructureInfo,
 }
 
 # Decision D2's seven sections, plus `foodInfo` and `harvestInfo`: the schema closes these with
@@ -423,6 +426,9 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "generationInfo": GenerationInfo,
     "enchantInfo": EnchantInfo,
     "professionInfo": ProfessionInfo,
+    "chestLoot": ChestLoot,
+    "linkList": LinkList,
+    "structureInfo": StructureInfo,
 }
 
 

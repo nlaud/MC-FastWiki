@@ -170,4 +170,8 @@ export interface ChestSource {
    * A namespaced identifier. Vanilla content uses the `minecraft` namespace. Mirrors `entity.schema.json`'s `$defs.entityId` exactly; the definition is copied rather than referenced across files, per this directory's self-containment rule in `pipeline/schema/__init__.py`.
    */
   ref?: string;
+  /**
+   * The registry id(s) of the structure(s) this chest or loot table generates within.
+   */
+  structureRef?: EntityId[];
 }

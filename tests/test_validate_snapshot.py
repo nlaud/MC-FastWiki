@@ -110,7 +110,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2141
+    assert snapshot.total == 2175
     assert snapshot.by_kind == {
         "block": 1195,
         "item": 540,
@@ -119,13 +119,18 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "biome": 66,
         "enchantment": 43,
         "effect": 39,
+        "structure": 34,
         "entity": 28,
         "profession": 13,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2141)
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2175)
     # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
     # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2110, "blurb": 1984, "icon": 2049}
+    # 2144 wikiUrl, 2015 blurb, 2049 icon after 34 structures were added, when a structure carried
+    # no icon and the three villages that share the `Village` page carried no blurb.
+    # 2144 wikiUrl, 2018 blurb, 2083 icon now: `Village` is fetched, so Savanna, Snowy and Taiga
+    # Village carry its prose (+3), and all 34 structures borrow a curated Tier C icon (+34).
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2144, "blurb": 2018, "icon": 2083}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -147,6 +152,9 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "GenerationInfo": 52,
         "EnchantInfo": 43,
         "ProfessionInfo": 13,
+        "StructureInfo": 34,
+        "ChestLoot": 30,
+        "LinkList": 62,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.

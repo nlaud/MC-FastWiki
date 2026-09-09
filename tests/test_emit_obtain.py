@@ -161,6 +161,7 @@ def test_sources_map_is_emitted_and_sorted() -> None:
     assert dumped["sources"]["loot_table/chests/abandoned_mineshaft.json"] == {
         "structure": "Mineshaft",
         "container": "Chest",
+        "structureRef": [],
     }
 
 

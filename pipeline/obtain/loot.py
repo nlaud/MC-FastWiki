@@ -105,7 +105,7 @@ from pipeline.enrich.resource_location import (
 )
 from pipeline.enrich.trade import TradeIndex
 from pipeline.obtain import ObtainError
-from pipeline.obtain.chests import ChestSource
+from pipeline.obtain.chests import ChestSource, _coerce_structure_ref
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
 
 __all__ = [
@@ -283,6 +283,7 @@ def load_loot_sources(path: Path = DEFAULT_LOOT_SOURCES_PATH) -> dict[str, Chest
             structure=entry["structure"],
             container=entry["container"],
             ref=entry.get("ref"),
+            structure_ref=_coerce_structure_ref(entry.get("structureRef")),
         )
     return result
 
@@ -290,14 +291,33 @@ def load_loot_sources(path: Path = DEFAULT_LOOT_SOURCES_PATH) -> dict[str, Chest
 def verify_loot_sources(
     found_tables: Iterable[str],
     curated: Mapping[str, ChestSource],
+    *,
+    extracted_structures: Iterable[str] | None = None,
 ) -> None:
-    """Raise ObtainError if any found loot table is missing from curated sources."""
+    """Raise ObtainError if any found loot table is missing from curated sources,
+    or if any structureRef names an unknown structure.
+    """
     missing = [table for table in sorted(found_tables) if table not in curated]
     if missing:
         raise ObtainError(
             f"found {len(missing)} loot tables with no curated entry in "
             f"{LOOT_SOURCES_FILENAME}: {', '.join(missing)}"
         )
+
+    if extracted_structures is not None:
+        known = set(extracted_structures)
+        unknown: set[str] = set()
+        for table in found_tables:
+            source = curated.get(table)
+            if source is not None:
+                for s_ref in source.structure_ref:
+                    if s_ref not in known:
+                        unknown.add(s_ref)
+        if unknown:
+            raise ObtainError(
+                f"structureRef in {LOOT_SOURCES_FILENAME} names unknown structure(s): "
+                f"{', '.join(sorted(unknown))}"
+            )
 
 
 def _namespaced(value: str) -> str:

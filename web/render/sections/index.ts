@@ -1,6 +1,7 @@
 import type {
   AdvancementInfo,
   BreedingInfo,
+  ChestLoot,
   DropTable,
   EffectSources,
   EnchantInfo,
@@ -8,26 +9,31 @@ import type {
   FoodInfo,
   GenerationInfo,
   HarvestInfo,
+  LinkList,
   ProfessionInfo,
   RecipeTree,
   Section,
   SpawnInfo,
   StatBlock,
+  StructureInfo,
   TradeTable,
 } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
 import { renderAdvancementInfo } from "./advancement-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
+import { renderChestLoot } from "./chest-loot.js";
 import { renderDropTable } from "./drop-table.js";
 import { renderEffectSources } from "./effect-sources.js";
 import { renderEnchantInfo } from "./enchant-info.js";
 import { renderFoodInfo } from "./food-info.js";
 import { renderGenerationInfo } from "./generation-info.js";
 import { renderHarvestInfo } from "./harvest-info.js";
+import { renderLinkList } from "./link-list.js";
 import { renderProfessionInfo } from "./profession-info.js";
 import { renderRecipeTree } from "./recipe-tree.js";
 import { renderSpawnInfo } from "./spawn-info.js";
 import { renderStatBlock } from "./stat-block.js";
+import { renderStructureInfo } from "./structure-info.js";
 import { renderTradeTable } from "./trade-table.js";
 
 export type SectionRenderer = (
@@ -62,6 +68,9 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   EffectSources: (s, ctx) => renderEffectSources(s as EffectSources, ctx),
   GenerationInfo: (s, ctx) => renderGenerationInfo(s as GenerationInfo, ctx),
   EnchantInfo: (s, ctx) => renderEnchantInfo(s as EnchantInfo, ctx),
+  ChestLoot: (s, ctx) => renderChestLoot(s as ChestLoot, ctx),
+  LinkList: (s, ctx) => renderLinkList(s as LinkList, ctx),
+  StructureInfo: (s, ctx) => renderStructureInfo(s as StructureInfo, ctx),
 };
 
 /**

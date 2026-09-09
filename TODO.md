@@ -148,9 +148,9 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
       trades grouped by level (Novice through Master). The `trade` bucket carries profession,
       level, quantities, price multiplier, max uses, and XP. **Keep `java_probability`, drop
       `bedrock_probability`**
-- [ ] **Structures** (52, Tier A) — where they generate, and the chests inside them. The `biomes`
+- [x] **Structures** (34, Tier A) — where they generate, and the chests inside them. The `biomes`
       field is a tag reference (`#minecraft:has_structure/village_plains`), so resolve it through
-      tag data rather than reading it as a literal
+      tag data rather than reading it as a literal (34 in 26.2, corrected from 52)
 - [ ] **Biomes** (67, Tier A) — what spawns there, what generates there, which structures appear
 - [ ] **Biome climate — two sources, do not assume one covers it**
   - [ ] Temperature, downfall, precipitation: take from mcmeta `worldgen/biome/<id>.json`
@@ -177,8 +177,8 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 ### Cross-linking
 
 - [ ] Mob spawns in a biome → the biome is a link
-- [ ] Structure generates in a biome → link, both directions
-- [ ] Structure → its chests → the items in them
+- [x] Structure generates in a biome → link, both directions
+- [x] Structure → its chests → the items in them
 - [x] Trade → the item traded; item → the professions that sell it
 - [x] Enchantment → the items that accept it. Rendered on the enchantment page; the item-page reverse
       lookup is deferred, per the Phase 6c record above
@@ -651,6 +651,49 @@ New collections the added data makes nearly free:
     exactly one row because `Music Disc` is the only drop name left that resolves to nothing. The
     one other unresolved droptable name, `Wool`, names the 16 coloured wools and its note does not
     enumerate them, so it stays unresolved and is untouched by this.
+
+26. **Structures are 34 entities from `worldgen/structure` (Java 26.2).**
+    The Phase 6c bullet estimated 52 structures. Java Edition 26.2 defines exactly 34 structures across
+    overworld, nether, and end in `worldgen/structure`. Each structure entity is populated with Tier A
+    placement rules from `worldgen/structure_set` (random_spread spacing/separation/frequency/exclusion
+    zones or concentric rings), sibling structures with weights, generation step, single dimension, mob
+    spawn overrides, suppressed spawn categories, and biomes resolved from `#minecraft:has_structure/*`
+    tags.
+    Chest loot tables from curated `chest-sources.json` and `loot-sources.json` attach to structures via
+    `structureRef` and render as `ChestLoot` tables sorted by chance descending. Biomes receive a
+    `LinkList` section listing all structures generating within them.
+
+    A `structureRef` is a list, not a single id, and that is the whole reason the join is curated
+    rather than matched on the display name. One village chest generates in all five villages and one
+    ruined portal chest in all seven portals, so a chest names every structure it belongs to. The item
+    page reads the same list backwards: where it resolves to one structure the label's structure half
+    becomes the link, and where it resolves to several the label stays text and the variants follow it
+    as their own links, because picking one of five would be a guess and `Village` is not an entity to
+    link the word to. The two curated files also disagreed on names before this
+    (`Trial Chamber` against `Trial Chambers`, `Ocean Ruins (Cold)` against `Ocean Ruins`), which is
+    why nothing matched on the string. `Dungeon`, `Desert Well`, `End Ship` and `Spawn` are correctly
+    ref-less: none is a `worldgen/structure` member.
+
+    Structures resolve no icon of their own and `ICON_RULES` still records that with
+    `has_icons=False`, because the wiki publishes no structure sprite family at all -- measured across
+    all 20,013 rows of the 26.2 `spritefile` bucket, the only hits on structure names are village
+    *maps* and villager entity sprites. That record is about what the wiki publishes and it stays
+    true. What each structure does carry is a Tier C borrowing in `overrides.json`: one characteristic
+    block or item whose sprite is already in the atlas, so all 34 are recognisable in a mixed
+    suggestion list without a single new sprite being fetched. Nether Bricks for the Nether Fortress,
+    End Portal Frame for the Stronghold, Trial Spawner for the Trial Chambers. It states a kind and a
+    place, not an identity, in the same spirit as the Enchanted Book frame every enchantment draws,
+    and it does not claim to be Mojang's or the wiki's picture of the structure. An earlier cut of
+    this entry said structures carry no icon "matching biomes", and both halves were wrong: biomes
+    resolve real `BiomeSprite` art, and structures now draw a borrowed sprite rather than nothing.
+
+    Three curated aliases land with this. `fort` now reaches the Nether Fortress, which
+    `aliases.json` had refused once and recorded why: in a draftout match `fort` means the fortress
+    far more often than Fortune, and the refusal said so while noting that structures did not exist
+    yet. `jungle temple` reaches `jungle_pyramid`, the name the game's own loot table uses for it.
+    `dungeon` reaches the Monster Spawner rather than a structure, because a dungeon is a feature and
+    not a `worldgen/structure` member, so it has no page and the spawner is what the player is
+    actually after.
 
 ## Still open
 

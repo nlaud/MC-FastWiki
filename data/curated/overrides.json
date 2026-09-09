@@ -1,6 +1,6 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-written corrections to one entity's name, kind, icon, blurb, or wikiUrl, for the rare case where Tier A or Tier B is simply wrong for that one ID and nobody upstream is going to fix it before the next build. Two kind entries exist as of 2026-08-31 for armor_stand and player. Icon overrides provide verified 16x16 sprite titles per Decisions 3 and 15 for advancements with missing or imprecise icons (Local Brewery, Hero of the Village, Voluntary Exile) and entities with oversized raw renders (Sculk, Sculk Shrieker, Zombie Horse Spawn Egg). See pipeline/normalize/curated.py for the loader and the shape each entry may carry.",
+  "note": "Hand-written corrections to one entity's name, kind, icon, blurb, or wikiUrl, for the rare case where Tier A or Tier B is simply wrong for that one ID and nobody upstream is going to fix it before the next build. Two kind entries exist as of 2026-08-31 for armor_stand and player. Icon overrides provide verified 16x16 sprite titles per Decisions 3 and 15 for advancements with missing or imprecise icons (Local Brewery, Hero of the Village, Voluntary Exile) and entities with oversized raw renders (Sculk, Sculk Shrieker, Zombie Horse Spawn Egg). See pipeline/normalize/curated.py for the loader and the shape each entry may carry. The 34 worldgen/structure entries are a different kind of icon override and are kept separate below on purpose. Every other icon here replaces art the wiki does publish for that thing; a structure has none at all, because measured against the 26.2 spritefile bucket there is no structure sprite family across all 20,013 rows. Each structure therefore borrows the sprite of one block or item that is characteristic of it and already in the atlas, so no new sprite is fetched: Nether Bricks for the Nether Fortress, End Portal Frame for the Stronghold, Trial Spawner for the Trial Chambers. This states a kind and a place, not an identity, in the same spirit as the Enchanted Book frame every enchantment draws, and it deliberately does not claim to be Mojang's or the wiki's picture of the structure. Where variants share one look they share one sprite, which is why all seven ruined portals draw Crying Obsidian; where the variants really are built from different blocks they differ, which is why the five villages draw their own building material.",
   "entities": {
     "minecraft:armor_stand": {
       "kind": "item"
@@ -25,6 +25,41 @@
     },
     "minecraft:zombie_horse_spawn_egg": {
       "icon": "ItemSprite:zombie-horse-spawn-egg"
-    }
+    },
+
+    "minecraft:ancient_city": { "icon": "InvSprite:Sculk Catalyst" },
+    "minecraft:bastion_remnant": { "icon": "InvSprite:Gilded Blackstone" },
+    "minecraft:buried_treasure": { "icon": "InvSprite:Heart of the Sea" },
+    "minecraft:desert_pyramid": { "icon": "InvSprite:Chiseled Sandstone" },
+    "minecraft:end_city": { "icon": "InvSprite:Purpur Block" },
+    "minecraft:fortress": { "icon": "InvSprite:Nether Bricks" },
+    "minecraft:igloo": { "icon": "InvSprite:Packed Ice" },
+    "minecraft:jungle_pyramid": { "icon": "InvSprite:Mossy Cobblestone" },
+    "minecraft:mansion": { "icon": "InvSprite:Dark Oak Planks" },
+    "minecraft:mineshaft": { "icon": "InvSprite:Rail" },
+    "minecraft:mineshaft_mesa": { "icon": "InvSprite:Terracotta" },
+    "minecraft:monument": { "icon": "InvSprite:Prismarine Bricks" },
+    "minecraft:nether_fossil": { "icon": "InvSprite:Bone Block" },
+    "minecraft:ocean_ruin_cold": { "icon": "InvSprite:Stone Bricks" },
+    "minecraft:ocean_ruin_warm": { "icon": "InvSprite:Sandstone" },
+    "minecraft:pillager_outpost": { "icon": "InvSprite:Crossbow" },
+    "minecraft:ruined_portal": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_desert": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_jungle": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_mountain": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_nether": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_ocean": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:ruined_portal_swamp": { "icon": "InvSprite:Crying Obsidian" },
+    "minecraft:shipwreck": { "icon": "InvSprite:Oak Planks" },
+    "minecraft:shipwreck_beached": { "icon": "InvSprite:Oak Planks" },
+    "minecraft:stronghold": { "icon": "InvSprite:End Portal Frame" },
+    "minecraft:swamp_hut": { "icon": "InvSprite:Cauldron" },
+    "minecraft:trail_ruins": { "icon": "InvSprite:Decorated Pot" },
+    "minecraft:trial_chambers": { "icon": "InvSprite:Trial Spawner" },
+    "minecraft:village_desert": { "icon": "InvSprite:Cut Sandstone" },
+    "minecraft:village_plains": { "icon": "InvSprite:Oak Planks" },
+    "minecraft:village_savanna": { "icon": "InvSprite:Acacia Planks" },
+    "minecraft:village_snowy": { "icon": "InvSprite:Snow Block" },
+    "minecraft:village_taiga": { "icon": "InvSprite:Spruce Planks" }
   }
 }

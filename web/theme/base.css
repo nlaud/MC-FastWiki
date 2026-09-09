@@ -2030,6 +2030,43 @@ canvas,
   font-weight: 500;
 }
 
+/* The container half of a linked chest label. The structure half is the link,
+   so this half stays plain and slightly dimmer to show where the click ends. */
+.sources-chest-container {
+  color: #b8b8b8;
+  font-weight: 400;
+}
+
+/* The variant links under a chest that generates in more than one structure --
+   a village armorer chest is in all five villages. Wraps rather than
+   overflowing, because five village names do not fit one line in a half-width
+   window. */
+.sources-structure-variants {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* The spacing is a gap rather than spaces around the separator, because a
+     flex container drops whitespace-only text between its items: a written
+     " · " renders hard against the name before it. */
+  gap: 0 5px;
+  margin-left: 5px;
+  font-weight: 400;
+  min-width: 0;
+}
+
+/* Separator and the name it introduces travel together, so a wrap never leaves
+   a lone bullet at the end of a line. */
+.sources-structure-variant {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sources-structure-separator {
+  color: #666;
+}
+
 .sources-item {
   display: flex;
   align-items: center;
@@ -2224,4 +2261,183 @@ canvas,
 .effect-source-notes {
   color: #aaa;
   font-size: 0.75rem;
+}
+
+/* LinkList */
+.link-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-list-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ChestLoot */
+.chest-loot-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chest-container-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chest-container-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.chest-loot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.chest-loot-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.chest-loot-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.chest-loot-table tr:last-child td {
+  border-bottom: none;
+}
+
+.chance-cell,
+.stack-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* StructureInfo */
+.structure-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.structure-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.structure-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.structure-label {
+  color: #888;
+  min-width: 140px;
+}
+
+.structure-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.structure-biomes-value,
+.structure-siblings-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.structure-biomes-details summary {
+  cursor: pointer;
+  color: #8ab4f8;
+  user-select: none;
+}
+
+.structure-biomes-details summary:hover {
+  text-decoration: underline;
+}
+
+.structure-biomes-list {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.structure-sibling-weight {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.structure-spawns-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.structure-spawns-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.structure-spawns-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.structure-spawns-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.structure-spawns-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.structure-spawns-table tr:last-child td {
+  border-bottom: none;
+}
+
+.group-cell,
+.weight-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
