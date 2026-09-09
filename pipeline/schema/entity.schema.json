@@ -336,6 +336,9 @@
         },
         {
           "$ref": "#/$defs/professionInfo"
+        },
+        {
+          "$ref": "#/$defs/structureInfo"
         }
       ]
     },
@@ -1078,15 +1081,62 @@
         }
       }
     },
+    "chestLootItem": {
+      "title": "ChestLootItem",
+      "description": "One item appearing in a chest or container table.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "chance", "stackRange"],
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "stackRange": {
+          "$ref": "#/$defs/integerRange"
+        }
+      }
+    },
+    "chestLootContainer": {
+      "title": "ChestLootContainer",
+      "description": "One container (chest, barrel, dispenser, pot, vault) within a structure.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "items"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chestLootItem"
+          },
+          "default": []
+        }
+      }
+    },
     "chestLoot": {
       "title": "ChestLoot",
-      "description": "The chest loot tables that hold the item. The payload of this section arrives in Phase 6c.",
+      "description": "The loot tables and containers that generate inside a structure.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": ["type", "containers"],
       "properties": {
         "type": {
           "const": "ChestLoot"
+        },
+        "containers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chestLootContainer"
+          },
+          "default": []
         }
       }
     },
@@ -1335,13 +1385,23 @@
     },
     "linkList": {
       "title": "LinkList",
-      "description": "A plain list of links to other entities. The payload of this section arrives in Phase 6.",
+      "description": "A plain list of links to other entities.",
       "type": "object",
-      "additionalProperties": true,
-      "required": ["type"],
+      "additionalProperties": false,
+      "required": ["type", "links"],
       "properties": {
         "type": {
           "const": "LinkList"
+        },
+        "title": {
+          "type": "string"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
         }
       }
     },
@@ -1361,6 +1421,188 @@
         "tradeCount": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "exclusionZone": {
+      "title": "ExclusionZone",
+      "description": "An area around another structure set where this structure cannot place.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["otherSet", "chunkCount"],
+      "properties": {
+        "otherSet": {
+          "type": "string"
+        },
+        "chunkCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "randomSpreadPlacement": {
+      "title": "RandomSpreadPlacement",
+      "description": "Placement across the world with spacing and separation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "spacing", "separation"],
+      "properties": {
+        "type": {
+          "const": "minecraft:random_spread"
+        },
+        "spacing": {
+          "type": "integer"
+        },
+        "separation": {
+          "type": "integer"
+        },
+        "spreadType": {
+          "type": "string"
+        },
+        "frequency": {
+          "type": "number"
+        },
+        "frequencyReductionMethod": {
+          "type": "string"
+        },
+        "exclusionZone": {
+          "$ref": "#/$defs/exclusionZone"
+        },
+        "salt": {
+          "type": "integer"
+        }
+      }
+    },
+    "concentricRingsPlacement": {
+      "title": "ConcentricRingsPlacement",
+      "description": "Placement in concentric rings around the world origin (e.g. Strongholds).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "count", "distance", "spread", "preferredBiomes"],
+      "properties": {
+        "type": {
+          "const": "minecraft:concentric_rings"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "distance": {
+          "type": "integer"
+        },
+        "spread": {
+          "type": "integer"
+        },
+        "preferredBiomes": {
+          "type": "string"
+        },
+        "salt": {
+          "type": "integer"
+        }
+      }
+    },
+    "structurePlacement": {
+      "title": "StructurePlacement",
+      "description": "Placement configuration for a structure set.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/randomSpreadPlacement"
+        },
+        {
+          "$ref": "#/$defs/concentricRingsPlacement"
+        }
+      ]
+    },
+    "structureSibling": {
+      "title": "StructureSibling",
+      "description": "Another structure belonging to the same structure set, with its relative weight.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structure", "weight"],
+      "properties": {
+        "structure": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      }
+    },
+    "structureSpawnEntry": {
+      "title": "StructureSpawnEntry",
+      "description": "One mob spawn override inside a structure bounding box.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "mob", "groupSize", "weight"],
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "mob": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "groupSize": {
+          "$ref": "#/$defs/integerRange"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      }
+    },
+    "structureInfo": {
+      "title": "StructureInfo",
+      "description": "Where and how a structure generates, its siblings, mob spawns, and suppressed spawns.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "dimension",
+        "step",
+        "biomes",
+        "placement",
+        "siblings",
+        "spawns",
+        "suppressedSpawns"
+      ],
+      "properties": {
+        "type": {
+          "const": "StructureInfo"
+        },
+        "dimension": {
+          "type": "string",
+          "enum": ["overworld", "nether", "end"]
+        },
+        "step": {
+          "type": "string"
+        },
+        "biomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        },
+        "placement": {
+          "$ref": "#/$defs/structurePlacement"
+        },
+        "siblings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/structureSibling"
+          },
+          "default": []
+        },
+        "spawns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/structureSpawnEntry"
+          },
+          "default": []
+        },
+        "suppressedSpawns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       }
     }

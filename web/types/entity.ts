@@ -57,7 +57,8 @@ export type Section =
   | EnchantInfo
   | GenerationInfo
   | LinkList
-  | ProfessionInfo;
+  | ProfessionInfo
+  | StructureInfo;
 /**
  * The tool that breaks a block, from the mineable tags.
  *
@@ -93,6 +94,13 @@ export type EnchantRarity = "common" | "uncommon" | "rare" | "very_rare";
  * via the `definition` "enchantSlot".
  */
 export type EnchantSlot = "any" | "armor" | "feet" | "hand" | "head" | "legs" | "mainhand" | "offhand";
+/**
+ * Placement configuration for a structure set.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "structurePlacement".
+ */
+export type StructurePlacement = RandomSpreadPlacement | ConcentricRingsPlacement;
 
 /**
  * One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.
@@ -549,14 +557,35 @@ export interface ItemAmount {
   note?: string;
 }
 /**
- * The chest loot tables that hold the item. The payload of this section arrives in Phase 6c.
+ * The loot tables and containers that generate inside a structure.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "chestLoot".
  */
 export interface ChestLoot {
   type: "ChestLoot";
-  [k: string]: unknown;
+  containers: ChestLootContainer[];
+}
+/**
+ * One container (chest, barrel, dispenser, pot, vault) within a structure.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "chestLootContainer".
+ */
+export interface ChestLootContainer {
+  label: string;
+  items: ChestLootItem[];
+}
+/**
+ * One item appearing in a chest or container table.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "chestLootItem".
+ */
+export interface ChestLootItem {
+  item: EntityRef;
+  chance: number;
+  stackRange: IntegerRange;
 }
 /**
  * Levels, applicable items, costs, and the exclusive set.
@@ -724,14 +753,15 @@ export interface VeinInfo {
   veinSize?: number;
 }
 /**
- * A plain list of links to other entities. The payload of this section arrives in Phase 6.
+ * A plain list of links to other entities.
  *
  * This interface was referenced by `Entity`'s JSON-Schema
  * via the `definition` "linkList".
  */
 export interface LinkList {
   type: "LinkList";
-  [k: string]: unknown;
+  title?: string;
+  links: EntityRef[];
 }
 /**
  * Villager profession details: workstation block and trade count.
@@ -743,4 +773,82 @@ export interface ProfessionInfo {
   type: "ProfessionInfo";
   workstation?: EntityRef;
   tradeCount: number;
+}
+/**
+ * Where and how a structure generates, its siblings, mob spawns, and suppressed spawns.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "structureInfo".
+ */
+export interface StructureInfo {
+  type: "StructureInfo";
+  dimension: "overworld" | "nether" | "end";
+  step: string;
+  biomes: EntityRef[];
+  placement: StructurePlacement;
+  siblings: StructureSibling[];
+  spawns: StructureSpawnEntry[];
+  suppressedSpawns: string[];
+}
+/**
+ * Placement across the world with spacing and separation.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "randomSpreadPlacement".
+ */
+export interface RandomSpreadPlacement {
+  type: "minecraft:random_spread";
+  spacing: number;
+  separation: number;
+  spreadType?: string;
+  frequency?: number;
+  frequencyReductionMethod?: string;
+  exclusionZone?: ExclusionZone;
+  salt?: number;
+}
+/**
+ * An area around another structure set where this structure cannot place.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "exclusionZone".
+ */
+export interface ExclusionZone {
+  otherSet: string;
+  chunkCount: number;
+}
+/**
+ * Placement in concentric rings around the world origin (e.g. Strongholds).
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "concentricRingsPlacement".
+ */
+export interface ConcentricRingsPlacement {
+  type: "minecraft:concentric_rings";
+  count: number;
+  distance: number;
+  spread: number;
+  preferredBiomes: string;
+  salt?: number;
+}
+/**
+ * Another structure belonging to the same structure set, with its relative weight.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "structureSibling".
+ */
+export interface StructureSibling {
+  structure: EntityRef;
+  weight: number;
+}
+/**
+ * One mob spawn override inside a structure bounding box.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "structureSpawnEntry".
+ */
+export interface StructureSpawnEntry {
+  category: string;
+  mob: EntityRef;
+  groupSize: IntegerRange;
+  weight: number;
 }

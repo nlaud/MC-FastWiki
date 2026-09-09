@@ -583,6 +583,8 @@ def test_the_data_groups_cover_the_rest_of_phase_one() -> None:
         "worldgen/biome",
         "worldgen/configured_feature",
         "worldgen/placed_feature",
+        "worldgen/structure",
+        "worldgen/structure_set",
     )
 
 

@@ -4,16 +4,19 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   AdvancementInfo,
   BreedingInfo,
+  ChestLoot,
   DropTable,
   EnchantInfo,
   Entity,
   FoodInfo,
   GenerationInfo,
   HarvestInfo,
+  LinkList,
   ProfessionInfo,
   RecipeTree,
   SpawnInfo,
   StatBlock,
+  StructureInfo,
   TradeTable,
 } from "../types/entity.js";
 import type { Index, IndexEntry } from "../types/index.js";
@@ -22,16 +25,19 @@ import type { RenderContext } from "./context.js";
 import { buildObtainTree } from "./obtain-tree.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
+import { renderChestLoot } from "./sections/chest-loot.js";
 import { renderDropTable } from "./sections/drop-table.js";
 import { renderEnchantInfo } from "./sections/enchant-info.js";
 import { renderFoodInfo } from "./sections/food-info.js";
 import { renderGenerationInfo } from "./sections/generation-info.js";
 import { renderHarvestInfo } from "./sections/harvest-info.js";
 import { renderSection } from "./sections/index.js";
+import { renderLinkList } from "./sections/link-list.js";
 import { renderProfessionInfo } from "./sections/profession-info.js";
 import { formatOdds, renderRecipeTree } from "./sections/recipe-tree.js";
 import { renderSpawnInfo } from "./sections/spawn-info.js";
 import { renderStatBlock } from "./sections/stat-block.js";
+import { renderStructureInfo } from "./sections/structure-info.js";
 import { renderTradeTable } from "./sections/trade-table.js";
 import { advanceTickerForTesting, resetTickerForTesting } from "./station/ticker.js";
 
@@ -1256,7 +1262,7 @@ describe("Section renderers with real committed build data", () => {
       resetTickerForTesting();
     });
 
-    it("renders chest loot sources in Title Case without links", () => {
+    it("renders chest loot sources in Title Case, linked to the structures they generate in", () => {
       const tree = buildObtainTree("minecraft:emerald", obtainGraph);
       const section = {
         type: "RecipeTree",
@@ -1285,9 +1291,68 @@ describe("Section renderers with real committed build data", () => {
         }
       }
 
-      // No anchor links in chest loot group (Decision 1)
+      // A chest label now links back to where the chest generates, and every
+      // link drawn resolves to a real index entry, so none is a dead click.
       const chestGroup = el.querySelector(".sources-chest-group");
-      expect(chestGroup?.querySelectorAll("a")).toHaveLength(0);
+      const chestLinks = Array.from(chestGroup?.querySelectorAll("a") ?? []).map(
+        (a) => a.textContent,
+      );
+      expect(chestLinks.length).toBeGreaterThan(0);
+      for (const name of chestLinks) {
+        expect(name).toBeTruthy();
+        if (name) {
+          expect(ctx.lookup(name)).not.toBeNull();
+        }
+      }
+    });
+
+    it("lists every village when a chest generates in all five of them", () => {
+      // A barrel's only chest source is the village fisher chest, which
+      // generates in all five villages. The label cannot become one link
+      // honestly -- picking one of five would be a guess, and `Village` is not
+      // an entity of its own to link the word to -- so the label stays text and
+      // the five follow it as their own links.
+      const tree = buildObtainTree("minecraft:barrel", obtainGraph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      const variants = el.querySelector(".sources-structure-variants");
+      const names = Array.from(variants?.querySelectorAll("a") ?? []).map((a) => a.textContent);
+      expect(names).toEqual([
+        "Desert Village",
+        "Plains Village",
+        "Savanna Village",
+        "Snowy Village",
+        "Taiga Village",
+      ]);
+    });
+
+    it("links a chest that generates in exactly one structure on the structure half", () => {
+      // An ancient city chest generates in one structure, so the structure half
+      // of `Ancient City - Chest` is the link and the container half is not:
+      // the click lands on the page that answers "where do I find this" rather
+      // than on a page named after a chest.
+      const tree = buildObtainTree("minecraft:echo_shard", obtainGraph);
+      const section = {
+        type: "RecipeTree",
+        root: tree.root,
+        rawProducers: tree.rawProducers,
+        sources: tree.sources,
+      } as unknown as RecipeTree;
+      const el = requireItem(renderRecipeTree(section, ctx), "RecipeTree element");
+
+      const chestGroup = el.querySelector(".sources-chest-group");
+      const links = Array.from(chestGroup?.querySelectorAll("a") ?? []).map((a) => a.textContent);
+      expect(links).toContain("Ancient City");
+
+      const container = chestGroup?.querySelector(".sources-chest-container");
+      expect(container?.textContent).toContain("Chest");
+      expect(container?.querySelector("a")).toBeNull();
     });
 
     it("shows up to 3 sources per group with remainder behind toggle button", () => {
@@ -2251,6 +2316,241 @@ describe("Section renderers with real committed build data", () => {
 
       const treasureBadge = requireItem(el.querySelector(".badge-treasure"), "treasure badge");
       expect(treasureBadge.textContent).toBe("Treasure");
+    });
+  });
+
+  describe("LinkList", () => {
+    it("returns null when links is empty", () => {
+      expect(renderLinkList({ type: "LinkList", links: [] }, ctx)).toBeNull();
+    });
+
+    it("renders title and entity links", () => {
+      const section: LinkList = {
+        type: "LinkList",
+        title: "Structures",
+        links: [
+          { id: "minecraft:desert", name: "Desert" },
+          { id: "minecraft:plains", name: "Plains" },
+        ],
+      };
+      const el = requireItem(renderLinkList(section, ctx), "LinkList element");
+      expect(el.querySelector(".section-title")?.textContent).toBe("Structures");
+      const links = el.querySelectorAll(".entity-link");
+      expect(links.length).toBe(2);
+    });
+  });
+
+  describe("ChestLoot", () => {
+    it("returns null when containers is empty", () => {
+      expect(renderChestLoot({ type: "ChestLoot", containers: [] }, ctx)).toBeNull();
+    });
+
+    it("returns null when all containers have no items", () => {
+      expect(
+        renderChestLoot(
+          { type: "ChestLoot", containers: [{ label: "Empty Chest", items: [] }] },
+          ctx,
+        ),
+      ).toBeNull();
+    });
+
+    it("renders container label and table of items sorted by chance descending", () => {
+      const section: ChestLoot = {
+        type: "ChestLoot",
+        containers: [
+          {
+            label: "Chest",
+            items: [
+              {
+                item: { id: "minecraft:iron_ingot", name: "Iron Ingot" },
+                chance: 0.25,
+                stackRange: { minimum: 1, maximum: 5 },
+              },
+              {
+                item: { id: "minecraft:diamond", name: "Diamond" },
+                chance: 0.75,
+                stackRange: { minimum: 1, maximum: 2 },
+              },
+            ],
+          },
+        ],
+      };
+      const el = requireItem(renderChestLoot(section, ctx), "ChestLoot element");
+      expect(el.querySelector(".chest-container-label")?.textContent).toBe("Chest");
+      const rows = el.querySelectorAll("tbody tr");
+      expect(rows.length).toBe(2);
+      expect(rows[0]?.textContent).toContain("Diamond");
+      expect(rows[0]?.textContent).toContain("75%");
+      expect(rows[0]?.textContent).toContain("1–2");
+      expect(rows[1]?.textContent).toContain("Iron Ingot");
+      expect(rows[1]?.textContent).toContain("25%");
+      expect(rows[1]?.textContent).toContain("1–5");
+    });
+  });
+
+  describe("StructureInfo", () => {
+    it("renders random_spread placement with exclusion zone and mob spawns", () => {
+      const section: StructureInfo = {
+        type: "StructureInfo",
+        dimension: "overworld",
+        step: "surface_structures",
+        biomes: [
+          { id: "minecraft:desert", name: "Desert" },
+          { id: "minecraft:plains", name: "Plains" },
+        ],
+        placement: {
+          type: "minecraft:random_spread",
+          spacing: 32,
+          separation: 8,
+          frequency: 0.004,
+          exclusionZone: {
+            otherSet: "minecraft:villages",
+            chunkCount: 10,
+          },
+        },
+        siblings: [
+          { structure: { id: "minecraft:desert_pyramid", name: "Desert Pyramid" }, weight: 1 },
+          { structure: { id: "minecraft:jungle_pyramid", name: "Jungle Pyramid" }, weight: 2 },
+        ],
+        spawns: [
+          {
+            category: "monster",
+            mob: { id: "minecraft:husk", name: "Husk" },
+            groupSize: { minimum: 1, maximum: 3 },
+            weight: 10,
+          },
+        ],
+        suppressedSpawns: ["creature"],
+      };
+      const el = requireItem(renderStructureInfo(section, ctx), "StructureInfo element");
+      const text = el.textContent;
+      expect(text).toContain("Overworld");
+      expect(text).toContain("Surface Structures");
+      expect(text).toContain("Every 32 chunks, at least 8 apart (in 0.4% of chunks)");
+      expect(text).toContain("Never within 10 chunks of a Village");
+      expect(text).toContain("Set Siblings:");
+      expect(text).toContain("weight 1");
+      expect(text).toContain("weight 2");
+      expect(text).toContain("Suppressed Spawns:");
+      expect(text).toContain("Creature");
+
+      const spawnRows = el.querySelectorAll(".structure-spawns-table tbody tr");
+      expect(spawnRows.length).toBe(1);
+      expect(spawnRows[0]?.textContent).toContain("Husk");
+      expect(spawnRows[0]?.textContent).toContain("Monster");
+      expect(spawnRows[0]?.textContent).toContain("1–3");
+      expect(spawnRows[0]?.textContent).toContain("10");
+    });
+
+    it("renders concentric_rings placement", () => {
+      const section: StructureInfo = {
+        type: "StructureInfo",
+        dimension: "overworld",
+        step: "strongholds",
+        biomes: [{ id: "minecraft:plains", name: "Plains" }],
+        placement: {
+          type: "minecraft:concentric_rings",
+          count: 128,
+          distance: 32,
+          spread: 3,
+          preferredBiomes: "#minecraft:stronghold_biased_to",
+        },
+        siblings: [],
+        spawns: [],
+        suppressedSpawns: [],
+      };
+      const el = requireItem(renderStructureInfo(section, ctx), "StructureInfo element");
+      expect(el.textContent).toContain("128 in rings 32 chunks apart");
+    });
+
+    it("states a frequency alone when the spacing grid decides nothing", () => {
+      // A mineshaft declares `spacing: 1, separation: 0` and then a frequency
+      // of 0.004. The grid says the game considers every chunk and lets the
+      // frequency decide, so printing "Every 1 chunks, at least 0 apart" would
+      // claim a mineshaft in every chunk -- the plausible-looking wrong answer.
+      const section: StructureInfo = {
+        type: "StructureInfo",
+        dimension: "overworld",
+        step: "underground_structures",
+        biomes: [{ id: "minecraft:plains", name: "Plains" }],
+        placement: {
+          type: "minecraft:random_spread",
+          spacing: 1,
+          separation: 0,
+          salt: 0,
+          frequency: 0.004,
+        },
+        siblings: [],
+        spawns: [],
+        suppressedSpawns: [],
+      };
+      const el = requireItem(renderStructureInfo(section, ctx), "StructureInfo element");
+      expect(el.textContent).toContain("In 0.4% of chunks");
+      expect(el.textContent).not.toContain("Every 1");
+      expect(el.textContent).not.toContain("at least 0 apart");
+    });
+
+    it("keeps the spacing grid when it really does decide something", () => {
+      const section: StructureInfo = {
+        type: "StructureInfo",
+        dimension: "overworld",
+        step: "surface_structures",
+        biomes: [{ id: "minecraft:plains", name: "Plains" }],
+        placement: {
+          type: "minecraft:random_spread",
+          spacing: 32,
+          separation: 8,
+          salt: 0,
+          frequency: 0.2,
+        },
+        siblings: [],
+        spawns: [],
+        suppressedSpawns: [],
+      };
+      const el = requireItem(renderStructureInfo(section, ctx), "StructureInfo element");
+      expect(el.textContent).toContain("Every 32 chunks, at least 8 apart");
+      expect(el.textContent).toContain("(in 20% of chunks)");
+    });
+
+    it("delegates to renderSection for all three new types", () => {
+      const linkList: LinkList = {
+        type: "LinkList",
+        title: "Test Links",
+        links: [{ id: "minecraft:desert", name: "Desert" }],
+      };
+      const chestLoot: ChestLoot = {
+        type: "ChestLoot",
+        containers: [
+          {
+            label: "Chest",
+            items: [
+              {
+                item: { id: "minecraft:apple", name: "Apple" },
+                chance: 1.0,
+                stackRange: { minimum: 1, maximum: 1 },
+              },
+            ],
+          },
+        ],
+      };
+      const structureInfo: StructureInfo = {
+        type: "StructureInfo",
+        dimension: "end",
+        step: "surface_structures",
+        biomes: [],
+        placement: {
+          type: "minecraft:random_spread",
+          spacing: 20,
+          separation: 11,
+        },
+        siblings: [],
+        spawns: [],
+        suppressedSpawns: [],
+      };
+
+      expect(renderSection(linkList, ctx)).not.toBeNull();
+      expect(renderSection(chestLoot, ctx)).not.toBeNull();
+      expect(renderSection(structureInfo, ctx)).not.toBeNull();
     });
   });
 });

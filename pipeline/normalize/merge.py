@@ -222,10 +222,17 @@ from pipeline.enrich.resource_location import (
 from pipeline.enrich.sprite import SpriteIndex
 from pipeline.extract.enchantment import EnchantIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
+from pipeline.extract.feature_place import FeaturePlaceIndex
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
 from pipeline.extract.generation import BlockGeneration
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.extract.profession import ProfessionIndex, extract_professions
+from pipeline.extract.structure import (
+    RandomSpreadPlacement as ExtractedRandomSpreadPlacement,
+)
+from pipeline.extract.structure import (
+    StructureIndex,
+)
 from pipeline.fetch.extracts import ExtractReport
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.aliases import AliasStrength, generate_aliases
@@ -235,6 +242,10 @@ from pipeline.normalize.entity import (
     ApplicableItems,
     BreedingInfo,
     BreedingItem,
+    ChestLoot,
+    ChestLootContainer,
+    ChestLootItem,
+    ConcentricRingsPlacement,
     DamageValue,
     DistributionEntry,
     DropEntry,
@@ -248,6 +259,7 @@ from pipeline.normalize.entity import (
     EntityDraft,
     EntityKind,
     EntityRef,
+    ExclusionZone,
     FoodEffect,
     FoodInfo,
     GenerationInfo,
@@ -260,9 +272,11 @@ from pipeline.normalize.entity import (
     JavaProbability,
     LabelledText,
     LabelledValue,
+    LinkList,
     LootingDrop,
     Measure,
     ProfessionInfo,
+    RandomSpreadPlacement,
     Ratio,
     Section,
     SizeValue,
@@ -270,12 +284,17 @@ from pipeline.normalize.entity import (
     SpawnEntry,
     SpawnInfo,
     StatBlock,
+    StructureInfo,
+    StructurePlacement,
+    StructureSibling,
+    StructureSpawnEntry,
     TradeEntry,
     TradeTable,
     VeinInfo,
 )
 from pipeline.normalize.reconcile import ICON_RULES, resolve_display_name_icon, resolve_icon
 from pipeline.obtain.brewing import POTION_ID_TEMPLATE
+from pipeline.obtain.chests import ChestSource, by_structure
 from pipeline.obtain.loot import SHEARS_NOTE, SILK_TOUCH_NOTE
 from pipeline.obtain.producer import ObtainMethod, Producer
 
@@ -291,6 +310,8 @@ __all__ = [
     "UnplacedRow",
     "block_drops_from_producers",
     "merge_entities",
+    "names_the_wiki_reuses",
+    "resolve_structure_pages",
     "write_report",
 ]
 
@@ -555,6 +576,126 @@ def _fallback_name(path: str) -> str:
     docstring's field-merge section for the measurement behind that claim.
     """
     return path.replace("_", " ").title()
+
+
+def resolve_structure_pages(
+    structure_index: StructureIndex, join_table: JoinTable
+) -> dict[str, tuple[str, str]]:
+    """Return each structure id's `(display_name, wiki_page)`.
+
+    Public, and called from two places on purpose. `merge_entities` needs the
+    pair to name the entity and to look its blurb up; `pipeline.cli.build` needs
+    the *page* half before that, because a page nothing asked the extracts
+    fetcher for has no blurb to look up by the time the merge runs.
+
+    Deriving the page in only one of those places is exactly the fault this
+    function exists to prevent. The village fallback below resolves three ids to
+    `Village`, a page no other stage requests -- the join table lists it under a
+    village variant's *display name*, never as that variant's own page -- so a
+    build that resolved it here and fetched elsewhere left Savanna, Snowy and
+    Taiga Village with a `wikiUrl` pointing at prose their entity did not carry.
+
+    The village rule: the `resource_location` bucket maps every village variant
+    to four candidate pages, so prefer the one whose title is the variant's own
+    display name and fall back to `Village` otherwise. `Plains Village` and
+    `Desert Village` have a page of their own; the other three do not, and share
+    the one article the wiki actually wrote.
+    """
+    resolved: dict[str, tuple[str, str]] = {}
+    for sid in structure_index.structures:
+        rows = [r for r in join_table.by_registry_id.get(sid, ()) if r.kind == "env"]
+        if not rows:
+            rows = list(join_table.by_registry_id.get(sid, ()))
+        if rows:
+            row = rows[0]
+            display_name = row.display_name
+            if sid.startswith(f"{NAMESPACE}:village_"):
+                page = row.page if row.page == display_name else "Village"
+            else:
+                page = row.page
+        else:
+            path = sid.split(":", 1)[-1]
+            display_name = _fallback_name(path)
+            page = display_name
+        resolved[sid] = (display_name, page)
+    return resolved
+
+
+def names_the_wiki_reuses(join_table: JoinTable) -> frozenset[str]:
+    """Return the display names several registry ids share while each keeps its own page.
+
+    The wiki's `display_name` is the *in-game item name*, and for one family that
+    name is deliberately not unique: all 22 music discs are called `Music Disc`,
+    because that is what the game prints on the stack, with the track shown only
+    in the tooltip. A reference tool that repeats it renders 22 identical rows,
+    and a dungeon chest listing three discs at three different odds becomes
+    unreadable -- the reader cannot tell which one is the 1.4%.
+
+    The wiki has the better name and files it as the *page title*: `Music Disc 13`,
+    `Music Disc Pigstep`, `Music Disc Creator (Music Box)`. So a name in this set
+    tells the merge to take the page title instead of the shared display name.
+
+    Both halves of the condition matter. Several ids must share the name, and
+    their pages must actually differ. That second half is what keeps this from
+    touching the four other collisions in the build, none of which is this
+    problem: `Wind Charge` and `Eye of Ender` are each two registry ids for one
+    page, so there is no better name to take, and `Hero of the Village` and
+    `The End` collide across two different *kinds*, where the kind badge already
+    tells them apart and renaming either would be wrong. Measured against the
+    live 26.2 data, this set holds exactly one name.
+    """
+    pages_by_name: dict[str, set[str]] = {}
+    ids_by_name: dict[str, set[str]] = {}
+    for row in join_table.entries:
+        pages_by_name.setdefault(row.display_name, set()).add(row.page)
+        ids_by_name.setdefault(row.display_name, set()).add(row.registry_id)
+    return frozenset(
+        name
+        for name, pages in pages_by_name.items()
+        if len(pages) > 1 and len(ids_by_name[name]) > 1
+    )
+
+
+def _build_chest_loot(
+    place_id: str,
+    containers_by_place: Mapping[str, Sequence[tuple[str, ChestSource]]],
+    producers_by_table: Mapping[str, Sequence[Producer]],
+    drafts: Mapping[str, EntityDraft],
+) -> ChestLoot | None:
+    """Return the `ChestLoot` section of one place, or `None` when it holds no container.
+
+    Shared by the 34 structures and by the curated feature places, because a
+    dungeon's chest is read from the same curated attribution and the same loot
+    producers as a bastion's. A place with no container gets `None` rather than an
+    empty section, so its page omits the heading instead of printing one over
+    nothing -- the rule `renderGenerationInfo` already follows.
+    """
+    container_tuples = containers_by_place.get(place_id, ())
+    if not container_tuples:
+        return None
+
+    containers: list[ChestLootContainer] = []
+    for table_path, chest_src in container_tuples:
+        items: list[ChestLootItem] = []
+        for prod in producers_by_table.get(table_path, ()):
+            item_id = prod.output.item
+            item_name = (
+                drafts[item_id].name
+                if item_id in drafts
+                else _fallback_name(item_id.split(":", 1)[-1])
+            )
+            stack_max = prod.count_max if prod.count_max is not None else prod.output.count
+            items.append(
+                ChestLootItem(
+                    item=EntityRef(id=item_id, name=item_name),
+                    chance=float(prod.chance) if prod.chance is not None else 1.0,
+                    stack_range=IntegerRange(minimum=prod.output.count, maximum=stack_max),
+                )
+            )
+        items.sort(key=lambda it: (-it.chance, it.item.name, it.item.id))
+        containers.append(ChestLootContainer(label=chest_src.container, items=tuple(items)))
+
+    return ChestLoot(containers=tuple(containers)) if containers else None
 
 
 def _biome_ref(biome_id: str, join_table: JoinTable) -> EntityRef:
@@ -1434,6 +1575,10 @@ def merge_entities(
     enchant_index: EnchantIndex | None = None,
     profession_index: ProfessionIndex | None = None,
     profession_infoboxes: Mapping[str, ProfessionInfobox] | None = None,
+    structure_index: StructureIndex | None = None,
+    feature_place_index: FeaturePlaceIndex | None = None,
+    curated_chests: Mapping[str, ChestSource] | None = None,
+    loot_producers: Sequence[Producer] | None = None,
 ) -> MergeResult:
     """Return the merged `Entity` set of one build, and the report of how it was built.
 
@@ -1496,6 +1641,9 @@ def merge_entities(
 
     blurbs = extract_report.blurbs()
     drafts: dict[str, EntityDraft] = {}
+    # The display names the wiki reuses across several ids, computed once before
+    # the loop because a collision is only visible across the whole table.
+    reused_names = names_the_wiki_reuses(join_table)
     # The display name each ID settled on, collected as the loop resolves it.
     # The food section reads it to name an effect it links to, and it cannot
     # ask the draft: `EntityDraft` deliberately exposes no name accessor, and
@@ -1544,8 +1692,11 @@ def merge_entities(
         row = _own_row(entity_id, regs, join_table)
         resolved_name = fallback_name
         if row is not None:
-            resolved_name = row.display_name
-            draft.set("name", row.display_name, SourceTier.B)
+            # The wiki's display name is the in-game stack name, which one family
+            # shares on purpose. Where it does, its page title is the real name.
+            # See `names_the_wiki_reuses`.
+            resolved_name = row.page if row.display_name in reused_names else row.display_name
+            draft.set("name", resolved_name, SourceTier.B)
             draft.set("wikiUrl", row.wiki_url, SourceTier.B)
             blurb = blurbs.get(row.page)
             if blurb is not None:
@@ -1811,6 +1962,264 @@ def merge_entities(
             draft.add_aliases([alias], alias_tier)
 
         drafts[entity_id] = draft
+
+    # --- Structures, enumerated separately ----------------------------------
+    #
+    # The 34 structures from the `worldgen/structure` registry enumerate here,
+    # mirroring villager professions, potions, and advancements.
+    if structure_index is not None:
+        resolved_pages = resolve_structure_pages(structure_index, join_table)
+        structure_display_names = {sid: name for sid, (name, _) in resolved_pages.items()}
+        structure_wiki_pages = {sid: page for sid, (_, page) in resolved_pages.items()}
+
+        producers_by_table: dict[str, list[Producer]] = {}
+        if loot_producers:
+            for p in loot_producers:
+                producers_by_table.setdefault(p.source_id, []).append(p)
+
+        containers_by_structure = by_structure(curated_chests) if curated_chests else {}
+        structures_by_biome: dict[str, list[EntityRef]] = {}
+
+        for sid, struct_entry in structure_index.structures.items():
+            entity_id = sid
+            kind = EntityKind.STRUCTURE
+            override = curated.overrides.get(entity_id)
+            if override is not None and override.kind is not None:
+                kind = override.kind
+
+            display_name = structure_display_names[sid]
+            page = structure_wiki_pages[sid]
+
+            draft = EntityDraft(id=entity_id, kind=kind, name=display_name, tier=SourceTier.A)
+            draft.set("name", display_name, SourceTier.B)
+            wiki_page = page.replace(" ", "_")
+            draft.set(
+                "wikiUrl",
+                f"https://minecraft.wiki/{wiki_page}"
+                if wiki_page.startswith("w/")
+                else f"https://minecraft.wiki/w/{wiki_page}",
+                SourceTier.B,
+            )
+
+            blurb = blurbs.get(page)
+            if blurb is not None:
+                draft.set("blurb", blurb, SourceTier.B)
+            else:
+                missing_blurbs.append(MissingBlurb(id=entity_id, page=page))
+
+            # A structure resolves no icon of its own, and `ICON_RULES` still
+            # says so with `has_icons=False`: the wiki publishes no structure
+            # sprite family, so there is nothing for the id or display-name
+            # routes to find and the registry stays an exemption in the icon
+            # report. That record is about what the wiki publishes and it is
+            # still correct.
+            #
+            # What a structure can carry is a curated borrowing, and the Tier C
+            # override is the mechanism that already exists for it. Each of the
+            # 34 names one characteristic block or item whose sprite is in the
+            # atlas anyway, so a structure row is recognisable in a mixed
+            # suggestion list without a single new sprite being fetched. It
+            # states a kind and a place rather than an identity. A structure
+            # with no override stays iconless rather than borrowing something
+            # arbitrary, which is why this reads the override and never falls
+            # back to a guess.
+            if override is not None and override.icon is not None:
+                draft.set("icon", override.icon, SourceTier.C)
+
+            # Resolve biomes to EntityRefs
+            biome_refs: list[EntityRef] = []
+            for b_id in struct_entry.biomes:
+                b_name = drafts[b_id].name if b_id in drafts else _biome_ref(b_id, join_table).name
+                b_ref = EntityRef(id=b_id, name=b_name)
+                biome_refs.append(b_ref)
+                structures_by_biome.setdefault(b_id, []).append(
+                    EntityRef(id=entity_id, name=display_name)
+                )
+
+            # Resolve siblings to StructureSibling
+            sibling_refs: list[StructureSibling] = []
+            for sib in struct_entry.siblings:
+                sib_name = structure_display_names.get(
+                    sib.structure, _fallback_name(sib.structure.split(":", 1)[-1])
+                )
+                sibling_refs.append(
+                    StructureSibling(
+                        structure=EntityRef(id=sib.structure, name=sib_name),
+                        weight=sib.weight,
+                    )
+                )
+
+            # Placement
+            placement: StructurePlacement
+            if isinstance(struct_entry.placement, ExtractedRandomSpreadPlacement):
+                ez = None
+                if struct_entry.placement.exclusion_zone is not None:
+                    ez = ExclusionZone(
+                        other_set=struct_entry.placement.exclusion_zone.other_set,
+                        chunk_count=struct_entry.placement.exclusion_zone.chunk_count,
+                    )
+                placement = RandomSpreadPlacement(
+                    type=struct_entry.placement.type,
+                    spacing=struct_entry.placement.spacing,
+                    separation=struct_entry.placement.separation,
+                    spread_type=struct_entry.placement.spread_type,
+                    frequency=struct_entry.placement.frequency,
+                    frequency_reduction_method=struct_entry.placement.frequency_reduction_method,
+                    exclusion_zone=ez,
+                    salt=struct_entry.placement.salt,
+                )
+            else:
+                placement = ConcentricRingsPlacement(
+                    type=struct_entry.placement.type,
+                    count=struct_entry.placement.count,
+                    distance=struct_entry.placement.distance,
+                    spread=struct_entry.placement.spread,
+                    preferred_biomes=struct_entry.placement.preferred_biomes,
+                    salt=struct_entry.placement.salt,
+                )
+
+            # Spawns
+            spawns: list[StructureSpawnEntry] = []
+            for sp in struct_entry.spawns:
+                mob_name = (
+                    drafts[sp.entity_type].name
+                    if sp.entity_type in drafts
+                    else _fallback_name(sp.entity_type.split(":", 1)[-1])
+                )
+                spawns.append(
+                    StructureSpawnEntry(
+                        category=sp.category,
+                        mob=EntityRef(id=sp.entity_type, name=mob_name),
+                        group_size=IntegerRange(minimum=sp.min_count, maximum=sp.max_count),
+                        weight=sp.weight,
+                    )
+                )
+
+            draft.add_section(
+                StructureInfo(
+                    dimension=struct_entry.dimension.value,
+                    step=struct_entry.step,
+                    biomes=tuple(biome_refs),
+                    placement=placement,
+                    siblings=tuple(sibling_refs),
+                    spawns=tuple(spawns),
+                    suppressed_spawns=struct_entry.suppressed_spawns,
+                ),
+                SourceTier.A,
+            )
+
+            # Chest loot containers
+            chest_section = _build_chest_loot(
+                entity_id, containers_by_structure, producers_by_table, drafts
+            )
+            if chest_section is not None:
+                draft.add_section(chest_section, SourceTier.A)
+
+            curated_aliases = curated.aliases.get(entity_id, ())
+            for alias, strength in generate_aliases(
+                entity_id=entity_id,
+                kind=kind,
+                name=display_name,
+                curated=curated_aliases,
+            ):
+                alias_tier = SourceTier.C if strength is AliasStrength.CURATED else SourceTier.A
+                draft.add_aliases([alias], alias_tier)
+
+            drafts[entity_id] = draft
+
+        # --- Curated feature places -----------------------------------------
+        #
+        # A dungeon is the reason this block exists. Players call it a structure
+        # and `chest-sources.json` files its chest under one, but the registry
+        # holds it as a configured feature, so `worldgen/structure` never names
+        # it and it was the one lootable place in the game with no page.
+        #
+        # It renders as `GenerationInfo` rather than `StructureInfo`, and that is
+        # the honest shape rather than a convenience: a feature has no structure
+        # set, no separation, and no generation step, so `StructureInfo` would be
+        # mostly empty and its placement field could not be filled at all. What a
+        # feature does have -- a dimension, a height band, attempts per chunk and
+        # a biome list -- is exactly what `GenerationInfo` was built to state for
+        # an ore vein. The kind stays `structure`, because that is the badge and
+        # the renderer a player looking for a place expects, not a claim about
+        # which registry the id came from.
+        for place_id, place in (feature_place_index or {}).items():
+            kind = EntityKind.STRUCTURE
+            override = curated.overrides.get(place_id)
+            if override is not None and override.kind is not None:
+                kind = override.kind
+
+            draft = EntityDraft(id=place_id, kind=kind, name=place.name, tier=SourceTier.A)
+            draft.set("name", place.name, SourceTier.B)
+            draft.set(
+                "wikiUrl",
+                f"https://minecraft.wiki/w/{place.page.replace(' ', '_')}",
+                SourceTier.B,
+            )
+
+            blurb = blurbs.get(place.page)
+            if blurb is not None:
+                draft.set("blurb", blurb, SourceTier.B)
+            else:
+                missing_blurbs.append(MissingBlurb(id=place_id, page=place.page))
+
+            if override is not None and override.icon is not None:
+                draft.set("icon", override.icon, SourceTier.C)
+
+            biome_refs = [
+                EntityRef(
+                    id=b_id,
+                    name=drafts[b_id].name if b_id in drafts else _biome_ref(b_id, join_table).name,
+                )
+                for b_id in place.biomes
+            ]
+            for place_biome in biome_refs:
+                structures_by_biome.setdefault(place_biome.id, []).append(
+                    EntityRef(id=place_id, name=place.name)
+                )
+
+            draft.add_section(
+                GenerationInfo(
+                    scopes=(
+                        GenerationScope(
+                            dimension=place.dimension.value,
+                            min_y=place.min_y,
+                            max_y=place.max_y,
+                            attempts_per_chunk=place.attempts_per_chunk,
+                            biome_count=len(biome_refs),
+                            all_biomes_of_dimension=place.all_biomes_of_dimension,
+                            biomes=() if place.all_biomes_of_dimension else tuple(biome_refs),
+                        ),
+                    )
+                ),
+                SourceTier.A,
+            )
+
+            chest_section = _build_chest_loot(
+                place_id, containers_by_structure, producers_by_table, drafts
+            )
+            if chest_section is not None:
+                draft.add_section(chest_section, SourceTier.A)
+
+            for alias, strength in generate_aliases(
+                entity_id=place_id,
+                kind=kind,
+                name=place.name,
+                curated=curated.aliases.get(place_id, ()),
+            ):
+                alias_tier = SourceTier.C if strength is AliasStrength.CURATED else SourceTier.A
+                draft.add_aliases([alias], alias_tier)
+
+            drafts[place_id] = draft
+
+        # Reverse links on biomes: attach LinkList(title="Structures", links=...)
+        for biome_id, struct_refs in structures_by_biome.items():
+            if biome_id in drafts:
+                sorted_links = tuple(sorted(struct_refs, key=lambda r: (r.name, r.id)))
+                drafts[biome_id].add_section(
+                    LinkList(title="Structures", links=sorted_links),
+                    SourceTier.A,
+                )
 
     # --- SpawnInfo, DropTable, TradeTable: forward resolution from Tier B ---
 
@@ -2250,6 +2659,7 @@ def merge_entities(
     counts["advancement"] = len(advancement_ids)
     counts["potion"] = len(registries.get("potion", ()))
     counts["profession"] = len(profession_index)
+    counts["structure"] = len(structure_index) if structure_index is not None else 0
     counts["entities"] = len(entities)
     # The per-kind breakdown of the 158 entity_type IDs, once the
     # classification, the demotion, and any curated override have all run.

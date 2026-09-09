@@ -52,6 +52,14 @@
         "ref": {
           "description": "The registry id of the one entity or block a player interacts with to reach this loot, where the source is a single thing with a page of its own: the piglin you barter with, the sheep you shear, the beehive you harvest. Absent for a source that is not one such thing -- a chest in a structure, a fishing catch, a hero-of-the-village gift -- so a renderer draws a link only where one would answer the question the label asks.",
           "$ref": "#/$defs/entityId"
+        },
+        "structureRef": {
+          "description": "The registry id(s) of the structure(s) this chest or loot table generates within.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityId"
+          },
+          "default": []
         }
       }
     },

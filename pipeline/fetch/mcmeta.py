@@ -168,6 +168,8 @@ DATA_GROUPS = (
     "worldgen/biome",
     "worldgen/configured_feature",
     "worldgen/placed_feature",
+    "worldgen/structure",
+    "worldgen/structure_set",
 )
 
 # How many bytes of archive this module reads before it stops.

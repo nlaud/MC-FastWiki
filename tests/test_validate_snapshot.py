@@ -110,7 +110,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2141
+    assert snapshot.total == 2176
     assert snapshot.by_kind == {
         "block": 1195,
         "item": 540,
@@ -119,13 +119,20 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "biome": 66,
         "enchantment": 43,
         "effect": 39,
+        "structure": 35,
         "entity": 28,
         "profession": 13,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2141)
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2176)
     # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
     # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2110, "blurb": 1984, "icon": 2049}
+    # 2144 wikiUrl, 2015 blurb, 2049 icon after 34 structures were added, when a structure carried
+    # no icon and the three villages that share the `Village` page carried no blurb.
+    # 2144 wikiUrl, 2018 blurb, 2083 icon after `Village` was fetched, so Savanna, Snowy and
+    # Taiga Village carry its prose (+3), and all 34 structures borrow a curated Tier C icon (+34).
+    # 2145/2019/2084 now: the dungeon is a 35th place, enumerated from the configured feature the
+    # game files it under, and it carries all three.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2019, "icon": 2084}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -144,9 +151,16 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "FoodInfo": 45,
         "HarvestInfo": 861,
         "EffectSources": 39,
-        "GenerationInfo": 52,
+        # 52 blocks with generation facts, plus the dungeon, which states where
+        # it generates through this section rather than `StructureInfo`: a
+        # feature has no structure set, no separation and no generation step.
+        "GenerationInfo": 53,
         "EnchantInfo": 43,
         "ProfessionInfo": 13,
+        "StructureInfo": 34,
+        # 30 of the 34 structures hold a container, plus the dungeon's chest.
+        "ChestLoot": 31,
+        "LinkList": 62,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.

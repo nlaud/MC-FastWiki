@@ -1,86 +1,114 @@
 {
   "verifiedFor": "26.2",
-  "note": "Hand-maintained structure and container attribution for all 63 chest, dispenser, pot, and spawner loot tables in Java Edition 26.2. Structure names use Title Case and will become links when structure pages exist in Phase 6c. Container labels describe the specific chest, barrel, dispenser, pot, or spawner vault within that structure.",
+  "note": "Hand-maintained structure and container attribution for all 63 chest, dispenser, pot, and spawner loot tables in Java Edition 26.2. Structure names use Title Case and link to structure pages via structureRef. Container labels describe the specific chest, barrel, dispenser, pot, or spawner vault within that structure.",
   "chests": {
     "loot_table/chests/abandoned_mineshaft.json": {
       "structure": "Mineshaft",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": ["minecraft:mineshaft", "minecraft:mineshaft_mesa"]
     },
     "loot_table/chests/ancient_city.json": {
       "structure": "Ancient City",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:ancient_city"
     },
     "loot_table/chests/ancient_city_ice_box.json": {
       "structure": "Ancient City",
-      "container": "Ice Box Chest"
+      "container": "Ice Box Chest",
+      "structureRef": "minecraft:ancient_city"
     },
     "loot_table/chests/bastion_bridge.json": {
       "structure": "Bastion Remnant",
-      "container": "Bridge Chest"
+      "container": "Bridge Chest",
+      "structureRef": "minecraft:bastion_remnant"
     },
     "loot_table/chests/bastion_hoglin_stable.json": {
       "structure": "Bastion Remnant",
-      "container": "Hoglin Stable Chest"
+      "container": "Hoglin Stable Chest",
+      "structureRef": "minecraft:bastion_remnant"
     },
     "loot_table/chests/bastion_other.json": {
       "structure": "Bastion Remnant",
-      "container": "Generic Chest"
+      "container": "Generic Chest",
+      "structureRef": "minecraft:bastion_remnant"
     },
     "loot_table/chests/bastion_treasure.json": {
       "structure": "Bastion Remnant",
-      "container": "Treasure Chest"
+      "container": "Treasure Chest",
+      "structureRef": "minecraft:bastion_remnant"
     },
     "loot_table/chests/buried_treasure.json": {
       "structure": "Buried Treasure",
-      "container": "Treasure Chest"
+      "container": "Treasure Chest",
+      "structureRef": "minecraft:buried_treasure"
     },
     "loot_table/chests/desert_pyramid.json": {
       "structure": "Desert Pyramid",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:desert_pyramid"
     },
     "loot_table/chests/end_city_treasure.json": {
       "structure": "End City",
-      "container": "Treasure Chest"
+      "container": "Treasure Chest",
+      "structureRef": "minecraft:end_city"
     },
     "loot_table/chests/igloo_chest.json": {
       "structure": "Igloo",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:igloo"
     },
     "loot_table/chests/jungle_temple.json": {
       "structure": "Jungle Pyramid",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:jungle_pyramid"
     },
     "loot_table/chests/jungle_temple_dispenser.json": {
       "structure": "Jungle Pyramid",
-      "container": "Dispenser"
+      "container": "Dispenser",
+      "structureRef": "minecraft:jungle_pyramid"
     },
     "loot_table/chests/nether_bridge.json": {
       "structure": "Nether Fortress",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:fortress"
     },
     "loot_table/chests/pillager_outpost.json": {
       "structure": "Pillager Outpost",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:pillager_outpost"
     },
     "loot_table/chests/ruined_portal.json": {
       "structure": "Ruined Portal",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": [
+        "minecraft:ruined_portal",
+        "minecraft:ruined_portal_desert",
+        "minecraft:ruined_portal_jungle",
+        "minecraft:ruined_portal_mountain",
+        "minecraft:ruined_portal_nether",
+        "minecraft:ruined_portal_ocean",
+        "minecraft:ruined_portal_swamp"
+      ]
     },
     "loot_table/chests/shipwreck_map.json": {
       "structure": "Shipwreck",
-      "container": "Map Chest"
+      "container": "Map Chest",
+      "structureRef": ["minecraft:shipwreck", "minecraft:shipwreck_beached"]
     },
     "loot_table/chests/shipwreck_supply.json": {
       "structure": "Shipwreck",
-      "container": "Supply Chest"
+      "container": "Supply Chest",
+      "structureRef": ["minecraft:shipwreck", "minecraft:shipwreck_beached"]
     },
     "loot_table/chests/shipwreck_treasure.json": {
       "structure": "Shipwreck",
-      "container": "Treasure Chest"
+      "container": "Treasure Chest",
+      "structureRef": ["minecraft:shipwreck", "minecraft:shipwreck_beached"]
     },
     "loot_table/chests/simple_dungeon.json": {
       "structure": "Dungeon",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": ["minecraft:monster_room"]
     },
     "loot_table/chests/spawn_bonus_chest.json": {
       "structure": "Spawn",
@@ -88,171 +116,279 @@
     },
     "loot_table/chests/stronghold_corridor.json": {
       "structure": "Stronghold",
-      "container": "Corridor Chest"
+      "container": "Corridor Chest",
+      "structureRef": "minecraft:stronghold"
     },
     "loot_table/chests/stronghold_crossing.json": {
       "structure": "Stronghold",
-      "container": "Crossing Chest"
+      "container": "Crossing Chest",
+      "structureRef": "minecraft:stronghold"
     },
     "loot_table/chests/stronghold_library.json": {
       "structure": "Stronghold",
-      "container": "Library Chest"
+      "container": "Library Chest",
+      "structureRef": "minecraft:stronghold"
     },
     "loot_table/chests/trial_chambers/corridor.json": {
       "structure": "Trial Chambers",
-      "container": "Corridor Chest"
+      "container": "Corridor Chest",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/entrance.json": {
       "structure": "Trial Chambers",
-      "container": "Entrance Chest"
+      "container": "Entrance Chest",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/intersection.json": {
       "structure": "Trial Chambers",
-      "container": "Intersection Chest"
+      "container": "Intersection Chest",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/intersection_barrel.json": {
       "structure": "Trial Chambers",
-      "container": "Intersection Barrel"
+      "container": "Intersection Barrel",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_common.json": {
       "structure": "Trial Chambers",
-      "container": "Common Vault"
+      "container": "Common Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_ominous_common.json": {
       "structure": "Trial Chambers",
-      "container": "Common Ominous Vault"
+      "container": "Common Ominous Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_ominous_rare.json": {
       "structure": "Trial Chambers",
-      "container": "Rare Ominous Vault"
+      "container": "Rare Ominous Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_ominous_unique.json": {
       "structure": "Trial Chambers",
-      "container": "Unique Ominous Vault"
+      "container": "Unique Ominous Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_rare.json": {
       "structure": "Trial Chambers",
-      "container": "Rare Vault"
+      "container": "Rare Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/reward_unique.json": {
       "structure": "Trial Chambers",
-      "container": "Unique Vault"
+      "container": "Unique Vault",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/trial_chambers/supply.json": {
       "structure": "Trial Chambers",
-      "container": "Supply Chest"
+      "container": "Supply Chest",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/chests/underwater_ruin_big.json": {
       "structure": "Ocean Ruins",
-      "container": "Big Ruins Chest"
+      "container": "Big Ruins Chest",
+      "structureRef": ["minecraft:ocean_ruin_cold", "minecraft:ocean_ruin_warm"]
     },
     "loot_table/chests/underwater_ruin_small.json": {
       "structure": "Ocean Ruins",
-      "container": "Small Ruins Chest"
+      "container": "Small Ruins Chest",
+      "structureRef": ["minecraft:ocean_ruin_cold", "minecraft:ocean_ruin_warm"]
     },
     "loot_table/chests/village/village_armorer.json": {
       "structure": "Village",
-      "container": "Armorer Chest"
+      "container": "Armorer Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_butcher.json": {
       "structure": "Village",
-      "container": "Butcher Chest"
+      "container": "Butcher Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_cartographer.json": {
       "structure": "Village",
-      "container": "Cartographer Chest"
+      "container": "Cartographer Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_desert_house.json": {
       "structure": "Village",
-      "container": "Desert House Chest"
+      "container": "Desert House Chest",
+      "structureRef": "minecraft:village_desert"
     },
     "loot_table/chests/village/village_fisher.json": {
       "structure": "Village",
-      "container": "Fisher Chest"
+      "container": "Fisher Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_fletcher.json": {
       "structure": "Village",
-      "container": "Fletcher Chest"
+      "container": "Fletcher Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_mason.json": {
       "structure": "Village",
-      "container": "Mason Chest"
+      "container": "Mason Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_plains_house.json": {
       "structure": "Village",
-      "container": "Plains House Chest"
+      "container": "Plains House Chest",
+      "structureRef": "minecraft:village_plains"
     },
     "loot_table/chests/village/village_savanna_house.json": {
       "structure": "Village",
-      "container": "Savanna House Chest"
+      "container": "Savanna House Chest",
+      "structureRef": "minecraft:village_savanna"
     },
     "loot_table/chests/village/village_shepherd.json": {
       "structure": "Village",
-      "container": "Shepherd Chest"
+      "container": "Shepherd Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_snowy_house.json": {
       "structure": "Village",
-      "container": "Snowy House Chest"
+      "container": "Snowy House Chest",
+      "structureRef": "minecraft:village_snowy"
     },
     "loot_table/chests/village/village_taiga_house.json": {
       "structure": "Village",
-      "container": "Taiga House Chest"
+      "container": "Taiga House Chest",
+      "structureRef": "minecraft:village_taiga"
     },
     "loot_table/chests/village/village_tannery.json": {
       "structure": "Village",
-      "container": "Tannery Chest"
+      "container": "Tannery Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_temple.json": {
       "structure": "Village",
-      "container": "Temple Chest"
+      "container": "Temple Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_toolsmith.json": {
       "structure": "Village",
-      "container": "Toolsmith Chest"
+      "container": "Toolsmith Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/village/village_weaponsmith.json": {
       "structure": "Village",
-      "container": "Weaponsmith Chest"
+      "container": "Weaponsmith Chest",
+      "structureRef": [
+        "minecraft:village_desert",
+        "minecraft:village_plains",
+        "minecraft:village_savanna",
+        "minecraft:village_snowy",
+        "minecraft:village_taiga"
+      ]
     },
     "loot_table/chests/woodland_mansion.json": {
       "structure": "Woodland Mansion",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": "minecraft:mansion"
     },
     "loot_table/dispensers/trial_chambers/chamber.json": {
       "structure": "Trial Chambers",
-      "container": "Chamber Dispenser"
+      "container": "Chamber Dispenser",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/dispensers/trial_chambers/corridor.json": {
       "structure": "Trial Chambers",
-      "container": "Corridor Dispenser"
+      "container": "Corridor Dispenser",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/dispensers/trial_chambers/water.json": {
       "structure": "Trial Chambers",
-      "container": "Water Dispenser"
+      "container": "Water Dispenser",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/pots/trial_chambers/corridor.json": {
       "structure": "Trial Chambers",
-      "container": "Corridor Decorated Pot"
+      "container": "Corridor Decorated Pot",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/spawners/ominous/trial_chamber/consumables.json": {
       "structure": "Trial Chambers",
-      "container": "Ominous Spawner Consumables"
+      "container": "Ominous Spawner Consumables",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/spawners/ominous/trial_chamber/key.json": {
       "structure": "Trial Chambers",
-      "container": "Ominous Trial Spawner"
+      "container": "Ominous Trial Spawner",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/spawners/trial_chamber/consumables.json": {
       "structure": "Trial Chambers",
-      "container": "Trial Spawner Consumables"
+      "container": "Trial Spawner Consumables",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/spawners/trial_chamber/items_to_drop_when_ominous.json": {
       "structure": "Trial Chambers",
-      "container": "Ominous Item Spawner"
+      "container": "Ominous Item Spawner",
+      "structureRef": "minecraft:trial_chambers"
     },
     "loot_table/spawners/trial_chamber/key.json": {
       "structure": "Trial Chambers",
-      "container": "Trial Spawner"
+      "container": "Trial Spawner",
+      "structureRef": "minecraft:trial_chambers"
     }
   }
 }

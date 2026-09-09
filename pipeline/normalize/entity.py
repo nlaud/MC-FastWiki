@@ -121,6 +121,9 @@ __all__ = [
     "BreedingInfo",
     "BreedingItem",
     "ChestLoot",
+    "ChestLootContainer",
+    "ChestLootItem",
+    "ConcentricRingsPlacement",
     "DamageValue",
     "DistributionEntry",
     "DropEntry",
@@ -136,6 +139,7 @@ __all__ = [
     "EntityDraft",
     "EntityKind",
     "EntityRef",
+    "ExclusionZone",
     "FoodEffect",
     "FoodInfo",
     "GenerationInfo",
@@ -155,6 +159,7 @@ __all__ = [
     "Measure",
     "ObtainList",
     "ProfessionInfo",
+    "RandomSpreadPlacement",
     "Ratio",
     "RecipeTree",
     "RecipeTreeInput",
@@ -166,6 +171,10 @@ __all__ = [
     "SpawnEntry",
     "SpawnInfo",
     "StatBlock",
+    "StructureInfo",
+    "StructurePlacement",
+    "StructureSibling",
+    "StructureSpawnEntry",
     "TradeEntry",
     "TradeTable",
     "VeinInfo",
@@ -801,13 +810,26 @@ class EffectSources(BaseModel, frozen=True, populate_by_name=True):
     removed_by: tuple[EffectLink, ...] = Field(default=(), alias="removedBy")
 
 
-class ChestLoot(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
-    """The chest loot tables that hold the item.
+class ChestLootItem(BaseModel, frozen=True, populate_by_name=True):
+    """One item appearing in a chest or container table."""
 
-    The payload of this section arrives in Phase 6c.
-    """
+    item: EntityRef
+    chance: float
+    stack_range: IntegerRange = Field(alias="stackRange")
+
+
+class ChestLootContainer(BaseModel, frozen=True, populate_by_name=True):
+    """One container (chest, barrel, dispenser, pot, vault) within a structure."""
+
+    label: str
+    items: tuple[ChestLootItem, ...] = ()
+
+
+class ChestLoot(BaseModel, frozen=True, populate_by_name=True):
+    """The loot tables and containers that generate inside a structure."""
 
     type: Literal["ChestLoot"] = "ChestLoot"
+    containers: tuple[ChestLootContainer, ...] = ()
 
 
 EnchantSlot = Literal[
@@ -902,13 +924,12 @@ class GenerationInfo(BaseModel, frozen=True, populate_by_name=True):
     scopes: tuple[GenerationScope, ...] = ()
 
 
-class LinkList(BaseModel, frozen=True, populate_by_name=True, extra="allow"):
-    """A plain list of links to other entities.
-
-    The payload of this section arrives in Phase 6.
-    """
+class LinkList(BaseModel, frozen=True, populate_by_name=True):
+    """A plain list of links to other entities."""
 
     type: Literal["LinkList"] = "LinkList"
+    title: str | None = None
+    links: tuple[EntityRef, ...] = ()
 
 
 class ProfessionInfo(BaseModel, frozen=True, populate_by_name=True):
@@ -917,6 +938,72 @@ class ProfessionInfo(BaseModel, frozen=True, populate_by_name=True):
     type: Literal["ProfessionInfo"] = "ProfessionInfo"
     workstation: EntityRef | None = Field(default=None)
     trade_count: int = Field(ge=0, alias="tradeCount")
+
+
+class ExclusionZone(BaseModel, frozen=True, populate_by_name=True):
+    """An area around another structure set where this structure cannot place."""
+
+    other_set: str = Field(alias="otherSet")
+    chunk_count: int = Field(alias="chunkCount")
+
+
+class RandomSpreadPlacement(BaseModel, frozen=True, populate_by_name=True):
+    """Placement across the world with spacing and separation."""
+
+    type: Literal["minecraft:random_spread"] = "minecraft:random_spread"
+    spacing: int
+    separation: int
+    spread_type: str | None = Field(default=None, alias="spreadType")
+    frequency: float | None = None
+    frequency_reduction_method: str | None = Field(default=None, alias="frequencyReductionMethod")
+    exclusion_zone: ExclusionZone | None = Field(default=None, alias="exclusionZone")
+    salt: int | None = None
+
+
+class ConcentricRingsPlacement(BaseModel, frozen=True, populate_by_name=True):
+    """Placement in concentric rings around the world origin (e.g. Strongholds)."""
+
+    type: Literal["minecraft:concentric_rings"] = "minecraft:concentric_rings"
+    count: int
+    distance: int
+    spread: int
+    preferred_biomes: str = Field(alias="preferredBiomes")
+    salt: int | None = None
+
+
+StructurePlacement = Annotated[
+    RandomSpreadPlacement | ConcentricRingsPlacement,
+    Field(discriminator="type"),
+]
+
+
+class StructureSibling(BaseModel, frozen=True, populate_by_name=True):
+    """Another structure belonging to the same structure set, with its relative weight."""
+
+    structure: EntityRef
+    weight: int
+
+
+class StructureSpawnEntry(BaseModel, frozen=True, populate_by_name=True):
+    """One mob spawn override inside a structure bounding box."""
+
+    category: str
+    mob: EntityRef
+    group_size: IntegerRange = Field(alias="groupSize")
+    weight: int
+
+
+class StructureInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Where and how a structure generates, its siblings, mob spawns, and suppressed spawns."""
+
+    type: Literal["StructureInfo"] = "StructureInfo"
+    dimension: Literal["overworld", "nether", "end"]
+    step: str
+    biomes: tuple[EntityRef, ...] = ()
+    placement: StructurePlacement
+    siblings: tuple[StructureSibling, ...] = ()
+    spawns: tuple[StructureSpawnEntry, ...] = ()
+    suppressed_spawns: tuple[str, ...] = Field(default=(), alias="suppressedSpawns")
 
 
 # The discriminated union. See the module docstring for why `discriminator`
@@ -937,7 +1024,8 @@ Section = Annotated[
     | EnchantInfo
     | GenerationInfo
     | LinkList
-    | ProfessionInfo,
+    | ProfessionInfo
+    | StructureInfo,
     Field(discriminator="type"),
 ]
 
@@ -951,7 +1039,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The sixteen `type` values a `sections.<Type>` provenance key may name,
+# The seventeen `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -972,6 +1060,7 @@ _SECTION_TYPES = frozenset(
         "GenerationInfo",
         "LinkList",
         "ProfessionInfo",
+        "StructureInfo",
     }
 )
 

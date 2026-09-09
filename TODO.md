@@ -148,9 +148,9 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
       trades grouped by level (Novice through Master). The `trade` bucket carries profession,
       level, quantities, price multiplier, max uses, and XP. **Keep `java_probability`, drop
       `bedrock_probability`**
-- [ ] **Structures** (52, Tier A) — where they generate, and the chests inside them. The `biomes`
+- [x] **Structures** (34, Tier A) — where they generate, and the chests inside them. The `biomes`
       field is a tag reference (`#minecraft:has_structure/village_plains`), so resolve it through
-      tag data rather than reading it as a literal
+      tag data rather than reading it as a literal (34 in 26.2, corrected from 52)
 - [ ] **Biomes** (67, Tier A) — what spawns there, what generates there, which structures appear
 - [ ] **Biome climate — two sources, do not assume one covers it**
   - [ ] Temperature, downfall, precipitation: take from mcmeta `worldgen/biome/<id>.json`
@@ -177,8 +177,8 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 ### Cross-linking
 
 - [ ] Mob spawns in a biome → the biome is a link
-- [ ] Structure generates in a biome → link, both directions
-- [ ] Structure → its chests → the items in them
+- [x] Structure generates in a biome → link, both directions
+- [x] Structure → its chests → the items in them
 - [x] Trade → the item traded; item → the professions that sell it
 - [x] Enchantment → the items that accept it. Rendered on the enchantment page; the item-page reverse
       lookup is deferred, per the Phase 6c record above
@@ -651,6 +651,115 @@ New collections the added data makes nearly free:
     exactly one row because `Music Disc` is the only drop name left that resolves to nothing. The
     one other unresolved droptable name, `Wool`, names the 16 coloured wools and its note does not
     enumerate them, so it stays unresolved and is untouched by this.
+
+26. **Structures are 34 entities from `worldgen/structure` (Java 26.2).**
+    The Phase 6c bullet estimated 52 structures. Java Edition 26.2 defines exactly 34 structures across
+    overworld, nether, and end in `worldgen/structure`. Each structure entity is populated with Tier A
+    placement rules from `worldgen/structure_set` (random_spread spacing/separation/frequency/exclusion
+    zones or concentric rings), sibling structures with weights, generation step, single dimension, mob
+    spawn overrides, suppressed spawn categories, and biomes resolved from `#minecraft:has_structure/*`
+    tags.
+    Chest loot tables from curated `chest-sources.json` and `loot-sources.json` attach to structures via
+    `structureRef` and render as `ChestLoot` tables sorted by chance descending. Biomes receive a
+    `LinkList` section listing all structures generating within them.
+
+    A `structureRef` is a list, not a single id, and that is the whole reason the join is curated
+    rather than matched on the display name. One village chest generates in all five villages and one
+    ruined portal chest in all seven portals, so a chest names every structure it belongs to. The item
+    page reads the same list backwards: where it resolves to one structure the label's structure half
+    becomes the link, and where it resolves to several the label stays text and the variants follow it
+    as their own links, because picking one of five would be a guess and `Village` is not an entity to
+    link the word to. The two curated files also disagreed on names before this
+    (`Trial Chamber` against `Trial Chambers`, `Ocean Ruins (Cold)` against `Ocean Ruins`), which is
+    why nothing matched on the string. `Dungeon`, `Desert Well`, `End Ship` and `Spawn` are correctly
+    ref-less: none is a `worldgen/structure` member.
+
+    Structures resolve no icon of their own and `ICON_RULES` still records that with
+    `has_icons=False`, because the wiki publishes no structure sprite family at all -- measured across
+    all 20,013 rows of the 26.2 `spritefile` bucket, the only hits on structure names are village
+    *maps* and villager entity sprites. That record is about what the wiki publishes and it stays
+    true. What each structure does carry is a Tier C borrowing in `overrides.json`: one characteristic
+    block or item whose sprite is already in the atlas, so all 34 are recognisable in a mixed
+    suggestion list without a single new sprite being fetched. Nether Bricks for the Nether Fortress,
+    End Portal Frame for the Stronghold, Trial Spawner for the Trial Chambers. It states a kind and a
+    place, not an identity, in the same spirit as the Enchanted Book frame every enchantment draws,
+    and it does not claim to be Mojang's or the wiki's picture of the structure. An earlier cut of
+    this entry said structures carry no icon "matching biomes", and both halves were wrong: biomes
+    resolve real `BiomeSprite` art, and structures now draw a borrowed sprite rather than nothing.
+
+    Five curated aliases land with this. `fort` now reaches the Nether Fortress, which
+    `aliases.json` had refused once and recorded why: in a draftout match `fort` means the fortress
+    far more often than Fortune, and the refusal said so while noting that structures did not exist
+    yet. The three structure nicknames divide into two cases. `jungle temple` is a name the game
+    itself uses, because the structure is `jungle_pyramid` while its loot table, its biome tag and
+    its structure set are all `jungle_temple` -- the game disagrees with itself, so both names are
+    real. `desert temple` and `witch hut` are not that: the game says `desert_pyramid` and
+    `swamp_hut` in every file, and these two are community shorthand, which is what this file exists
+    for. The `structure/village/desert/houses/desert_temple_*.nbt` files are not evidence for
+    `desert temple`; they are village houses and have nothing to do with the desert pyramid.
+
+    **A dungeon is a feature, not a structure, and that is why it has no page.** The question comes
+    up because `chest-sources.json` attributes `chests/simple_dungeon.json` to a structure named
+    `Dungeon` and that row is one of only two that get no `structureRef`. The dungeon is entirely
+    real in the game and it is simply registered elsewhere: `worldgen/configured_feature/
+    monster_room.json` holds it, and two placed features run it -- `monster_room` at 10 attempts per
+    chunk from Y 0 to the world top, and `monster_room_deep` at 4 attempts per chunk from Y -58 to
+    -1. It is absent from `worldgen/structure`, so this task does not enumerate it, and the chest
+    label correctly renders `Dungeon - Chest` as plain text rather than as a dead link. Its
+    configured feature carries `config: {}`, because the room's blocks are built in the game's Java
+    code rather than described in data, so `extract_generation` could not describe its contents even
+    if it read the type. `dungeon` therefore aliases to the Monster Spawner, which is the block a
+    player typing it is actually looking for. Giving dungeons a page of their own means enumerating
+    features as an entity kind, which is a separate piece of work and is not proposed here.
+
+27. **The dungeon has a page, built from the feature the game files it under.**
+    Decision 26 recorded why it had none and called a page separate work. It was asked for, and it
+    turned out not to need a new entity kind after all. `pipeline/extract/feature_place.py` reads a
+    curated list of configured-feature ids from `data/curated/feature-places.json` and derives
+    everything a page states from the pack: the dimension from the biomes that run the passes, and
+    the band and the attempts from the placed features. Only the display name and the wiki page are
+    curated, because the `resource_location` bucket has no row for a configured feature and cannot
+    answer them. Today the file holds one entry. `desert_well` is the obvious second and is left out
+    only because nobody asked; adding it is a data change and no code change.
+
+    The dungeon renders `GenerationInfo`, not `StructureInfo`, and that is the honest shape rather
+    than a convenience. A feature has no structure set, no separation and no generation step, so
+    `StructureInfo` would be mostly empty and its placement field could not be filled at all. What a
+    feature does have -- a dimension, a height band, attempts per chunk, a biome list -- is exactly
+    what `GenerationInfo` already states for an ore vein, so the two share `band_of_placement` and
+    `rate_of_placement` literally rather than restating the anchor arithmetic. The kind stays
+    `structure`, because that is the badge and the renderer a player looking for a place expects,
+    not a claim about which registry the id came from.
+
+    Measured: Overworld, Y -58 to 320, 14 attempts per chunk, all 55 overworld biomes. The 14 is
+    both passes summed and the band spans both; either pass alone halves the rate and cuts the band
+    at zero. `chests/simple_dungeon.json` now points at `minecraft:monster_room`, so the chest label
+    on an item page links, and `dungeon` aliases to the place rather than to the Monster Spawner,
+    which was the stand-in used while it had no page. The spawner keeps its own name and aliases.
+
+28. **A music disc is named after its track, because the wiki's page title says so.**
+    The wiki's `display_name` is the in-game stack name, and for one family that name is
+    deliberately not unique: all 22 discs are called `Music Disc`, which is what the game prints on
+    the stack, with the track only in the tooltip. Repeating it gave 22 identically named entities,
+    and it became unreadable the moment a dungeon chest listed three discs at three different odds
+    with no way to tell which one was the 1.4%.
+
+    `names_the_wiki_reuses` takes the page title instead, wherever several registry ids share a
+    display name *and* keep their own pages. Both halves matter. Measured against 26.2 the set holds
+    exactly one name, and the four other collisions in the build are correctly untouched: `Wind
+    Charge` and `Eye of Ender` are each two ids for one page, so there is no better name to take,
+    and `Hero of the Village` and `The End` collide across two different kinds, where the kind badge
+    already separates them and renaming either would be wrong.
+
+    The wiki's own casing is kept rather than normalized, so the data reads `Music Disc Pigstep`
+    beside `Music Disc cat`. That is not an inconsistency to fix: those track titles really are
+    lowercase.
+
+    One thing this deliberately does not change: the creeper's drop row still reads `Music Disc` as
+    plain text with a note naming the 12 discs a skeleton-killed creeper can drop. That row is a
+    random pick of 12 rather than one disc, so refusing to resolve it to a single item stays the
+    right answer, exactly as Decision 25 recorded. The 12 names inside that note are still plain
+    text and remain a candidate for the Phase 6 lint bullet.
 
 ## Still open
 

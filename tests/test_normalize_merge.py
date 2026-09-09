@@ -38,19 +38,28 @@ from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
 from pipeline.extract.enchantment import EnchantIndex, EnchantmentFacts
 from pipeline.extract.entity_class import EntityClass, EntityClassification
+from pipeline.extract.generation import Dimension
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
+from pipeline.extract.structure import (
+    RandomSpreadPlacement,
+    StructureEntry,
+    StructureIndex,
+)
 from pipeline.fetch.extracts import ExtractReport, PageExtract
 from pipeline.normalize import NormalizeError
 from pipeline.normalize.curated import CuratedData, EntityOverride, StaleDocument
 from pipeline.normalize.entity import (
     BreedingInfo,
+    ChestLoot,
     EnchantInfo,
     EntityKind,
     HarvestDrop,
     HarvestInfo,
     IntegerRange,
+    LinkList,
     ProfessionInfo,
     SourceTier,
+    StructureInfo,
     TradeTable,
 )
 from pipeline.normalize.merge import (
@@ -61,6 +70,7 @@ from pipeline.normalize.merge import (
     merge_entities,
     write_report,
 )
+from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.loot import SHEARS_NOTE, SILK_TOUCH_NOTE
 from pipeline.obtain.producer import ObtainMethod, Producer, ProducerInput, ProducerOutput
 
@@ -1784,3 +1794,172 @@ def test_wandering_trader_trades_attached_to_mob() -> None:
     assert wt_ref is not None
     assert wt_ref.id == "minecraft:wandering_trader"
 
+
+def test_structures_merged_and_linked_to_biomes() -> None:
+    test_registries = dict(REGISTRIES)
+    test_registries["worldgen/structure"] = ["desert_pyramid", "village_plains"]
+    test_registries["worldgen/biome"] = ["desert", "plains"]
+
+    extra_rows = [
+        rl_row("Desert Pyramid", "desert_pyramid", "structure"),
+        rl_row("Plains Village", "village_plains", "structure"),
+        rl_row("Desert", "desert", "biome"),
+        rl_row("Plains", "plains", "biome"),
+    ]
+    test_join_table = parse_resource_locations([*JOIN_ROWS, *extra_rows])
+
+    structure_index = StructureIndex(
+        structures={
+            "minecraft:desert_pyramid": StructureEntry(
+                id="minecraft:desert_pyramid",
+                path="desert_pyramid",
+                structure_type="minecraft:jigsaw",
+                step="surface_structures",
+                biomes=("minecraft:desert",),
+                dimension=Dimension.OVERWORLD,
+                set_id="minecraft:desert_pyramids",
+                siblings=(),
+                placement=RandomSpreadPlacement(spacing=32, separation=8),
+                spawns=(),
+                suppressed_spawns=(),
+            ),
+            "minecraft:village_plains": StructureEntry(
+                id="minecraft:village_plains",
+                path="village_plains",
+                structure_type="minecraft:jigsaw",
+                step="surface_structures",
+                biomes=("minecraft:plains",),
+                dimension=Dimension.OVERWORLD,
+                set_id="minecraft:villages",
+                siblings=(),
+                placement=RandomSpreadPlacement(spacing=34, separation=8),
+                spawns=(),
+                suppressed_spawns=(),
+            ),
+        }
+    )
+
+    curated_chests = {
+        "chests/desert_pyramid": ChestSource(
+            structure="Desert Pyramid",
+            container="Chest",
+            structure_ref=("minecraft:desert_pyramid",),
+        )
+    }
+
+    loot_producers = [
+        Producer(
+            method=ObtainMethod.CHEST_LOOT,
+            output=ProducerOutput(item="minecraft:diamond", count=1),
+            inputs=(),
+            source_id="chests/desert_pyramid",
+            chance=0.18,
+            count_max=3,
+            per_attempt=0.4,
+        )
+    ]
+
+    result = merge_entities(
+        registries=test_registries,
+        advancement_ids=ADVANCEMENT_IDS,
+        join_table=test_join_table,
+        sprite_index=SPRITE_INDEX,
+        infobox_report=INFOBOX_REPORT,
+        spawn_index=SPAWN_INDEX,
+        drop_index=DROP_INDEX,
+        trade_index=TRADE_INDEX,
+        advancement_tree=ADVANCEMENT_TREE,
+        extract_report=EXTRACT_REPORT,
+        curated=CURATED,
+        entity_classification=ENTITY_CLASSIFICATION,
+        structure_index=structure_index,
+        curated_chests=curated_chests,
+        loot_producers=loot_producers,
+    )
+
+    # 1. Structure entities
+    assert "minecraft:desert_pyramid" in result.by_id
+    pyramid = result.by_id["minecraft:desert_pyramid"]
+    assert pyramid.kind is EntityKind.STRUCTURE
+    assert pyramid.name == "Desert Pyramid"
+    assert pyramid.icon is None
+
+    # StructureInfo section
+    s_info = next(s for s in pyramid.sections if isinstance(s, StructureInfo))
+    assert s_info.dimension == "overworld"
+    assert s_info.step == "surface_structures"
+    assert len(s_info.biomes) == 1
+    assert s_info.biomes[0].id == "minecraft:desert"
+
+    # ChestLoot section
+    c_loot = next(s for s in pyramid.sections if isinstance(s, ChestLoot))
+    assert len(c_loot.containers) == 1
+    assert c_loot.containers[0].label == "Chest"
+    assert len(c_loot.containers[0].items) == 1
+    assert c_loot.containers[0].items[0].item.id == "minecraft:diamond"
+    assert c_loot.containers[0].items[0].chance == 0.18
+
+    # Village disambiguation
+    assert "minecraft:village_plains" in result.by_id
+    plains_village = result.by_id["minecraft:village_plains"]
+    assert plains_village.name == "Plains Village"
+
+    # 2. Biome reverse links
+    assert "minecraft:desert" in result.by_id
+    desert = result.by_id["minecraft:desert"]
+    link_list = next(s for s in desert.sections if isinstance(s, LinkList))
+    assert link_list.title == "Structures"
+    assert len(link_list.links) == 1
+    assert link_list.links[0].id == "minecraft:desert_pyramid"
+
+
+
+
+def test_names_the_wiki_reuses_finds_the_shared_name_and_leaves_the_others(
+) -> None:
+    """Only a name several ids share *while keeping their own pages* qualifies."""
+    from pipeline.enrich.resource_location import JoinTable, ResourceLocation
+    from pipeline.normalize.merge import names_the_wiki_reuses
+
+    def row(display: str, path: str, page: str) -> ResourceLocation:
+        return ResourceLocation(
+            display_name=display,
+            resource_location=path,
+            kind="item",
+            page=page,
+            wiki_url=f"https://minecraft.wiki/w/{page.replace(' ', '_')}",
+        )
+
+    table = JoinTable.build((
+            # Two ids, one shared stack name, two real pages. This is the case.
+            row("Music Disc", "music_disc_13", "Music Disc 13"),
+            row("Music Disc", "music_disc_cat", "Music Disc cat"),
+            # Two ids, one name, but one page: there is no better name to take.
+            row("Wind Charge", "wind_charge", "Wind Charge"),
+            row("Wind Charge", "breeze_wind_charge", "Wind Charge"),
+            # One id, one name, one page: not a collision at all.
+            row("Emerald", "emerald", "Emerald"),
+    ))
+
+    assert names_the_wiki_reuses(table) == frozenset({"Music Disc"})
+
+
+def test_every_music_disc_in_the_built_data_carries_its_own_name() -> None:
+    """The built shards name each disc, so a chest listing three is readable."""
+    import json
+    from pathlib import Path
+
+    names: dict[str, str] = {}
+    for shard in sorted(Path("data/dist/entities").glob("item-*.json")):
+        document = json.loads(shard.read_text(encoding="utf-8"))
+        for entity in document["entities"]:
+            if entity["id"].startswith("minecraft:music_disc"):
+                names[entity["id"]] = entity["name"]
+
+    assert len(names) == 22
+    # No disc is left as the bare stack name, and no two share one.
+    assert "Music Disc" not in names.values()
+    assert len(set(names.values())) == len(names)
+    assert names["minecraft:music_disc_pigstep"] == "Music Disc Pigstep"
+    # The wiki's own casing is kept: these track titles really are lowercase.
+    assert names["minecraft:music_disc_cat"] == "Music Disc cat"

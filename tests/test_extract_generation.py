@@ -11,11 +11,11 @@ from pipeline.extract.generation import (
     Dimension,
     GenerationScope,
     VeinFacts,
-    _band,
     _densest_y_of_scope,
     _extract_blocks_from_config,
-    _rate,
+    band_of_placement,
     extract_generation,
+    rate_of_placement,
     resolve_anchor,
 )
 from pipeline.fetch.cache import ContentCache
@@ -119,7 +119,7 @@ def test_band_clips_to_the_build_range_and_peaks_on_the_declared_one() -> None:
             },
         },
     ]
-    assert _band(placement, floor=-64, top=320) == (-64, 16, False, -64)
+    assert band_of_placement(placement, floor=-64, top=320) == (-64, 16, False, -64)
 
 
 def test_band_of_a_heightmap_placement_is_a_surface_not_the_whole_world() -> None:
@@ -127,10 +127,10 @@ def test_band_of_a_heightmap_placement_is_a_surface_not_the_whole_world() -> Non
         {"type": "minecraft:in_square"},
         {"type": "minecraft:heightmap", "heightmap": "WORLD_SURFACE_WG"},
     ]
-    assert _band(placement, floor=-64, top=320) == (None, None, True, None)
+    assert band_of_placement(placement, floor=-64, top=320) == (None, None, True, None)
 
     # A placement that states neither states nothing, and gets nothing.
-    assert _band([{"type": "minecraft:in_square"}], floor=-64, top=320) == (
+    assert band_of_placement([{"type": "minecraft:in_square"}], floor=-64, top=320) == (
         None,
         None,
         False,
@@ -142,14 +142,14 @@ def test_rate_reads_only_the_counts_that_run_per_chunk() -> None:
     position = {"type": "minecraft:heightmap", "heightmap": "WORLD_SURFACE_WG"}
 
     # A count ahead of the position modifier is an attempt count.
-    assert _rate([{"type": "minecraft:count", "count": 7}, position]) == (7, None)
+    assert rate_of_placement([{"type": "minecraft:count", "count": 7}, position]) == (7, None)
 
     # A count behind it is patch density, so no attempt count is stated -- and the
     # "no modifier means one attempt" fallback must not fire either.
-    assert _rate([position, {"type": "minecraft:count", "count": 96}]) == (None, None)
+    assert rate_of_placement([position, {"type": "minecraft:count", "count": 96}]) == (None, None)
 
     # Rarity survives that, because the rarity filter did run per chunk.
-    assert _rate(
+    assert rate_of_placement(
         [
             {"type": "minecraft:rarity_filter", "chance": 32},
             position,
@@ -158,13 +158,14 @@ def test_rate_reads_only_the_counts_that_run_per_chunk() -> None:
     ) == (None, 32)
 
     # A noise-driven count is no fixed number at all.
-    assert _rate([{"type": "minecraft:noise_threshold_count", "noise_level": 0}, position]) == (
+    noise = {"type": "minecraft:noise_threshold_count", "noise_level": 0}
+    assert rate_of_placement([noise, position]) == (
         None,
         None,
     )
 
     # A uniform count carries its average.
-    assert _rate(
+    assert rate_of_placement(
         [
             {
                 "type": "minecraft:count",
@@ -175,7 +176,7 @@ def test_rate_reads_only_the_counts_that_run_per_chunk() -> None:
     ) == (0.5, None)
 
     # Nothing at all means one attempt.
-    assert _rate([{"type": "minecraft:in_square"}, position]) == (1, None)
+    assert rate_of_placement([{"type": "minecraft:in_square"}, position]) == (1, None)
 
 
 def test_densest_y_of_scope() -> None:

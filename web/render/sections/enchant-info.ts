@@ -1,6 +1,6 @@
 import type { ApplicableItems, EnchantInfo } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
-import { entityLink } from "../link.js";
+import { entityLink, proseEntityLink } from "../link.js";
 
 const ROMAN_NUMERALS: Record<number, string> = {
   1: "I",
@@ -145,7 +145,7 @@ export function renderEnchantInfo(section: EnchantInfo, ctx: RenderContext): HTM
         conflictsContainer.append(document.createTextNode(", "));
       }
       first = false;
-      conflictsContainer.append(entityLink(conflict, ctx));
+      conflictsContainer.append(proseEntityLink(conflict, ctx));
     }
     conflictValue.append(conflictsContainer);
   }

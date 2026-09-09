@@ -116,3 +116,26 @@ export function entityLink(target: EntityRef | ItemAmount, ctx: RenderContext): 
 
   return link;
 }
+
+/**
+ * An `entityLink` for a link that sits inside a run of text or punctuation.
+ *
+ * The standalone link is a chip: it carries horizontal padding so it reads as
+ * its own target in a table cell or a grid row. Inside a comma-separated run
+ * that padding lands between the name and the punctuation after it, and
+ * `Crimson Forest, Nether Wastes` renders as `Crimson Forest , Nether Wastes`.
+ *
+ * `web/render/wikilinks.ts` already solved this for links inside a blurb, and
+ * the rule is the same wherever a separator follows a link immediately, so the
+ * class it uses is applied through here rather than restated at each call site.
+ * Use this for any list joined by `", "` or `" · "`; keep the plain
+ * `entityLink` where each link is its own row, cell, or flex child.
+ *
+ * A ref the search index does not hold still degrades to plain text, because
+ * this only ever adds a class to whatever `entityLink` decided to build.
+ */
+export function proseEntityLink(target: EntityRef | ItemAmount, ctx: RenderContext): HTMLElement {
+  const el = entityLink(target, ctx);
+  el.classList.add("entity-link-prose");
+  return el;
+}
