@@ -1,10 +1,11 @@
 """Spawn tables: the edition inside the blob, and the variant the page does not name.
 
-`pipeline.enrich.spawn_table` is the only source this project has for per-biome
-mob lists, because mcmeta's biome `spawners` field is empty. Two of its traps are
-easy to walk into: the edition is a JSON field rather than a column, so nothing
-upstream can filter it, and the `mob` column names the wiki page rather than the
-entity that actually spawns.
+`pipeline.enrich.spawn_table` parses the wiki's `spawn_table` bucket. Previously
+relied upon for all spawn lists, it is now used as a Tier B overlay for conditional
+notes onto Tier A biome spawners (reversing the earlier false claim that mcmeta's
+`spawners` field was empty; see Decision 29). Two of its traps are easy to walk into:
+the edition is a JSON field rather than a column, so nothing upstream can filter it,
+and the `mob` column names the wiki page rather than the entity that actually spawns.
 
 `parse_spawn_tables` is pure, so nothing here opens a socket.
 """

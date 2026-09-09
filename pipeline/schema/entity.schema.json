@@ -339,6 +339,9 @@
         },
         {
           "$ref": "#/$defs/structureInfo"
+        },
+        {
+          "$ref": "#/$defs/biomeInfo"
         }
       ]
     },
@@ -462,7 +465,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["biome", "category", "weight", "totalWeight", "groupSize"],
+            "required": ["biome", "biomeRef", "category", "weight", "totalWeight", "groupSize"],
             "properties": {
               "biome": {
                 "type": "string"
@@ -1603,6 +1606,99 @@
             "type": "string"
           },
           "default": []
+        }
+      }
+    },
+    "biomeSpawnEntry": {
+      "title": "BiomeSpawnEntry",
+      "description": "One mob spawning in a biome, at a given weight and group size.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "mob", "groupSize", "weight", "totalWeight"],
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "mob": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "groupSize": {
+          "$ref": "#/$defs/integerRange"
+        },
+        "weight": {
+          "type": "integer"
+        },
+        "totalWeight": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        },
+        "noteName": {
+          "type": "string"
+        }
+      }
+    },
+    "biomeInfo": {
+      "title": "BiomeInfo",
+      "description": "Climate, mob spawns, and generating blocks of a biome.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "temperature", "downfall", "hasPrecipitation", "precipitation"],
+      "properties": {
+        "type": {
+          "const": "BiomeInfo"
+        },
+        "dimension": {
+          "type": "string",
+          "enum": ["overworld", "nether", "end"]
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "temperatureModifier": {
+          "type": "string"
+        },
+        "downfall": {
+          "type": "number"
+        },
+        "hasPrecipitation": {
+          "type": "boolean"
+        },
+        "precipitation": {
+          "type": "string",
+          "enum": ["rain", "snow", "none"]
+        },
+        "creatureSpawnProbability": {
+          "type": "number"
+        },
+        "spawnCosts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "default": {}
+        },
+        "spawns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/biomeSpawnEntry"
+          },
+          "default": []
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        },
+        "commonBlocksCount": {
+          "type": "integer",
+          "default": 0
         }
       }
     }

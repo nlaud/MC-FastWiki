@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from pipeline.normalize.entity import (
     AdvancementInfo,
+    BiomeInfo,
     BreedingInfo,
     ChestLoot,
     DropTable,
@@ -75,6 +76,7 @@ SECTION_TYPES = {
     "LinkList",
     "ProfessionInfo",
     "StructureInfo",
+    "BiomeInfo",
 }
 
 # `pipeline.normalize.entity.EntityKind` is the source of truth for this
@@ -408,6 +410,7 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "linkList": LinkList,
     "professionInfo": ProfessionInfo,
     "structureInfo": StructureInfo,
+    "biomeInfo": BiomeInfo,
 }
 
 # Decision D2's seven sections, plus `foodInfo` and `harvestInfo`: the schema closes these with
@@ -429,6 +432,7 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "chestLoot": ChestLoot,
     "linkList": LinkList,
     "structureInfo": StructureInfo,
+    "biomeInfo": BiomeInfo,
 }
 
 

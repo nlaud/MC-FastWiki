@@ -1,8 +1,10 @@
 """Where a mob spawns, how often, and how many at a time. Java only.
 
-mcmeta's biome JSON has a `spawners` field and it is empty, so Tier A cannot
-answer this. CLAUDE.md records that gap and points here: per-biome mob lists
-come from the wiki's `spawn_table` bucket.
+The wiki's `spawn_table` bucket was previously the primary source for mob spawns
+under the false belief that mcmeta's biome `spawners` field was empty. As of 26.2
+(Decision 29), Tier A biome JSON files authoritatively provide spawners for 64 biomes
+and 52 mobs. This bucket is now used solely as an overlay to attach conditional
+notes (such as slime chunk requirements) to Tier A spawn entries.
 
 The bucket is 1,602 rows and each row is one mob in one biome. Three things
 about its shape are worth knowing before reading it.

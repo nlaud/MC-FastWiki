@@ -36,6 +36,13 @@ from pipeline.enrich.resource_location import JoinTable, parse_resource_location
 from pipeline.enrich.spawn_table import SpawnEntry, SpawnIndex
 from pipeline.enrich.sprite import SpriteIndex, parse_sprite_files
 from pipeline.enrich.trade import Probability, TradeIndex, TradeItem, WikiTrade
+from pipeline.extract.biome import (
+    BiomeEntry,
+    BiomeIndex,
+)
+from pipeline.extract.biome import (
+    BiomeSpawnEntry as ExtractedBiomeSpawnEntry,
+)
 from pipeline.extract.enchantment import EnchantIndex, EnchantmentFacts
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.generation import Dimension
@@ -255,6 +262,31 @@ SPAWN_INDEX = SpawnIndex.build(
     ]
 )
 
+BIOME_INDEX = BiomeIndex(
+    {
+        "minecraft:jungle": BiomeEntry(
+            id="minecraft:jungle",
+            path="jungle",
+            dimension=Dimension.OVERWORLD,
+            temperature=0.95,
+            downfall=0.9,
+            has_precipitation=True,
+            precipitation="rain",
+            spawners={
+                "monster": (
+                    ExtractedBiomeSpawnEntry(
+                        entity_type="minecraft:creeper",
+                        weight=100,
+                        min_count=4,
+                        max_count=4,
+                    ),
+                )
+            },
+            category_totals={"monster": 1000},
+        )
+    }
+)
+
 DROP_INDEX = DropIndex.build(
     [
         MobDrop(
@@ -414,6 +446,7 @@ def run_merge() -> MergeResult:
         extract_report=EXTRACT_REPORT,
         curated=CURATED,
         entity_classification=ENTITY_CLASSIFICATION,
+        biome_index=BIOME_INDEX,
     )
 
 
@@ -639,12 +672,15 @@ def test_an_advancement_with_no_wiki_row_still_enumerates() -> None:
 
 
 def test_provenance_is_recorded_for_every_field_actually_written() -> None:
-    creeper = run_merge().by_id["minecraft:creeper"]
+    merged = run_merge()
+    creeper = merged.by_id["minecraft:creeper"]
+    jungle = merged.by_id["minecraft:jungle"]
     assert creeper.source_tiers["name"] is SourceTier.B
     assert creeper.source_tiers["icon"] is SourceTier.B
     assert creeper.source_tiers["sections.StatBlock"] is SourceTier.B
-    assert creeper.source_tiers["sections.SpawnInfo"] is SourceTier.B
+    assert creeper.source_tiers["sections.SpawnInfo"] is SourceTier.A
     assert creeper.source_tiers["sections.DropTable"] is SourceTier.B
+    assert jungle.source_tiers["sections.BiomeInfo"] is SourceTier.A
 
 
 def test_no_provenance_is_recorded_for_a_field_never_written() -> None:
