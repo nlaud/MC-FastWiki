@@ -687,13 +687,30 @@ New collections the added data makes nearly free:
     this entry said structures carry no icon "matching biomes", and both halves were wrong: biomes
     resolve real `BiomeSprite` art, and structures now draw a borrowed sprite rather than nothing.
 
-    Three curated aliases land with this. `fort` now reaches the Nether Fortress, which
+    Five curated aliases land with this. `fort` now reaches the Nether Fortress, which
     `aliases.json` had refused once and recorded why: in a draftout match `fort` means the fortress
     far more often than Fortune, and the refusal said so while noting that structures did not exist
-    yet. `jungle temple` reaches `jungle_pyramid`, the name the game's own loot table uses for it.
-    `dungeon` reaches the Monster Spawner rather than a structure, because a dungeon is a feature and
-    not a `worldgen/structure` member, so it has no page and the spawner is what the player is
-    actually after.
+    yet. The three structure nicknames divide into two cases. `jungle temple` is a name the game
+    itself uses, because the structure is `jungle_pyramid` while its loot table, its biome tag and
+    its structure set are all `jungle_temple` -- the game disagrees with itself, so both names are
+    real. `desert temple` and `witch hut` are not that: the game says `desert_pyramid` and
+    `swamp_hut` in every file, and these two are community shorthand, which is what this file exists
+    for. The `structure/village/desert/houses/desert_temple_*.nbt` files are not evidence for
+    `desert temple`; they are village houses and have nothing to do with the desert pyramid.
+
+    **A dungeon is a feature, not a structure, and that is why it has no page.** The question comes
+    up because `chest-sources.json` attributes `chests/simple_dungeon.json` to a structure named
+    `Dungeon` and that row is one of only two that get no `structureRef`. The dungeon is entirely
+    real in the game and it is simply registered elsewhere: `worldgen/configured_feature/
+    monster_room.json` holds it, and two placed features run it -- `monster_room` at 10 attempts per
+    chunk from Y 0 to the world top, and `monster_room_deep` at 4 attempts per chunk from Y -58 to
+    -1. It is absent from `worldgen/structure`, so this task does not enumerate it, and the chest
+    label correctly renders `Dungeon - Chest` as plain text rather than as a dead link. Its
+    configured feature carries `config: {}`, because the room's blocks are built in the game's Java
+    code rather than described in data, so `extract_generation` could not describe its contents even
+    if it read the type. `dungeon` therefore aliases to the Monster Spawner, which is the block a
+    player typing it is actually looking for. Giving dungeons a page of their own means enumerating
+    features as an entity kind, which is a separate piece of work and is not proposed here.
 
 ## Still open
 
