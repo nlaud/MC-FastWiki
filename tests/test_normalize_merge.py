@@ -1913,3 +1913,53 @@ def test_structures_merged_and_linked_to_biomes() -> None:
     assert link_list.links[0].id == "minecraft:desert_pyramid"
 
 
+
+
+def test_names_the_wiki_reuses_finds_the_shared_name_and_leaves_the_others(
+) -> None:
+    """Only a name several ids share *while keeping their own pages* qualifies."""
+    from pipeline.enrich.resource_location import JoinTable, ResourceLocation
+    from pipeline.normalize.merge import names_the_wiki_reuses
+
+    def row(display: str, path: str, page: str) -> ResourceLocation:
+        return ResourceLocation(
+            display_name=display,
+            resource_location=path,
+            kind="item",
+            page=page,
+            wiki_url=f"https://minecraft.wiki/w/{page.replace(' ', '_')}",
+        )
+
+    table = JoinTable.build((
+            # Two ids, one shared stack name, two real pages. This is the case.
+            row("Music Disc", "music_disc_13", "Music Disc 13"),
+            row("Music Disc", "music_disc_cat", "Music Disc cat"),
+            # Two ids, one name, but one page: there is no better name to take.
+            row("Wind Charge", "wind_charge", "Wind Charge"),
+            row("Wind Charge", "breeze_wind_charge", "Wind Charge"),
+            # One id, one name, one page: not a collision at all.
+            row("Emerald", "emerald", "Emerald"),
+    ))
+
+    assert names_the_wiki_reuses(table) == frozenset({"Music Disc"})
+
+
+def test_every_music_disc_in_the_built_data_carries_its_own_name() -> None:
+    """The built shards name each disc, so a chest listing three is readable."""
+    import json
+    from pathlib import Path
+
+    names: dict[str, str] = {}
+    for shard in sorted(Path("data/dist/entities").glob("item-*.json")):
+        document = json.loads(shard.read_text(encoding="utf-8"))
+        for entity in document["entities"]:
+            if entity["id"].startswith("minecraft:music_disc"):
+                names[entity["id"]] = entity["name"]
+
+    assert len(names) == 22
+    # No disc is left as the bare stack name, and no two share one.
+    assert "Music Disc" not in names.values()
+    assert len(set(names.values())) == len(names)
+    assert names["minecraft:music_disc_pigstep"] == "Music Disc Pigstep"
+    # The wiki's own casing is kept: these track titles really are lowercase.
+    assert names["minecraft:music_disc_cat"] == "Music Disc cat"

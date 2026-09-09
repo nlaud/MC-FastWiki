@@ -157,6 +157,11 @@ from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.enchantment import extract_enchantments
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
+from pipeline.extract.feature_place import (
+    DEFAULT_FEATURE_PLACES_PATH,
+    extract_feature_places,
+    load_feature_places,
+)
 from pipeline.extract.food import extract_food
 from pipeline.extract.generation import (
     GenerationReport,
@@ -597,6 +602,9 @@ def run_build(
     gen_result = extract_generation(files)
     enchant_index = extract_enchantments(files)
     struct_index = extract_structures(files)
+    feature_place_index = extract_feature_places(
+        files, load_feature_places(DEFAULT_FEATURE_PLACES_PATH)
+    )
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
@@ -604,7 +612,7 @@ def run_build(
         f"{len(harvest_index)} blocks with harvest requirements, "
         f"{len(gen_result.blocks)} blocks with generation facts, "
         f"{len(enchant_index)} enchantments, "
-        f"{len(struct_index)} structures"
+        f"{len(struct_index)} structures, {len(feature_place_index)} feature places"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
@@ -618,9 +626,11 @@ def run_build(
         for producer in loot_result.producers
         if producer.method is ObtainMethod.CHEST_LOOT
     }
-    verify_chest_sources(
-        chest_tables, curated_chests, extracted_structures=struct_index.structures.keys()
-    )
+    # A `structureRef` may name a curated feature place as well as a registry
+    # structure: a dungeon's chest points at `minecraft:monster_room`, which is a
+    # configured feature. Both sets are valid targets, so both are offered.
+    known_places = set(struct_index.structures.keys()) | set(feature_place_index.keys())
+    verify_chest_sources(chest_tables, curated_chests, extracted_structures=known_places)
     loot_methods = {
         ObtainMethod.BRUSHING,
         ObtainMethod.FISHING,
@@ -634,9 +644,7 @@ def run_build(
         for producer in loot_result.producers
         if producer.method in loot_methods
     }
-    verify_loot_sources(
-        loot_tables, curated_loot, extracted_structures=struct_index.structures.keys()
-    )
+    verify_loot_sources(loot_tables, curated_loot, extracted_structures=known_places)
     method_counts = Counter(p.method for p in loot_result.producers)
     method_summary = ", ".join(
         f"{m.value}={method_counts[m]}"
@@ -720,6 +728,7 @@ def run_build(
         {entry.page for entry in join_table.entries}
         | {entry.page_title for entry in profession_index.entries}
         | structure_pages
+        | {place.page for place in feature_place_index.values()}
     )
     extract_report = fetch_page_extracts(
         pages, revision=version, cache=store, transport=network_transport
@@ -803,6 +812,7 @@ def run_build(
         profession_index=profession_index,
         profession_infoboxes=profession_infoboxes,
         structure_index=struct_index,
+        feature_place_index=feature_place_index,
         curated_chests=curated_chests,
         loot_producers=loot_result.producers,
     )

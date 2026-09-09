@@ -77,7 +77,9 @@ __all__ = [
     "GenerationScope",
     "SkippedFeature",
     "VeinFacts",
+    "band_of_placement",
     "extract_generation",
+    "rate_of_placement",
     "resolve_anchor",
 ]
 
@@ -247,7 +249,7 @@ def _extract_blocks_from_config(
     return blocks, vein_size
 
 
-def _band(
+def band_of_placement(
     placement: Sequence[Any], *, floor: int, top: int
 ) -> tuple[int | None, int | None, bool, int | None]:
     """Return `(min_y, max_y, surface, densest_y)` for one placement list.
@@ -280,7 +282,7 @@ def _band(
     return None, None, heightmap, None
 
 
-def _rate(placement: Sequence[Any]) -> tuple[int | float | None, int | None]:
+def rate_of_placement(placement: Sequence[Any]) -> tuple[int | float | None, int | None]:
     """Return `(tries, chunk_chance)` for one placement list.
 
     Only the modifiers ahead of the position modifier are read, because those are the
@@ -415,14 +417,14 @@ def extract_generation(files: Mapping[str, bytes]) -> GenerationExtractionResult
         placement = placed.get("placement", [])
         if not isinstance(placement, list):
             placement = []
-        tries, chunk_chance = _rate(placement)
+        tries, chunk_chance = rate_of_placement(placement)
 
         for dimension, dimension_set in dimension_biomes.items():
             in_dimension = biomes & dimension_set
             if not in_dimension:
                 continue
             floor, top = DIMENSION_BOUNDS[dimension]
-            min_y, max_y, surface, densest_y = _band(placement, floor=floor, top=top)
+            min_y, max_y, surface, densest_y = band_of_placement(placement, floor=floor, top=top)
             vein = VeinFacts(
                 feature=placed_id,
                 dimension=dimension,

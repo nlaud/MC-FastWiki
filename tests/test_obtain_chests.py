@@ -134,6 +134,12 @@ def test_load_curated_chest_sources() -> None:
     assert len(sources) > 0
     structure_sources = [s for s in sources.values() if s.structure_ref]
     assert len(structure_sources) > 0
-    # Dungeon and bonus chest are not structure entities
-    assert sources["loot_table/chests/simple_dungeon.json"].structure_ref == ()
+    # The dungeon has a page now. It is a configured feature rather than a
+    # `worldgen/structure`, so `pipeline.extract.feature_place` enumerates it and
+    # its chest points at that entity like any other.
+    assert sources["loot_table/chests/simple_dungeon.json"].structure_ref == (
+        "minecraft:monster_room",
+    )
+    # The bonus chest still names no place, and never will: `Spawn` is where a
+    # world drops the player, not somewhere that generates.
     assert sources["loot_table/chests/spawn_bonus_chest.json"].structure_ref == ()

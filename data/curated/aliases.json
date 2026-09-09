@@ -18,6 +18,6 @@
     "minecraft:jungle_pyramid": ["jungle temple"],
     "minecraft:desert_pyramid": ["desert temple"],
     "minecraft:swamp_hut": ["witch hut"],
-    "minecraft:spawner": ["dungeon"]
+    "minecraft:monster_room": ["dungeon"]
   }
 }

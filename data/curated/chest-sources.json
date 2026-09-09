@@ -107,7 +107,8 @@
     },
     "loot_table/chests/simple_dungeon.json": {
       "structure": "Dungeon",
-      "container": "Chest"
+      "container": "Chest",
+      "structureRef": ["minecraft:monster_room"]
     },
     "loot_table/chests/spawn_bonus_chest.json": {
       "structure": "Spawn",

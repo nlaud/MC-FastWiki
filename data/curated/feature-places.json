@@ -1,0 +1,12 @@
+{
+  "verifiedFor": "26.2",
+  "note": "Places a player looks for that the game registers as a configured feature rather than as a worldgen/structure. A dungeon is the case this file was written for: every player calls it a structure, `chest-sources.json` files its chest under one, and the registry does not list it, so before this file it was the one lootable place in the game with no page. Only the name and the wiki page are curated here. Everything a page actually states -- the dimension, the height band, the attempts per chunk, the biomes -- is derived from the placed features named below, because that data is in the pack and guessing it would be the fault Decision 3 forbids. Add an entry only for a feature a player would search for by name and expect a page for; a vegetation patch or a terrain pass is not one, which is why `kelp`, `vines` and `freeze_top_layer` are absent despite sharing the same empty-config shape. `desert_well` is the obvious next candidate and is left out only because nobody has asked for it: `loot-sources.json` already names it, so adding it here would be a data change and no code change. Icons live in `overrides.json` with the 34 structures, because the mechanism is the same one.",
+  "places": {
+    "minecraft:monster_room": {
+      "name": "Monster Room",
+      "page": "Monster Room",
+      "placedFeatures": ["minecraft:monster_room", "minecraft:monster_room_deep"],
+      "note": "The wiki titles the article `Monster Room` and opens it with `commonly known as a dungeon`, so the page carries the wiki's name and `dungeon` reaches it through `aliases.json`. The two placed features are the shallow and deep passes: 10 attempts per chunk from Y 0 upward and 4 more below Y 0, which is why the page states 14 and a band that crosses zero."
+    }
+  }
+}

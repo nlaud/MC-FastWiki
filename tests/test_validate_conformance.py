@@ -81,7 +81,7 @@ def test_the_real_committed_dist_passes_conformance() -> None:
 
     assert report.failures == ()
     assert report.truncated_count == 0
-    assert report.checked["entity"] == 2175
+    assert report.checked["entity"] == 2176
     assert report.checked["shard"] == 17
     assert report.checked["index"] == 1
     assert report.checked["obtain"] == 1

@@ -712,6 +712,55 @@ New collections the added data makes nearly free:
     player typing it is actually looking for. Giving dungeons a page of their own means enumerating
     features as an entity kind, which is a separate piece of work and is not proposed here.
 
+27. **The dungeon has a page, built from the feature the game files it under.**
+    Decision 26 recorded why it had none and called a page separate work. It was asked for, and it
+    turned out not to need a new entity kind after all. `pipeline/extract/feature_place.py` reads a
+    curated list of configured-feature ids from `data/curated/feature-places.json` and derives
+    everything a page states from the pack: the dimension from the biomes that run the passes, and
+    the band and the attempts from the placed features. Only the display name and the wiki page are
+    curated, because the `resource_location` bucket has no row for a configured feature and cannot
+    answer them. Today the file holds one entry. `desert_well` is the obvious second and is left out
+    only because nobody asked; adding it is a data change and no code change.
+
+    The dungeon renders `GenerationInfo`, not `StructureInfo`, and that is the honest shape rather
+    than a convenience. A feature has no structure set, no separation and no generation step, so
+    `StructureInfo` would be mostly empty and its placement field could not be filled at all. What a
+    feature does have -- a dimension, a height band, attempts per chunk, a biome list -- is exactly
+    what `GenerationInfo` already states for an ore vein, so the two share `band_of_placement` and
+    `rate_of_placement` literally rather than restating the anchor arithmetic. The kind stays
+    `structure`, because that is the badge and the renderer a player looking for a place expects,
+    not a claim about which registry the id came from.
+
+    Measured: Overworld, Y -58 to 320, 14 attempts per chunk, all 55 overworld biomes. The 14 is
+    both passes summed and the band spans both; either pass alone halves the rate and cuts the band
+    at zero. `chests/simple_dungeon.json` now points at `minecraft:monster_room`, so the chest label
+    on an item page links, and `dungeon` aliases to the place rather than to the Monster Spawner,
+    which was the stand-in used while it had no page. The spawner keeps its own name and aliases.
+
+28. **A music disc is named after its track, because the wiki's page title says so.**
+    The wiki's `display_name` is the in-game stack name, and for one family that name is
+    deliberately not unique: all 22 discs are called `Music Disc`, which is what the game prints on
+    the stack, with the track only in the tooltip. Repeating it gave 22 identically named entities,
+    and it became unreadable the moment a dungeon chest listed three discs at three different odds
+    with no way to tell which one was the 1.4%.
+
+    `names_the_wiki_reuses` takes the page title instead, wherever several registry ids share a
+    display name *and* keep their own pages. Both halves matter. Measured against 26.2 the set holds
+    exactly one name, and the four other collisions in the build are correctly untouched: `Wind
+    Charge` and `Eye of Ender` are each two ids for one page, so there is no better name to take,
+    and `Hero of the Village` and `The End` collide across two different kinds, where the kind badge
+    already separates them and renaming either would be wrong.
+
+    The wiki's own casing is kept rather than normalized, so the data reads `Music Disc Pigstep`
+    beside `Music Disc cat`. That is not an inconsistency to fix: those track titles really are
+    lowercase.
+
+    One thing this deliberately does not change: the creeper's drop row still reads `Music Disc` as
+    plain text with a note naming the 12 discs a skeleton-killed creeper can drop. That row is a
+    random pick of 12 rather than one disc, so refusing to resolve it to a single item stays the
+    right answer, exactly as Decision 25 recorded. The 12 names inside that note are still plain
+    text and remain a candidate for the Phase 6 lint bullet.
+
 ## Still open
 
 1. **Match-specific extras.** Since this is for draftout matches — is there value in pinning
