@@ -155,6 +155,7 @@ from pipeline.enrich.spawn_table import fetch_spawn_tables
 from pipeline.enrich.sprite import fetch_sprite_index
 from pipeline.enrich.trade import fetch_trades
 from pipeline.extract.advancement import extract_advancement_ids
+from pipeline.extract.biome import extract_biomes
 from pipeline.extract.enchantment import extract_enchantments
 from pipeline.extract.entity_class import EntityClass, EntityClassification, classify_entity_types
 from pipeline.extract.feature_place import (
@@ -605,6 +606,7 @@ def run_build(
     feature_place_index = extract_feature_places(
         files, load_feature_places(DEFAULT_FEATURE_PLACES_PATH)
     )
+    biome_index = extract_biomes(files)
     report(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
@@ -612,7 +614,8 @@ def run_build(
         f"{len(harvest_index)} blocks with harvest requirements, "
         f"{len(gen_result.blocks)} blocks with generation facts, "
         f"{len(enchant_index)} enchantments, "
-        f"{len(struct_index)} structures, {len(feature_place_index)} feature places"
+        f"{len(struct_index)} structures, {len(feature_place_index)} feature places, "
+        f"{len(biome_index)} biomes"
     )
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
@@ -813,6 +816,7 @@ def run_build(
         profession_infoboxes=profession_infoboxes,
         structure_index=struct_index,
         feature_place_index=feature_place_index,
+        biome_index=biome_index,
         curated_chests=curated_chests,
         loot_producers=loot_result.producers,
     )

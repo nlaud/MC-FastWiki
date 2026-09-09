@@ -41,14 +41,7 @@ export function renderSpawnInfo(section: SpawnInfo, ctx: RenderContext): HTMLEle
       itemEl.classList.add("is-collapsed-item");
     }
 
-    if (entry.biomeRef) {
-      itemEl.append(entityLink(entry.biomeRef, ctx));
-    } else {
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "biome-name";
-      nameSpan.textContent = entry.biome;
-      itemEl.append(nameSpan);
-    }
+    itemEl.append(entityLink(entry.biomeRef, ctx));
 
     listContainer.append(itemEl);
     itemElements.push(itemEl);

@@ -151,9 +151,9 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 - [x] **Structures** (34, Tier A) — where they generate, and the chests inside them. The `biomes`
       field is a tag reference (`#minecraft:has_structure/village_plains`), so resolve it through
       tag data rather than reading it as a literal (34 in 26.2, corrected from 52)
-- [ ] **Biomes** (67, Tier A) — what spawns there, what generates there, which structures appear
+- [x] **Biomes** (66 in 26.2, Tier A) — what spawns there, what generates there, which structures appear
 - [ ] **Biome climate — two sources, do not assume one covers it**
-  - [ ] Temperature, downfall, precipitation: take from mcmeta `worldgen/biome/<id>.json`
+  - [x] Temperature, downfall, precipitation: take from mcmeta `worldgen/biome/<id>.json`
         (**Tier A**, no scraping). The biome infobox has a `Climate` group with the same three
         values, but there is no reason to parse it when the data is already in Tier A
   - [ ] Continentalness, erosion, weirdness, depth: in **neither** the infobox nor mcmeta, which
@@ -170,13 +170,14 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
         mangrove swamps at high erosion" are not structured values
   - [ ] Source from minecraft.wiki, not Fandom — Fandom lags (last edit 2026-06-18 vs 2026-08-02
         here) and was already missing 26.x content like Poplar
-- [ ] **Per-biome mob lists** — mcmeta's biome `spawners` field is empty, so these come from the
-      wiki `spawn_table` bucket, not Tier A
+- [x] **Per-biome mob lists** — sourced from Tier A mcmeta biome `spawners` (64 biomes, 677 spawners,
+      52 unique mobs), with wiki `spawn_table` demoted to an overlay for conditional notes.
+      (The previous claim that `spawners` was empty was false; see Decision 29).
 - [ ] **Brewing folded into the recipe tree** — not a separate renderer. See Phase 3
 
 ### Cross-linking
 
-- [ ] Mob spawns in a biome → the biome is a link
+- [x] Mob spawns in a biome → the biome is a link (and mob page spawn biomes link to biomes)
 - [x] Structure generates in a biome → link, both directions
 - [x] Structure → its chests → the items in them
 - [x] Trade → the item traded; item → the professions that sell it
@@ -760,6 +761,19 @@ New collections the added data makes nearly free:
     random pick of 12 rather than one disc, so refusing to resolve it to a single item stays the
     right answer, exactly as Decision 25 recorded. The 12 names inside that note are still plain
     text and remain a candidate for the Phase 6 lint bullet.
+
+29. **Tier A biome `spawners` is authoritative; wiki `spawn_table` is demoted to a notes overlay.**
+    Earlier docs and tests claimed mcmeta biome `spawners` was empty and forced mob spawn lists to
+    come from the wiki's `spawn_table` bucket. Checked against 26.2 data on 2026-09-09: 64 of the 66
+    biomes have populated `spawners` in `data/minecraft/worldgen/biome/*.json` (totaling 677 entries
+    across 52 unique mob entity types). Only `deep_dark` and `the_void` are empty.
+
+    Mob spawns are therefore extracted directly from Tier A, providing exact weights, category
+    totals, and group size ranges. Inverting this index produces mob-side `SpawnInfo` (52 mobs),
+    with `SpawnEntry.biomeRef` unconditionally resolved to the biome entity. The wiki's Tier B
+    `spawn_table` bucket is retained solely as an overlay for conditional notes (`note`, `noteName`),
+    such as slime chunk requirements. Mob texture variants in the wiki (e.g. Cold Chicken, Pale Wolf)
+    which share an underlying `entity_type` are deferred until mob variants have first-class pages.
 
 ## Still open
 

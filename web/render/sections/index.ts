@@ -1,5 +1,6 @@
 import type {
   AdvancementInfo,
+  BiomeInfo,
   BreedingInfo,
   ChestLoot,
   DropTable,
@@ -20,6 +21,7 @@ import type {
 } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
 import { renderAdvancementInfo } from "./advancement-info.js";
+import { renderBiomeInfo } from "./biome-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
 import { renderChestLoot } from "./chest-loot.js";
 import { renderDropTable } from "./drop-table.js";
@@ -71,6 +73,7 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   ChestLoot: (s, ctx) => renderChestLoot(s as ChestLoot, ctx),
   LinkList: (s, ctx) => renderLinkList(s as LinkList, ctx),
   StructureInfo: (s, ctx) => renderStructureInfo(s as StructureInfo, ctx),
+  BiomeInfo: (s, ctx) => renderBiomeInfo(s as BiomeInfo, ctx),
 };
 
 /**

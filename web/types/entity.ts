@@ -58,7 +58,8 @@ export type Section =
   | GenerationInfo
   | LinkList
   | ProfessionInfo
-  | StructureInfo;
+  | StructureInfo
+  | BiomeInfo;
 /**
  * The tool that breaks a block, from the mineable tags.
  *
@@ -210,7 +211,7 @@ export interface SpawnInfo {
   type: "SpawnInfo";
   entries?: {
     biome: string;
-    biomeRef?: EntityRef;
+    biomeRef: EntityRef;
     category: string;
     weight: number;
     totalWeight: number;
@@ -851,4 +852,43 @@ export interface StructureSpawnEntry {
   mob: EntityRef;
   groupSize: IntegerRange;
   weight: number;
+}
+/**
+ * Climate, mob spawns, and generating blocks of a biome.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "biomeInfo".
+ */
+export interface BiomeInfo {
+  type: "BiomeInfo";
+  dimension?: "overworld" | "nether" | "end";
+  temperature: number;
+  temperatureModifier?: string;
+  downfall: number;
+  hasPrecipitation: boolean;
+  precipitation: "rain" | "snow" | "none";
+  creatureSpawnProbability?: number;
+  spawnCosts?: {
+    [k: string]: {
+      [k: string]: number;
+    };
+  };
+  spawns?: BiomeSpawnEntry[];
+  blocks?: EntityRef[];
+  commonBlocksCount?: number;
+}
+/**
+ * One mob spawning in a biome, at a given weight and group size.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "biomeSpawnEntry".
+ */
+export interface BiomeSpawnEntry {
+  category: string;
+  mob: EntityRef;
+  groupSize: IntegerRange;
+  weight: number;
+  totalWeight: number;
+  note?: string;
+  noteName?: string;
 }

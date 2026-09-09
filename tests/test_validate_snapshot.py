@@ -142,7 +142,9 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         "TradeTable": 184,
         "StatBlock": 93,
         "DropTable": 65,
-        "SpawnInfo": 53,
+        # 53 when sourced from Tier B wiki spawn table. 52 now: sourced from
+        # Tier A biome spawners inverted onto mob entities.
+        "SpawnInfo": 52,
         "BreedingInfo": 26,
         # 44 items with a `minecraft:food` component, plus the milk bucket,
         # which clears every effect while restoring no hunger. `ominous_bottle`
@@ -161,6 +163,8 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         # 30 of the 34 structures hold a container, plus the dungeon's chest.
         "ChestLoot": 31,
         "LinkList": 62,
+        # All 66 enumerated biomes carry climate, spawns, and generating blocks.
+        "BiomeInfo": 66,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.

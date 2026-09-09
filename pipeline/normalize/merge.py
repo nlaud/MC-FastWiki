@@ -220,11 +220,12 @@ from pipeline.enrich.resource_location import (
     alternative_registry_id,
 )
 from pipeline.enrich.sprite import SpriteIndex
+from pipeline.extract.biome import BiomeIndex
 from pipeline.extract.enchantment import EnchantIndex
 from pipeline.extract.entity_class import EntityClass, EntityClassification
 from pipeline.extract.feature_place import FeaturePlaceIndex
 from pipeline.extract.food import ConsumeEffectKind, FoodFacts
-from pipeline.extract.generation import BlockGeneration
+from pipeline.extract.generation import BlockGeneration, Dimension
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.extract.profession import ProfessionIndex, extract_professions
 from pipeline.extract.structure import (
@@ -240,6 +241,8 @@ from pipeline.normalize.curated import CuratedData, StaleDocument
 from pipeline.normalize.entity import (
     AdvancementInfo,
     ApplicableItems,
+    BiomeInfo,
+    BiomeSpawnEntry,
     BreedingInfo,
     BreedingItem,
     ChestLoot,
@@ -1201,19 +1204,15 @@ def _build_stat_block(box: enrich_infobox.EntityInfobox) -> StatBlock:
     )
 
 
-def _convert_spawn_entry(
-    entry: enrich_spawn_table.SpawnEntry, join_table: JoinTable, by_id: Mapping[str, object]
-) -> SpawnEntry:
-    return SpawnEntry(
-        biome=entry.biome,
-        biome_ref=_maybe_ref(entry.biome, "worldgen/biome", join_table, by_id),
-        category=entry.category,
-        weight=float(entry.weight),
-        total_weight=float(entry.total_weight),
-        group_size=IntegerRange(minimum=entry.group_size.minimum, maximum=entry.group_size.maximum),
-        note=entry.note,
-        note_name=entry.note_name,
-    )
+def _resolve_mob_id(entity_type: str, drafts: Mapping[str, EntityDraft]) -> str:
+    """Resolve an entity_type ID to its mob draft key, respecting split IDs."""
+    if entity_type in drafts and drafts[entity_type].kind is EntityKind.MOB:
+        return entity_type
+    path = entity_type.split(":", 1)[-1]
+    qualified = f"{NAMESPACE}:entity_type/{path}"
+    if qualified in drafts and drafts[qualified].kind is EntityKind.MOB:
+        return qualified
+    return entity_type
 
 
 def _convert_ratio(value: enrich_droptable.Ratio) -> Ratio:
@@ -1577,6 +1576,7 @@ def merge_entities(
     profession_infoboxes: Mapping[str, ProfessionInfobox] | None = None,
     structure_index: StructureIndex | None = None,
     feature_place_index: FeaturePlaceIndex | None = None,
+    biome_index: BiomeIndex | None = None,
     curated_chests: Mapping[str, ChestSource] | None = None,
     loot_producers: Sequence[Producer] | None = None,
 ) -> MergeResult:
@@ -1967,6 +1967,7 @@ def merge_entities(
     #
     # The 34 structures from the `worldgen/structure` registry enumerate here,
     # mirroring villager professions, potions, and advancements.
+    structures_by_biome: dict[str, list[EntityRef]] = {}
     if structure_index is not None:
         resolved_pages = resolve_structure_pages(structure_index, join_table)
         structure_display_names = {sid: name for sid, (name, _) in resolved_pages.items()}
@@ -1978,7 +1979,6 @@ def merge_entities(
                 producers_by_table.setdefault(p.source_id, []).append(p)
 
         containers_by_structure = by_structure(curated_chests) if curated_chests else {}
-        structures_by_biome: dict[str, list[EntityRef]] = {}
 
         for sid, struct_entry in structure_index.structures.items():
             entity_id = sid
@@ -2212,16 +2212,171 @@ def merge_entities(
 
             drafts[place_id] = draft
 
-        # Reverse links on biomes: attach LinkList(title="Structures", links=...)
-        for biome_id, struct_refs in structures_by_biome.items():
-            if biome_id in drafts:
-                sorted_links = tuple(sorted(struct_refs, key=lambda r: (r.name, r.id)))
-                drafts[biome_id].add_section(
-                    LinkList(title="Structures", links=sorted_links),
-                    SourceTier.A,
+    # --- Biomes: climate, spawns, and generating blocks ---------------------
+    if biome_index is not None:
+        biome_by_name: dict[str, str] = {}
+        for b_id in biome_index:
+            name = (
+                drafts[b_id].name
+                if b_id in drafts
+                else _fallback_name(b_id.split(":", 1)[-1])
+            )
+            biome_by_name[name.lower()] = b_id
+
+        # Overlay wiki notes from spawn_index
+        notes_by_mob_biome: dict[tuple[str, str], tuple[str | None, str | None]] = {}
+        for entry in spawn_index.entries:
+            if entry.note is None:
+                continue
+            mob_rows = _wiki_rows(entry.mob_page, "entity_type", join_table)
+            if not mob_rows:
+                mob_rows = _wiki_rows(entry.mob, "entity_type", join_table)
+            mob_id = next(iter({r.registry_id for r in mob_rows})) if mob_rows else None
+            if mob_id is not None:
+                mob_id = _resolve_mob_id(mob_id, drafts)
+
+            resolved_biome_id: str | None = biome_by_name.get(entry.biome.lower())
+            if not resolved_biome_id:
+                resolved_biome_id = biome_by_name.get(entry.biome_page.lower())
+
+            if mob_id and resolved_biome_id:
+                notes_by_mob_biome[(mob_id, resolved_biome_id)] = (entry.note, entry.note_name)
+            else:
+                unplaced.append(
+                    UnplacedRow(
+                        table="spawn_table",
+                        subject=entry.mob,
+                        reason=(
+                            f"biome {entry.biome!r} is not an enumerated biome entity"
+                            if not resolved_biome_id
+                            else f"mob {entry.mob!r} could not be resolved to an entity_type ID"
+                        ),
+                    )
                 )
 
-    # --- SpawnInfo, DropTable, TradeTable: forward resolution from Tier B ---
+        # Block generation by biome
+        common_blocks: dict[Dimension, set[str]] = {
+            Dimension.OVERWORLD: set(),
+            Dimension.NETHER: set(),
+            Dimension.END: set(),
+        }
+        specific_blocks_by_biome: dict[str, set[str]] = {}
+        if generation_index is not None:
+            for block_id, bg in generation_index.items():
+                for scope in bg.scopes:
+                    if scope.all_biomes_of_dimension:
+                        common_blocks[scope.dimension].add(block_id)
+                    else:
+                        for b_id in scope.biomes:
+                            specific_blocks_by_biome.setdefault(b_id, set()).add(block_id)
+
+        # Build BiomeInfo for each biome and collect inverted mob spawns
+        mob_spawns: dict[str, list[SpawnEntry]] = {}
+
+        for biome_id, biome_entry in biome_index.items():
+            biome_draft = drafts.get(biome_id)
+            if biome_draft is None:
+                continue
+
+            biome_name = biome_draft.name
+            biome_ref = EntityRef(id=biome_id, name=biome_name)
+
+            b_spawns: list[BiomeSpawnEntry] = []
+            for category, spawners in biome_entry.spawners.items():
+                cat_total = biome_entry.category_totals.get(category, 0)
+                for spawner in spawners:
+                    mob_id = _resolve_mob_id(spawner.entity_type, drafts)
+                    mob_name = (
+                        drafts[mob_id].name
+                        if mob_id in drafts
+                        else _fallback_name(mob_id.split(":", 1)[-1])
+                    )
+                    note_tuple = notes_by_mob_biome.get((mob_id, biome_id))
+                    note = note_tuple[0] if note_tuple else None
+                    note_name = note_tuple[1] if note_tuple else None
+
+                    b_spawns.append(
+                        BiomeSpawnEntry(
+                            category=category,
+                            mob=EntityRef(id=mob_id, name=mob_name),
+                            group_size=IntegerRange(
+                                minimum=spawner.min_count, maximum=spawner.max_count
+                            ),
+                            weight=spawner.weight,
+                            total_weight=cat_total,
+                            note=note,
+                            note_name=note_name,
+                        )
+                    )
+
+                    mob_spawns.setdefault(mob_id, []).append(
+                        SpawnEntry(
+                            biome=biome_name,
+                            biome_ref=biome_ref,
+                            category=category,
+                            weight=float(spawner.weight),
+                            total_weight=float(cat_total),
+                            group_size=IntegerRange(
+                                minimum=spawner.min_count, maximum=spawner.max_count
+                            ),
+                            note=note,
+                            note_name=note_name,
+                        )
+                    )
+
+            b_spawns.sort(key=lambda s: (s.category, -s.weight, s.mob.name))
+
+            specific_blks = specific_blocks_by_biome.get(biome_id, set())
+            b_blocks: list[EntityRef] = []
+            for blk_id in sorted(specific_blks):
+                blk_name = (
+                    drafts[blk_id].name
+                    if blk_id in drafts
+                    else _fallback_name(blk_id.split(":", 1)[-1])
+                )
+                b_blocks.append(EntityRef(id=blk_id, name=blk_name))
+            b_blocks.sort(key=lambda r: (r.name, r.id))
+
+            # A biome in no dimension tag has no dimension-wide block set to count.
+            common_blocks_count = (
+                len(common_blocks.get(biome_entry.dimension, set()))
+                if biome_entry.dimension is not None
+                else 0
+            )
+
+            biome_info = BiomeInfo(
+                dimension=(
+                    biome_entry.dimension.value if biome_entry.dimension is not None else None
+                ),
+                temperature=biome_entry.temperature,
+                temperature_modifier=biome_entry.temperature_modifier,
+                downfall=biome_entry.downfall,
+                has_precipitation=biome_entry.has_precipitation,
+                precipitation=biome_entry.precipitation,
+                creature_spawn_probability=biome_entry.creature_spawn_probability,
+                spawn_costs=biome_entry.spawn_costs,
+                spawns=tuple(b_spawns),
+                blocks=tuple(b_blocks),
+                common_blocks_count=common_blocks_count,
+            )
+            biome_draft.add_section(biome_info, SourceTier.A)
+
+        for mob_id, m_entries in mob_spawns.items():
+            mob_draft = drafts.get(mob_id)
+            if mob_draft is not None:
+                sorted_entries = tuple(sorted(m_entries, key=lambda e: (e.biome, e.category)))
+                mob_draft.add_section(SpawnInfo(entries=sorted_entries), SourceTier.A)
+
+    # Reverse links on biomes: attach LinkList(title="Structures", links=...)
+    for biome_id, struct_refs in structures_by_biome.items():
+        if biome_id in drafts:
+            sorted_links = tuple(sorted(struct_refs, key=lambda r: (r.name, r.id)))
+            drafts[biome_id].add_section(
+                LinkList(title="Structures", links=sorted_links),
+                SourceTier.A,
+            )
+
+    # --- DropTable, TradeTable: forward resolution from Tier B ---
 
     def attach(target: str, section: Section, *, table: str, subject: str) -> None:
         """Attach one wiki-authored section, or report why it cannot be attached.
@@ -2253,15 +2408,6 @@ def merge_entities(
             )
             return
         draft.add_section(section, SourceTier.B)
-
-    for mob_name, spawn_entries in spawn_index.by_mob.items():
-        target = _resolve_forward(
-            mob_name, "entity_type", join_table, drafts, table="spawn_table", unplaced=unplaced
-        )
-        if target is None:
-            continue
-        entries = tuple(_convert_spawn_entry(entry, join_table, drafts) for entry in spawn_entries)
-        attach(target, SpawnInfo(entries=entries), table="spawn_table", subject=mob_name)
 
     for mob_name, mob_drops in drop_index.by_mob.items():
         target = _resolve_forward(

@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   AdvancementInfo,
+  BiomeInfo,
   BreedingInfo,
   ChestLoot,
   DropTable,
@@ -24,6 +25,7 @@ import type { Obtain, ObtainProducer } from "../types/obtain.js";
 import type { RenderContext } from "./context.js";
 import { buildObtainTree } from "./obtain-tree.js";
 import { renderAdvancementInfo } from "./sections/advancement-info.js";
+import { renderBiomeInfo } from "./sections/biome-info.js";
 import { renderBreedingInfo } from "./sections/breeding-info.js";
 import { renderChestLoot } from "./sections/chest-loot.js";
 import { renderDropTable } from "./sections/drop-table.js";
@@ -59,6 +61,7 @@ describe("Section renderers with real committed build data", () => {
   let itemsById: Map<string, Entity>;
   let blocksById: Map<string, Entity>;
   let enchantmentsById: Map<string, Entity>;
+  let biomesById: Map<string, Entity>;
   let obtainGraph: Obtain;
 
   beforeAll(() => {
@@ -128,6 +131,15 @@ describe("Section renderers with real committed build data", () => {
     );
     for (const entity of (JSON.parse(ench0Raw) as { entities: Entity[] }).entities) {
       enchantmentsById.set(entity.id, entity);
+    }
+
+    biomesById = new Map<string, Entity>();
+    const biome0Raw = fs.readFileSync(
+      path.resolve(process.cwd(), "data/dist/entities/biome-0.json"),
+      "utf8",
+    );
+    for (const entity of (JSON.parse(biome0Raw) as { entities: Entity[] }).entities) {
+      biomesById.set(entity.id, entity);
     }
 
     const obtainRaw = fs.readFileSync(path.resolve(process.cwd(), "data/dist/obtain.json"), "utf8");
@@ -2551,6 +2563,114 @@ describe("Section renderers with real committed build data", () => {
       expect(renderSection(linkList, ctx)).not.toBeNull();
       expect(renderSection(chestLoot, ctx)).not.toBeNull();
       expect(renderSection(structureInfo, ctx)).not.toBeNull();
+    });
+
+    describe("BiomeInfo", () => {
+      it("renders climate, spawns grouped by category, and generating blocks on Jungle", () => {
+        const jungle = requireItem(biomesById.get("minecraft:jungle"), "Jungle");
+        const biomeInfo = requireItem(
+          jungle.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Jungle BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+
+        // 1. Climate
+        expect(el.querySelector(".biome-climate-container")).not.toBeNull();
+        expect(el.textContent).toContain("Overworld");
+        expect(el.textContent).toContain("0.95");
+        expect(el.textContent).toContain("0.9");
+        expect(el.textContent).toContain("Rain");
+
+        // 2. Mob Spawns
+        const spawnsEl = requireItem(
+          el.querySelector(".biome-spawns-container"),
+          "spawns container",
+        );
+        expect(spawnsEl.textContent).toContain("Creature");
+        expect(spawnsEl.textContent).toContain("Monster");
+
+        // Parrot has weight 40 and 44.0% share of 91
+        expect(spawnsEl.textContent).toContain("Parrot");
+        expect(spawnsEl.textContent).toContain("44.0%");
+
+        // Slime has note
+        expect(spawnsEl.textContent).toContain("Spawn attempt succeeds only in slime chunks.");
+
+        // 3. Generating Blocks
+        const blocksEl = requireItem(
+          el.querySelector(".biome-blocks-container"),
+          "blocks container",
+        );
+        expect(blocksEl.textContent).toContain("Melon");
+        expect(blocksEl.textContent).toContain(
+          "Plus 21 more blocks common to every Overworld biome.",
+        );
+      });
+
+      it("renders temperature modifier on Frozen Ocean", () => {
+        const frozenOcean = requireItem(biomesById.get("minecraft:frozen_ocean"), "Frozen Ocean");
+        const biomeInfo = requireItem(
+          frozenOcean.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Frozen Ocean BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        expect(el.textContent).toContain("0 (frozen)");
+      });
+
+      it("omits spawns heading when empty on Deep Dark", () => {
+        const deepDark = requireItem(biomesById.get("minecraft:deep_dark"), "Deep Dark");
+        const biomeInfo = requireItem(
+          deepDark.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Deep Dark BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        expect(el.querySelector(".biome-climate-container")).not.toBeNull();
+        expect(el.querySelector(".biome-blocks-container")).not.toBeNull();
+        expect(el.querySelector(".biome-spawns-container")).toBeNull();
+        expect(el.textContent).not.toContain("Mob Spawns");
+      });
+
+      it("omits spawns and blocks headings when empty on The Void", () => {
+        const theVoid = requireItem(biomesById.get("minecraft:the_void"), "The Void");
+        const biomeInfo = requireItem(
+          theVoid.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "The Void BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        expect(el.querySelector(".biome-climate-container")).not.toBeNull();
+        expect(el.querySelector(".biome-spawns-container")).toBeNull();
+        expect(el.querySelector(".biome-blocks-container")).toBeNull();
+        expect(el.textContent).not.toContain("Mob Spawns");
+        expect(el.textContent).not.toContain("Generating Blocks");
+      });
+
+      it("omits the dimension row when the biome is in no dimension tag", () => {
+        const theVoid = requireItem(biomesById.get("minecraft:the_void"), "The Void");
+        const biomeInfo = requireItem(
+          theVoid.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "The Void BiomeInfo",
+        );
+
+        expect(biomeInfo.dimension).toBeUndefined();
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        expect(el.textContent).not.toContain("Dimension:");
+        // The rest of the climate block still renders.
+        expect(el.textContent).toContain("Temperature:");
+      });
+
+      it("delegates BiomeInfo to renderSection", () => {
+        const theVoid = requireItem(biomesById.get("minecraft:the_void"), "The Void");
+        const biomeInfo = requireItem(
+          theVoid.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "The Void BiomeInfo",
+        );
+        expect(renderSection(biomeInfo, ctx)).not.toBeNull();
+      });
     });
   });
 });

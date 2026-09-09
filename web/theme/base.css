@@ -2437,7 +2437,138 @@ canvas,
 }
 
 .group-cell,
-.weight-cell {
+.weight-cell,
+.share-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* BiomeInfo */
+.biome-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.biome-climate-container,
+.biome-spawns-container,
+.biome-blocks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biome-climate-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.biome-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.biome-label {
+  color: #888;
+  min-width: 120px;
+}
+
+.biome-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.biome-spawn-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.biome-spawn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.biome-category-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+/* One category renders one table, and a biome stacks up to seven of them directly
+   under each other. Auto layout sizes each table to its own longest mob name, so
+   Ambient's single Bat row put its columns hundreds of pixels away from Monster's.
+   Fixed layout holds every category to the same four column positions, which is
+   what makes the stack read as one table split by heading rather than four
+   unrelated ones. `min-width` keeps the columns legible in a narrow window and
+   hands the overflow to `.table-wrapper`, which already scrolls. */
+.biome-spawns-table {
+  width: 100%;
+  min-width: 340px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+/* Fixed layout reads its widths from the first row, which is the header row, so
+   these select by column position rather than by the cell classes the body rows
+   carry. */
+.biome-spawns-table th:nth-child(1) {
+  width: 46%;
+}
+
+.biome-spawns-table th:nth-child(2),
+.biome-spawns-table th:nth-child(3),
+.biome-spawns-table th:nth-child(4) {
+  width: 18%;
+}
+
+.biome-spawns-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.biome-spawns-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.biome-spawns-table tr:last-child td {
+  border-bottom: none;
+}
+
+.biome-spawn-note {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.biome-blocks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.biome-common-blocks {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #888;
 }

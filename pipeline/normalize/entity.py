@@ -118,6 +118,8 @@ __all__ = [
     "ENTITY_ID_PATTERN",
     "AdvancementInfo",
     "ApplicableItems",
+    "BiomeInfo",
+    "BiomeSpawnEntry",
     "BreedingInfo",
     "BreedingItem",
     "ChestLoot",
@@ -406,7 +408,7 @@ class SpawnEntry(BaseModel, frozen=True, populate_by_name=True):
     """
 
     biome: str
-    biome_ref: EntityRef | None = Field(default=None, alias="biomeRef")
+    biome_ref: EntityRef = Field(alias="biomeRef")
     category: str
     weight: float
     total_weight: float = Field(alias="totalWeight")
@@ -1006,6 +1008,40 @@ class StructureInfo(BaseModel, frozen=True, populate_by_name=True):
     suppressed_spawns: tuple[str, ...] = Field(default=(), alias="suppressedSpawns")
 
 
+class BiomeSpawnEntry(BaseModel, frozen=True, populate_by_name=True):
+    """One mob spawning in a biome, at a given weight and group size."""
+
+    category: str
+    mob: EntityRef
+    group_size: IntegerRange = Field(alias="groupSize")
+    weight: int
+    total_weight: int = Field(alias="totalWeight")
+    note: str | None = None
+    note_name: str | None = Field(default=None, alias="noteName")
+
+
+class BiomeInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Climate, mob spawns, and generating blocks of a biome."""
+
+    type: Literal["BiomeInfo"] = "BiomeInfo"
+    # Absent where no dimension tag lists the biome, which in 26.2 is `the_void`
+    # alone. See `pipeline.extract.biome.extract_biomes` for why that is stated as
+    # nothing rather than defaulted to the overworld.
+    dimension: Literal["overworld", "nether", "end"] | None = None
+    temperature: float
+    temperature_modifier: str | None = Field(default=None, alias="temperatureModifier")
+    downfall: float
+    has_precipitation: bool = Field(alias="hasPrecipitation")
+    precipitation: Literal["rain", "snow", "none"]
+    creature_spawn_probability: float | None = Field(
+        default=None, alias="creatureSpawnProbability"
+    )
+    spawn_costs: Mapping[str, Mapping[str, float]] = Field(default_factory=dict, alias="spawnCosts")
+    spawns: tuple[BiomeSpawnEntry, ...] = ()
+    blocks: tuple[EntityRef, ...] = ()
+    common_blocks_count: int = Field(default=0, alias="commonBlocksCount")
+
+
 # The discriminated union. See the module docstring for why `discriminator`
 # rather than a plain `Union`.
 Section = Annotated[
@@ -1025,7 +1061,8 @@ Section = Annotated[
     | GenerationInfo
     | LinkList
     | ProfessionInfo
-    | StructureInfo,
+    | StructureInfo
+    | BiomeInfo,
     Field(discriminator="type"),
 ]
 
@@ -1039,7 +1076,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The seventeen `type` values a `sections.<Type>` provenance key may name,
+# The eighteen `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -1061,6 +1098,7 @@ _SECTION_TYPES = frozenset(
         "LinkList",
         "ProfessionInfo",
         "StructureInfo",
+        "BiomeInfo",
     }
 )
 
@@ -1226,6 +1264,11 @@ class EntityDraft:
         self._aliases: dict[str, SourceTier] = {}
         self._sections: dict[str, Section] = {}
         self._provenance: dict[str, SourceTier] = {"id": tier, "kind": tier, "name": tier}
+
+    @property
+    def kind(self) -> EntityKind:
+        """The entity kind set at construction."""
+        return self._kind
 
     @property
     def name(self) -> str:
