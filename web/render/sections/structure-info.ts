@@ -168,7 +168,7 @@ export function renderStructureInfo(
   }
 
   // Siblings
-  if (section.siblings.length > 1) {
+  if (section.siblings.length > 0) {
     const sibVal = row("Set Siblings:", grid);
     sibVal.className = "structure-value structure-siblings-value";
     let first = true;

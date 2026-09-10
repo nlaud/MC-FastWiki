@@ -59,7 +59,14 @@ export const RENDERERS: Record<string, SectionRenderer> = {
     if (entity?.kind === "profession" || entity?.kind === "mob") {
       return renderTradeTable(s as TradeTable, ctx, { groupByLevelOnly: true });
     }
-    return null;
+    // This branch used to `return null`, which contradicted the paragraph above and
+    // silently dropped a populated trade table from all 170 item and block pages that
+    // carry one -- an Armorer sells a Bell for 36 emeralds, and the Bell page showed
+    // nothing. It also defeated half of Phase 6c's "item -> the professions that sell
+    // it" cross-link, because every `professionRef` in the section went unrendered.
+    // `renderTradeTable` already returns null for an empty trades list, so passing
+    // through is safe for a section with nothing in it.
+    return renderTradeTable(s as TradeTable, ctx);
   },
   AdvancementInfo: (s, ctx) => renderAdvancementInfo(s as AdvancementInfo, ctx),
   BreedingInfo: (s, ctx) => renderBreedingInfo(s as BreedingInfo, ctx),

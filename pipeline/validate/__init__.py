@@ -10,7 +10,7 @@ policy question finally gets answered. It sits between `pipeline.normalize` (sta
 `pipeline.emit` (stage 8) in `pipeline.cli.build.run_build`'s own stage order, and it has exactly
 one job: decide whether the build stage 7 produced is good enough to let stage 8 write it.
 
-## Two independent halves, and why neither one is optional
+## Three independent checks, and why none is optional
 
 **Conformance** (`pipeline.validate.conformance`) asks whether every document this build is about
 to write is *shaped* right -- does this entity satisfy `entity.schema.json`, does this shard
@@ -32,11 +32,21 @@ disappearance, obtain graph producer count, and sprite atlas icon coverage -- ar
 integer or percentage comparison against that baseline; `pipeline.validate.regression`'s own module
 docstring is where each one's threshold and reasoning actually live.
 
-Neither half can stand in for the other. A build can be perfectly shaped and still have silently
-lost 90% of its mobs -- conformance has nothing to say about that, because every entity it does
-still find is a completely valid `Entity`. And a build can hold its numbers steady while writing a
-`sourceTiers` key that names a field that does not exist -- regression has nothing to say about
-that, because it never looks inside a document, only at how many of them there are.
+**References** (`pipeline.validate.references`) asks whether every Tier B display name that failed
+resolution in the merge can be defended as benign -- a variant group where picking one ID would be
+fabricated, stack data that varies by component rather than registry ID, or content from a snapshot
+or future release that this build does not carry. Conformance has nothing to say about that because
+an unresolved reference simply omits `ref`, and regression has nothing to say about it because the
+count of entities does not change. Anything unclassified fails the build, and `--allow-regression`
+downgrades it to a warning.
+
+None of the three can stand in for the others. A build can be perfectly shaped and still have
+silently lost 90% of its mobs -- conformance has nothing to say about that, because every entity it
+does still find is a completely valid `Entity`. And a build can hold its numbers steady while
+writing a `sourceTiers` key that names a field that does not exist -- regression has nothing to
+say about that, because it never looks inside a document, only at how many of them there are. And a
+build can fail to link known entities while producing valid documents and steady counts -- only
+reference validation catches that.
 
 ## Where the gate hooks in, and the read-write hazard that ordering has to respect
 
@@ -89,6 +99,12 @@ from pydantic import BaseModel
 from pipeline.normalize.merge import MergeResult
 from pipeline.obtain.producer import ProducerIndex
 from pipeline.validate.conformance import ConformanceReport, GateDocuments, validate_conformance
+from pipeline.validate.references import (
+    BenignGroup,
+    ReferenceReport,
+    UnlinkedName,
+    check_references,
+)
 from pipeline.validate.regression import (
     RegressionCheck,
     RegressionReport,
@@ -98,34 +114,41 @@ from pipeline.validate.regression import (
 from pipeline.validate.snapshot import BuildSnapshot
 
 __all__ = [
+    "BenignGroup",
     "GateCallback",
+    "ReferenceReport",
+    "UnlinkedName",
     "ValidationError",
     "ValidationGate",
     "ValidationReport",
+    "check_references",
     "validate_build",
 ]
 
 
 class ValidationError(Exception):
-    """A build failed the validation gate: either a document is malformed, or an unexplained
-    regression.
+    """A build failed the validation gate: a document is malformed, an unexplained
+    regression occurred, or an unresolved reference could not be classified.
 
-    Raised only by `ValidationGate.__call__`, and only for one of two reasons: `pipeline.validate.
+    Raised only by `ValidationGate.__call__`, and only for one of three reasons: `pipeline.validate.
     conformance.ConformanceReport.failures` is non-empty (never downgradable -- see the module
-    docstring's closing section), or `pipeline.validate.regression.RegressionReport.blocking_
-    failures` is non-empty and the build was not run with `--allow-regression`. `str(error)` names
-    every failure that caused the refusal, matching every other stage exception's own convention of
-    writing a message meant for a person to read at the command line.
+    docstring's closing section), `pipeline.validate.regression.RegressionReport.blocking_
+    failures` is non-empty and the build was not run with `--allow-regression`, or `pipeline.
+    validate.references.ReferenceReport.blocking_failures` is non-empty and the build was not
+    run with `--allow-regression`. `str(error)` names every failure that caused the refusal,
+    matching every other stage exception's own convention of writing a message meant for a
+    person to read at the command line.
     """
 
 
 class ValidationReport(BaseModel, frozen=True):
-    """What one validation gate call found, across both halves. Written whole to
+    """What one validation gate call found, across all three parts. Written whole to
     `data/reports/validation.json`.
     """
 
     conformance: ConformanceReport
     regression: RegressionReport
+    references: ReferenceReport
 
 
 class GateCallback(Protocol):
@@ -190,13 +213,37 @@ class ValidationGate:
         regression = check_regression(
             new=new_snapshot, baseline=self._baseline, allow_regression=self._allow_regression
         )
-        self.report = ValidationReport(conformance=conformance, regression=regression)
+        references = check_references(
+            report=self._merge_result.report, allow_regression=self._allow_regression
+        )
+        self.report = ValidationReport(
+            conformance=conformance,
+            regression=regression,
+            references=references,
+        )
 
         if conformance.failures:
             raise ValidationError(_conformance_message(conformance))
-        blocking = regression.blocking_failures
-        if blocking:
-            raise ValidationError(_regression_message(blocking))
+        blocking_regression = regression.blocking_failures
+        if blocking_regression:
+            raise ValidationError(_regression_message(blocking_regression))
+        blocking_references = references.blocking_failures
+        if blocking_references:
+            raise ValidationError(_references_message(blocking_references))
+
+
+def _references_message(blocking: tuple[UnlinkedName, ...]) -> str:
+    lines = [
+        f"  {failure.table}: '{failure.subject}' ({failure.reason})"
+        for failure in blocking
+    ]
+    return (
+        f"the validation gate refused this build: {len(blocking)} unplaced reference(s) failed "
+        f"classification. Pass --allow-regression if this gap is expected -- it downgrades an "
+        f"unplaced reference failure to a warning that is still recorded in "
+        f"data/reports/validation.json; it never downgrades a schema conformance failure.\n"
+        + "\n".join(lines)
+    )
 
 
 def _conformance_message(report: ConformanceReport) -> str:

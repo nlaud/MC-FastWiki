@@ -973,14 +973,26 @@ def run_build(
     # run with `--allow-regression` has zero blocking failures by construction, so reporting only
     # that number would print a line that reads as completely clean for the one build that most
     # needs a second look -- the reader would have to open `validation.json` to learn that anything
-    # failed at all.
-    downgraded = tuple(check for check in validation_report.regression.checks if check.downgraded)
-    downgraded_note = f", {len(downgraded)} downgraded by --allow-regression" if downgraded else ""
+    # failed at all. It now sums both downgradeable checks, because a reference failure downgrades
+    # on the same flag and would otherwise vanish from the line for the same reason.
+    downgraded_regression = tuple(
+        check for check in validation_report.regression.checks if check.downgraded
+    )
+    downgraded_refs = tuple(
+        failure for failure in validation_report.references.failures if failure.downgraded
+    )
+    downgraded_total = len(downgraded_regression) + len(downgraded_refs)
+    downgraded_note = (
+        f", {downgraded_total} downgraded by --allow-regression" if downgraded_total else ""
+    )
+    classified_refs = sum(len(v) for v in validation_report.references.classified.values())
+    blocking_refs = len(validation_report.references.blocking_failures)
     report(
         f"validate: {documents_checked} documents checked, "
         f"{len(validation_report.conformance.failures)} conformance failures, "
         f"baseline={'present' if validation_report.regression.has_baseline else 'absent'}, "
-        f"{len(validation_report.regression.blocking_failures)} blocking regression failures"
+        f"{len(validation_report.regression.blocking_failures)} blocking regression failures, "
+        f"{classified_refs} unplaced references classified ({blocking_refs} blocking)"
         f"{downgraded_note}"
     )
     report(
