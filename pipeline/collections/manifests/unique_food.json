@@ -1,0 +1,14 @@
+{
+  "id": "unique_food",
+  "title": "Food",
+  "blurb": "Every edible item, with what it restores. Nutrition is the hunger points restored on eating; saturation is the hidden value that delays hunger from ticking down again.",
+  "aliases": ["foods", "edible", "hunger"],
+  "rule": { "type": "component", "component": "minecraft:food" },
+  "columns": [
+    { "fact": "food.nutrition", "label": "Hunger" },
+    { "fact": "food.saturation", "label": "Saturation" }
+  ],
+  "sortBy": "food.nutrition",
+  "sortDirection": "descending",
+  "note": "Tier A. 44 items carry minecraft:food in 26.2."
+}

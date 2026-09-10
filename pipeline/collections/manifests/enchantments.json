@@ -1,0 +1,11 @@
+{
+  "id": "enchantments",
+  "title": "Enchantments",
+  "blurb": "Every enchantment in the game, with its maximum level. Treasure enchantments cannot be found at an enchanting table and are marked in the wiki's own data.",
+  "aliases": ["all enchantments", "enchant list", "enchanting"],
+  "rule": { "type": "kind", "kind": "enchantment" },
+  "columns": [{ "fact": "enchant.maxLevel", "label": "Max Level" }],
+  "sortBy": "name",
+  "sortDirection": "ascending",
+  "note": "43 enchantments in 26.2. Flat list rather than the grouped-by-applicability form the later Phase 7 bullet describes — that grouping needs a tree-shaped section the flat member list cannot express."
+}

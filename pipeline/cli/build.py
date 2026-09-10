@@ -134,6 +134,8 @@ from typing import Any, TextIO
 from pydantic import BaseModel
 
 from pipeline.cli import CliError
+from pipeline.collections.manifest import load_manifests
+from pipeline.collections.resolve import resolve_collections
 from pipeline.emit import EmitError
 from pipeline.emit.atlas import DecodedSprite, collect_sprite_files, decode_sprite, pack_atlas
 from pipeline.emit.manifest import BuildInfo
@@ -187,6 +189,7 @@ from pipeline.normalize.merge import DEFAULT_REPORT_PATH as MERGE_REPORT_PATH
 from pipeline.normalize.merge import (
     WIKI_KIND,
     MergeReport,
+    MergeResult,
     block_drops_from_producers,
     merge_entities,
     resolve_structure_pages,
@@ -317,6 +320,7 @@ class BuildOptions(BaseModel, frozen=True):
     # full. Never downgrades a schema conformance failure -- see `pipeline.
     # validate`'s own module docstring for why that half stays absolute.
     allow_regression: bool = False
+    collections_dir: Path | None = None
 
 
 class BuildOutcome(BaseModel, frozen=True):
@@ -638,6 +642,7 @@ def run_build(
 
     # --- 3b. obtain, Tier A half: crafting/smelting recipes and loot tables ---
     item_tags = TagIndex(files, registry="item")
+    entity_type_tags = TagIndex(files, registry="entity_type")
     recipe_result: RecipeExtractionResult = extract_recipes(files, tags=item_tags)
     loot_result: LootExtractionResult = extract_loot(files)
     curated_chests = load_chest_sources(CURATED_DIRECTORY / CHEST_SOURCES_FILENAME)
@@ -888,6 +893,46 @@ def run_build(
         loot_producers=loot_result.producers,
     )
     report(f"normalize: {len(result.entities)} entities merged")
+
+    # --- 7a. collections ---------------------------------------------------------------
+    #
+    # A collection is an entity whose members are other entities, so it can only be built
+    # after every other entity exists with its final display name. That places it after
+    # stage 7 (merge_entities) and before stage 7b (the sprite atlas), which is the first
+    # stage that reads the finished entity list.
+    collection_manifests = load_manifests(options.collections_dir)
+    collection_entities = (
+        resolve_collections(
+            manifests=collection_manifests,
+            entities=result.entities,
+            item_components=item_components,
+            tag_indexes={"item": item_tags, "entity_type": entity_type_tags},
+        )
+        if collection_manifests
+        else []
+    )
+    # Append the collections to the merge result. Collections carry icon=None, so the
+    # sprite atlas stage skips them of its own accord.
+    #
+    # Rebuilt through the constructor rather than `model_copy(update=...)`, because
+    # `model_copy` does not re-run validators: it would leave `by_id` indexing only the
+    # entities merge produced while `entities` also held the collections, which is exactly
+    # the mismatch `MergeResult._by_id_must_match_the_entities` exists to refuse. Nothing
+    # downstream reads `by_id` today, so the fault would have been silent until something
+    # did.
+    if collection_entities:
+        merged_entities = tuple(
+            sorted([*result.entities, *collection_entities], key=lambda e: e.id)
+        )
+        result = MergeResult(
+            entities=merged_entities,
+            by_id={entity.id: entity for entity in merged_entities},
+            report=result.report,
+        )
+    report(
+        f"collections: {len(collection_entities)} collections from "
+        f"{len(collection_manifests)} manifests"
+    )
 
     # --- 7b. sprite atlas -------------------------------------------------------------
     #

@@ -2809,3 +2809,22 @@ canvas,
 .biome-noise-table tr:last-child td {
   border-bottom: none;
 }
+
+/* CollectionMembers */
+.collection-members-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-members-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.collection-members-table td.fact-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

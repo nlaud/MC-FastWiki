@@ -515,11 +515,14 @@ def _fake_transport(fixtures: Mapping[str, bytes]) -> Transport:
 
 
 def _base_options(tmp_path: Path) -> BuildOptions:
+    empty_manifests = tmp_path / "manifests"
+    empty_manifests.mkdir(parents=True, exist_ok=True)
     return BuildOptions(
         minecraft_version=VERSION,
         dist=tmp_path / "dist",
         cache=tmp_path / "cache",
         reports=tmp_path / "reports",
+        collections_dir=empty_manifests,
         quiet=True,
     )
 
@@ -863,3 +866,47 @@ def test_the_sprite_atlas_progress_line_names_every_count(tmp_path: Path) -> Non
     assert "5 sprites downloaded" in atlas_line
     assert "5 frames packed" in atlas_line
     assert "0 failures" in atlas_line
+
+
+# --- Stage 7a, collections ----------------------------------------------------------------
+
+
+def test_stage_7a_collection_manifest_resolves_and_emits(tmp_path: Path) -> None:
+    fixtures = _build_fixtures()
+    transport = _fake_transport(fixtures)
+    cache = ContentCache(tmp_path / "cache")
+
+    manifest_dir = tmp_path / "manifests"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "id": "creepers",
+        "title": "Creepers",
+        "blurb": "All creepers",
+        "rule": {"type": "kind", "kind": "mob"},
+        "columns": [],
+    }
+    (manifest_dir / "creepers.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    options = _base_options(tmp_path).model_copy(
+        update={"collections_dir": manifest_dir, "quiet": False}
+    )
+    stream = io.StringIO()
+    outcome = run_build(options, transport=transport, cache=cache, now=BUILT_AT, stream=stream)
+
+    # 3 fixture entities + 1 collection entity
+    assert outcome.entity_count == 4
+
+    dist = tmp_path / "dist"
+    shard_path = dist / "entities" / "collection-0.json"
+    assert shard_path.is_file()
+    shard_data = json.loads(shard_path.read_text(encoding="utf-8"))
+    assert len(shard_data["entities"]) == 1
+    col = shard_data["entities"][0]
+    assert col["id"] == "collection:creepers"
+    assert col["name"] == "Creepers"
+
+    collections_line = next(
+        line for line in stream.getvalue().splitlines() if line.startswith("collections:")
+    )
+    assert collections_line == "collections: 1 collections from 1 manifests"
+
