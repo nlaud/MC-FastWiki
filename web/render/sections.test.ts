@@ -2575,12 +2575,14 @@ describe("Section renderers with real committed build data", () => {
 
         const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
 
-        // 1. Climate
+        // 1. Climate, now precipitation alone
         expect(el.querySelector(".biome-climate-container")).not.toBeNull();
-        expect(el.textContent).toContain("Overworld");
-        expect(el.textContent).toContain("0.95");
-        expect(el.textContent).toContain("0.9");
         expect(el.textContent).toContain("Rain");
+        expect(el.textContent).not.toContain("Dimension:");
+        expect(el.textContent).not.toContain("Downfall:");
+        // 0.95 is Jungle's temperature property. The World Generation block
+        // below states T=3, and the property must not reappear beside it.
+        expect(el.textContent).not.toContain("0.95");
 
         // 2. Mob Spawns
         const spawnsEl = requireItem(
@@ -2608,15 +2610,23 @@ describe("Section renderers with real committed build data", () => {
         );
       });
 
-      it("renders temperature modifier on Frozen Ocean", () => {
+      it("keeps the temperature property out of the page on Frozen Ocean", () => {
         const frozenOcean = requireItem(biomesById.get("minecraft:frozen_ocean"), "Frozen Ocean");
         const biomeInfo = requireItem(
           frozenOcean.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
           "Frozen Ocean BiomeInfo",
         );
 
+        // The data still carries the property and its modifier -- the renderer
+        // simply no longer prints either. Frozen Ocean is the sharpest case,
+        // because its property reads 0 while its noise level reads T=0 as well,
+        // and the two agreeing here is a coincidence rather than a rule.
+        expect(biomeInfo.temperature).toBe(0);
+        expect(biomeInfo.temperatureModifier).toBe("frozen");
+
         const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
-        expect(el.textContent).toContain("0 (frozen)");
+        expect(el.textContent).not.toContain("Temperature:");
+        expect(el.textContent).not.toContain("(frozen)");
       });
 
       it("omits spawns heading when empty on Deep Dark", () => {
@@ -2648,7 +2658,7 @@ describe("Section renderers with real committed build data", () => {
         expect(el.textContent).not.toContain("Generating Blocks");
       });
 
-      it("omits the dimension row when the biome is in no dimension tag", () => {
+      it("renders the climate block as precipitation alone", () => {
         const theVoid = requireItem(biomesById.get("minecraft:the_void"), "The Void");
         const biomeInfo = requireItem(
           theVoid.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
@@ -2657,10 +2667,13 @@ describe("Section renderers with real committed build data", () => {
 
         expect(biomeInfo.dimension).toBeUndefined();
 
+        // Dimension, temperature and downfall are all read from the data
+        // elsewhere but none of them is printed as a row any more.
         const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
-        expect(el.textContent).not.toContain("Dimension:");
-        // The rest of the climate block still renders.
-        expect(el.textContent).toContain("Temperature:");
+        const labels = Array.from(el.querySelectorAll(".biome-climate-grid .biome-label")).map(
+          (l) => l.textContent,
+        );
+        expect(labels).toEqual(["Precipitation:"]);
       });
 
       it("delegates BiomeInfo to renderSection", () => {
@@ -2686,9 +2699,7 @@ describe("Section renderers with real committed build data", () => {
         );
 
         expect(worldgenEl.textContent).toContain("World Generation");
-        expect(worldgenEl.textContent).toContain(
-          "Noise generator climate parameters, distinct from the temperature and downfall properties above.",
-        );
+        expect(worldgenEl.textContent).toContain("Where the world generator places this biome.");
 
         // Group titles exist and are plain text, not links
         const groupTitles = Array.from(worldgenEl.querySelectorAll(".biome-noise-group-title")).map(
@@ -2744,7 +2755,84 @@ describe("Section renderers with real committed build data", () => {
         expect(worldgenEl.textContent).toContain("Oceans");
       });
 
-      it("renders World generation depth table on Deep Dark", () => {
+      it("summarises Jungle on plain-language axes before any exact value", () => {
+        const jungle = requireItem(biomesById.get("minecraft:jungle"), "Jungle");
+        const biomeInfo = requireItem(
+          jungle.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Jungle BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        const axes = Array.from(worldgenEl.querySelectorAll(".noise-axis"));
+        const axisNames = axes.map((a) => a.querySelector(".noise-axis-name")?.textContent);
+        expect(axisNames).toEqual(["Temperature", "Humidity", "Continentalness", "Erosion"]);
+
+        const values = axes.map((a) => a.querySelector(".noise-axis-value")?.textContent);
+        // Jungle is pinned to one temperature level, spans two humidity levels,
+        // and is unconstrained by erosion. The axes state exactly that.
+        expect(values[0]).toBe("T=3");
+        expect(values[1]).toBe("H=3–4");
+        expect(values[2]).toBe("Coast to Far-inland");
+        expect(values[3]).toBe("E=0–6");
+
+        // The exact range moved off the surface and onto the tooltip.
+        const tempValue = requireItem(
+          axes[0]?.querySelector(".noise-axis-value"),
+          "temperature value",
+        );
+        expect(tempValue.getAttribute("title")).toContain("0.2~0.55");
+
+        // Only the matching segments are filled, so the position reads at a glance.
+        const tempOn = axes[0]?.querySelectorAll(".noise-axis-seg.is-on").length;
+        const tempAll = axes[0]?.querySelectorAll(".noise-axis-seg").length;
+        expect(tempAll).toBe(5);
+        expect(tempOn).toBe(1);
+        expect(axes[3]?.querySelectorAll(".noise-axis-seg.is-on").length).toBe(7);
+      });
+
+      it("names Jungle's variants and hides the exact rows behind a disclosure", () => {
+        const jungle = requireItem(biomesById.get("minecraft:jungle"), "Jungle");
+        const biomeInfo = requireItem(
+          jungle.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Jungle BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        const variantLinks = Array.from(worldgenEl.querySelectorAll(".biome-noise-variant a")).map(
+          (a) => a.textContent,
+        );
+        expect(variantLinks).toContain("Bamboo Jungle");
+        expect(variantLinks).toContain("Sparse Jungle");
+
+        // Groups are named but never linked: a "middle biome" is not an entity.
+        const placedAs = requireItem(
+          worldgenEl.querySelector(".biome-noise-placed-as"),
+          "placed-as line",
+        );
+        expect(placedAs.textContent).toContain("middle biomes");
+        expect(placedAs.querySelector("a")).toBeNull();
+
+        // The 40 terrain rows still exist, but a closed disclosure holds them.
+        const detail = requireItem(
+          worldgenEl.querySelector(".biome-noise-detail"),
+          "detail disclosure",
+        );
+        expect(detail.hasAttribute("open")).toBe(false);
+        expect(detail.querySelector("summary")?.textContent).toContain("Exact noise values");
+        expect(detail.querySelectorAll(".biome-noise-table tbody tr").length).toBeGreaterThan(20);
+      });
+
+      it("states depth as a sentence on Deep Dark, with no disclosure to open", () => {
         const deepDark = requireItem(biomesById.get("minecraft:deep_dark"), "Deep Dark");
         const biomeInfo = requireItem(
           deepDark.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
@@ -2758,11 +2846,16 @@ describe("Section renderers with real committed build data", () => {
         );
 
         expect(worldgenEl.textContent).toContain("World Generation");
-        const ths = Array.from(worldgenEl.querySelectorAll(".biome-noise-table th")).map(
-          (th) => th.textContent,
-        );
-        expect(ths).toEqual(["Depth", "Additional Requirement"]);
-        expect(worldgenEl.textContent).toContain("0");
+
+        // A one-row table for one fact was more chrome than fact, so a depth
+        // placement reads as a line instead.
+        const depthLine = requireItem(worldgenEl.querySelector(".biome-noise-depth"), "depth line");
+        expect(depthLine.textContent).toContain("Underground: generates at depth");
+        expect(depthLine.textContent).toContain("Erosion=-1.0~-0.375");
+
+        // Deep Dark is placed by depth alone, so the exact-values disclosure
+        // would open onto nothing and is therefore not rendered at all.
+        expect(worldgenEl.querySelector(".biome-noise-detail")).toBeNull();
       });
 
       it("renders World generation direct inland table with sibling on River", () => {

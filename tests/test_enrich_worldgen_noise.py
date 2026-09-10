@@ -195,3 +195,75 @@ def test_extract_worldgen_noise_table_count_mismatch() -> None:
     with pytest.raises(EnrichError, match="expected exactly 8 tables"):
         extract_worldgen_noise(wikitext)
 
+
+
+def test_placements_carry_levels_as_integers(overworld_wikitext: str) -> None:
+    """The display strings and the level integers must state the same fact.
+
+    A renderer plots a biome on the temperature axis from the integers and
+    spells the exact band from the string. If the two ever disagree the page
+    shows one number and highlights another, so they are checked together.
+    """
+    result = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    jungle = result.placements_by_biome["minecraft:jungle"]
+
+    group_rows = [p for p in jungle if p.route == "group"]
+    for placement in group_rows:
+        assert placement.temperature is not None
+        assert placement.temperature_levels
+        # "T=3 (0.2~0.55)" and (3,) are the same claim.
+        for level in placement.temperature_levels:
+            assert f"T={level}" in placement.temperature
+
+    t_levels = {lvl for p in jungle for lvl in p.temperature_levels}
+    h_levels = {lvl for p in jungle for lvl in p.humidity_levels}
+    assert t_levels == {3}
+    assert h_levels == {3, 4}
+
+    # Erosion does not constrain Jungle at all, and the axis should show that
+    # rather than implying a narrow band.
+    e_levels = {lvl for p in jungle for lvl in p.erosion_levels}
+    assert e_levels == {0, 1, 2, 3, 4, 5, 6}
+
+
+def test_continentalness_bands_share_one_absolute_axis(overworld_wikitext: str) -> None:
+    """Ocean-side and inland placements must index the same seven prose bands.
+
+    The inland table names only its own four columns, so a reader that took the
+    column index literally would place Coast at 0 and collide it with Mushroom
+    fields, which is band 0 on the real axis.
+    """
+    result = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+
+    def bands(biome_id: str) -> set[int]:
+        return {
+            band
+            for placement in result.placements_by_biome[biome_id]
+            for band in placement.continentalness_bands
+        }
+
+    ocean_bands = bands("minecraft:ocean")
+    mushroom_bands = bands("minecraft:mushroom_fields")
+    jungle_bands = bands("minecraft:jungle")
+
+    assert mushroom_bands == {0}
+    assert ocean_bands == {2}
+    # Coast is band 3, so every inland band sits above the ocean ones.
+    assert jungle_bands == {3, 4, 5, 6}
+    assert min(jungle_bands) > max(ocean_bands)
+
+
+def test_beach_biomes_take_every_humidity_level(overworld_wikitext: str) -> None:
+    """Beach placement reads temperature only, so humidity must not read empty.
+
+    The prose says the beach biome "is related only to the temperature value".
+    An empty humidity tuple would render as a blank axis, which reads as "no
+    data" rather than "every level qualifies".
+    """
+    result = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    beach_groups = [
+        p for p in result.placements_by_biome["minecraft:beach"] if p.route == "group"
+    ]
+    assert beach_groups
+    for placement in beach_groups:
+        assert set(placement.humidity_levels) == {0, 1, 2, 3, 4}

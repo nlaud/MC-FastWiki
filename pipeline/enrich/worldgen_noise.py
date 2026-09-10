@@ -44,6 +44,11 @@ __all__ = [
 OVERWORLD_SECTION_HEADING = "=== Overworld ==="
 CONTINENTALNESS_COL_NAMES = ("Coast", "Near-inland", "Mid-inland", "Far-inland")
 
+# The prose lists seven continentalness bands, from Mushroom fields through the
+# oceans to Far-inland. The inland table names only the last four as columns, so
+# its column index plus this offset is the band's index on the shared axis.
+INLAND_BAND_OFFSET = 3
+
 GROUPS = (
     "Beach biomes",
     "Badland biomes",
@@ -61,7 +66,27 @@ class NoiseSibling(BaseModel, frozen=True):
 
 
 class NoisePlacement(BaseModel, frozen=True, populate_by_name=True):
-    """One noise climate placement rule for an Overworld biome."""
+    """One noise climate placement rule for an Overworld biome.
+
+    Every parameter appears twice, and the pair is deliberate. The bare fields
+    (`temperature`, `erosion`, ...) are display strings that already carry the
+    level and its numeric range, and the detail table renders them verbatim. The
+    `*_levels` fields beside them are the same facts as integers.
+
+    The renderer cannot recover a level from a display string without parsing
+    `T=3 (0.2~0.55)` back apart, and a renderer that re-parses a string this
+    module formatted duplicates the knowledge of how to format it. So the
+    integers ship alongside rather than instead: a summary that plots where a
+    biome sits on the 0-4 temperature axis reads `temperature_levels`, and the
+    row that spells the exact range reads `temperature`.
+
+    Level indices are absolute and match the prose definitions:
+    temperature and humidity run 0-4, erosion runs 0-6, and
+    `continentalness_bands` indexes all seven bands the prose lists, from
+    0 (Mushroom fields) through 3 (Coast) to 6 (Far-inland). The inland table's
+    own four columns are the last four of those, which is why placements read
+    from it carry bands 3-6.
+    """
 
     route: Literal["depth", "non_inland", "direct_inland", "group", "group_terrain"]
     group: str | None = None
@@ -75,6 +100,11 @@ class NoisePlacement(BaseModel, frozen=True, populate_by_name=True):
     additional_requirement: str | None = Field(default=None, alias="additionalRequirement")
     condition: str | None = None
     sibling: NoiseSibling | None = None
+    temperature_levels: tuple[int, ...] = Field(default=(), alias="temperatureLevels")
+    humidity_levels: tuple[int, ...] = Field(default=(), alias="humidityLevels")
+    erosion_levels: tuple[int, ...] = Field(default=(), alias="erosionLevels")
+    continentalness_bands: tuple[int, ...] = Field(default=(), alias="continentalnessBands")
+    pv_band: str | None = Field(default=None, alias="pvBand")
 
 
 class NoiseLegend(BaseModel, frozen=True):
@@ -392,8 +422,7 @@ def _format_e_range(start_e: int, end_e: int, legend: NoiseLegend) -> str:
 
 
 def _format_c_range(start_idx: int, end_idx: int, legend: NoiseLegend) -> str:
-    # Offset by 3 since Coast is index 3 in prose continentalness bands
-    c_band_offset = 3
+    c_band_offset = INLAND_BAND_OFFSET
     if start_idx == end_idx:
         name = CONTINENTALNESS_COL_NAMES[start_idx]
         band_idx = start_idx + c_band_offset
@@ -551,14 +580,21 @@ def extract_worldgen_noise(
             cell = grid1[r][col_idx]
             txt = _clean_cell_text(cell.text)
             c_desc = ""
+            # Band indices are absolute over the seven prose bands, so the ocean
+            # side of the axis lands below Coast rather than restarting at zero.
+            c_bands: tuple[int, ...] = ()
             if col_idx == 1 and cell.colspan == 2:
                 c_desc = "Oceans, Deep oceans (-1.05~-0.19)"
+                c_bands = (1, 2)
             elif col_idx == 1:
                 c_desc = "Oceans (-0.455~-0.19)"
+                c_bands = (2,)
             elif col_idx == 2:
                 c_desc = "Deep oceans (-1.05~-0.455)"
+                c_bands = (1,)
             elif col_idx == 3:
                 c_desc = "Mushroom fields (-1.2~-1.05)"
+                c_bands = (0,)
 
             if col_idx == 2 and cell.colspan > 1:
                 continue
@@ -567,13 +603,16 @@ def extract_worldgen_noise(
                 resolved = resolve_biome(m.group(1))
                 if resolved:
                     b_id, _ = resolved
-                    eff_t = "T=0-4 (-1.0~1.0)" if cell.rowspan >= 5 else t_str
+                    spans_all_t = cell.rowspan >= 5
+                    eff_t = "T=0-4 (-1.0~1.0)" if spans_all_t else t_str
                     add_placement(
                         b_id,
                         NoisePlacement(
                             route="non_inland",
                             temperature=eff_t,
                             continentalness=c_desc,
+                            temperature_levels=(0, 1, 2, 3, 4) if spans_all_t else (t_level,),
+                            continentalness_bands=c_bands,
                         ),
                     )
                     t1_count += 1
@@ -650,6 +689,10 @@ def extract_worldgen_noise(
             e_formatted = _format_e_range(e_start, e_end, legend)
             c_formatted = _format_c_range(c_start, c_end, legend)
             pv_formatted = _format_pv_range(pv, legend)
+            e_span = tuple(range(e_start, e_end + 1))
+            # The inland table's four columns are the last four prose bands, so
+            # shift by 3 to keep one absolute axis shared with the ocean side.
+            c_span = tuple(range(c_start + INLAND_BAND_OFFSET, c_end + INLAND_BAND_OFFSET + 1))
 
             if kind == "biome":
                 resolved = resolve_biome(name)
@@ -665,6 +708,9 @@ def extract_worldgen_noise(
                             continentalness=c_formatted,
                             condition=cond,
                             sibling=sib,
+                            erosion_levels=e_span,
+                            continentalness_bands=c_span,
+                            pv_band=pv,
                         ),
                     )
                     t2_direct_count += 1
@@ -676,6 +722,9 @@ def extract_worldgen_noise(
                     pv=pv_formatted,
                     continentalness=c_formatted,
                     condition=cond,
+                    erosion_levels=e_span,
+                    continentalness_bands=c_span,
+                    pv_band=pv,
                 )
                 group_terrain_placements.setdefault(name, []).append(p)
 
@@ -691,6 +740,9 @@ def extract_worldgen_noise(
         group_name: str,
         temp_str: str,
         hum_str: str,
+        *,
+        t_levels: tuple[int, ...] = (),
+        h_levels: tuple[int, ...] = (),
     ) -> int:
         cleaned = _clean_cell_text(cell_text)
         lines = [
@@ -731,6 +783,8 @@ def extract_worldgen_noise(
                         weirdness=cond if cond and ("W<" in cond or "W>" in cond) else None,
                         condition=cond if cond and not ("W<" in cond or "W>" in cond) else None,
                         sibling=sib,
+                        temperature_levels=t_levels,
+                        humidity_levels=h_levels,
                     ),
                 )
                 placed_count += 1
@@ -748,8 +802,16 @@ def extract_worldgen_noise(
             t_s = legend.temperature[t_indices[0]].split("~")[0]
             t_e = legend.temperature[t_indices[-1]].split("~")[-1]
             t_formatted = f"T={t_str_raw} ({t_s}~{t_e})"
+        # Beach placement does not read humidity at all -- the prose says the
+        # biome "is related only to the temperature value" -- so every humidity
+        # level qualifies rather than none.
         t3_count += extract_group_cell(
-            grid3[r][1].text, "Beach biomes", t_formatted, "Any"
+            grid3[r][1].text,
+            "Beach biomes",
+            t_formatted,
+            "Any",
+            t_levels=tuple(t_indices),
+            h_levels=(0, 1, 2, 3, 4),
         )
     table_counts["beach"] = t3_count
 
@@ -766,7 +828,12 @@ def extract_worldgen_noise(
             h_e = legend.humidity[h_indices[-1]].split("~")[-1]
             h_formatted = f"H={h_str_raw} ({h_s}~{h_e})"
         t4_count += extract_group_cell(
-            grid4[r][1].text, "Badland biomes", "T=4 (0.55~1.0)", h_formatted
+            grid4[r][1].text,
+            "Badland biomes",
+            "T=4 (0.55~1.0)",
+            h_formatted,
+            t_levels=(4,),
+            h_levels=tuple(h_indices),
         )
     table_counts["badland"] = t4_count
 
@@ -780,7 +847,12 @@ def extract_worldgen_noise(
             t_level = c - 1
             t_formatted = f"T={t_level} ({legend.temperature[t_level]})"
             t5_count += extract_group_cell(
-                grid5[r][c].text, "Middle biomes", t_formatted, h_formatted
+                grid5[r][c].text,
+                "Middle biomes",
+                t_formatted,
+                h_formatted,
+                t_levels=(t_level,),
+                h_levels=(h_level,),
             )
     table_counts["middle"] = t5_count
 
@@ -794,7 +866,12 @@ def extract_worldgen_noise(
             t_level = c - 1
             t_formatted = f"T={t_level} ({legend.temperature[t_level]})"
             t6_count += extract_group_cell(
-                grid6[r][c].text, "Plateau biomes", t_formatted, h_formatted
+                grid6[r][c].text,
+                "Plateau biomes",
+                t_formatted,
+                h_formatted,
+                t_levels=(t_level,),
+                h_levels=(h_level,),
             )
     table_counts["plateau"] = t6_count
 
@@ -803,12 +880,22 @@ def extract_worldgen_noise(
     t7_count = 0
     t_headers = ["T=0~1 (-1.0~-0.15)", "T=2 (-0.15~0.2)", "T=3 (0.2~0.55)", "T=4 (0.55~1.0)"]
     h_headers = ["H=0~1 (-1.0~-0.1)", "H=2 (-0.1~0.1)", "H=3 (0.1~0.3)", "H=4 (0.3~1.0)"]
+    # This table pairs its first two levels into one column and one row, so the
+    # level tuples run alongside the headers rather than being derived from the
+    # index the way the middle and plateau tables allow.
+    t_header_levels: list[tuple[int, ...]] = [(0, 1), (2,), (3,), (4,)]
+    h_header_levels: list[tuple[int, ...]] = [(0, 1), (2,), (3,), (4,)]
     for r in range(1, len(grid7)):
         h_formatted = h_headers[r - 1]
         for c in range(1, 5):
             t_formatted = t_headers[c - 1]
             t7_count += extract_group_cell(
-                grid7[r][c].text, "Shattered biomes", t_formatted, h_formatted
+                grid7[r][c].text,
+                "Shattered biomes",
+                t_formatted,
+                h_formatted,
+                t_levels=t_header_levels[c - 1],
+                h_levels=h_header_levels[r - 1],
             )
     table_counts["shattered"] = t7_count
 

@@ -2375,6 +2375,11 @@ def merge_entities(
                                 additional_requirement=p.additional_requirement,
                                 condition=p.condition,
                                 sibling=noise_sib,
+                                temperature_levels=p.temperature_levels,
+                                humidity_levels=p.humidity_levels,
+                                erosion_levels=p.erosion_levels,
+                                continentalness_bands=p.continentalness_bands,
+                                pv_band=p.pv_band,
                             )
                         )
 
