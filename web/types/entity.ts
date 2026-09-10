@@ -876,6 +876,7 @@ export interface BiomeInfo {
   spawns?: BiomeSpawnEntry[];
   blocks?: EntityRef[];
   commonBlocksCount?: number;
+  noisePlacements?: NoisePlacement[];
 }
 /**
  * One mob spawning in a biome, at a given weight and group size.
@@ -891,4 +892,24 @@ export interface BiomeSpawnEntry {
   totalWeight: number;
   note?: string;
   noteName?: string;
+}
+/**
+ * One noise climate placement rule for an Overworld biome, sourced from World generation § Biomes -> Overworld.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "noisePlacement".
+ */
+export interface NoisePlacement {
+  route: "depth" | "non_inland" | "direct_inland" | "group" | "group_terrain";
+  group?: string;
+  temperature?: string;
+  humidity?: string;
+  continentalness?: string;
+  erosion?: string;
+  weirdness?: string;
+  pv?: string;
+  depth?: string;
+  additionalRequirement?: string;
+  condition?: string;
+  sibling?: EntityRef;
 }

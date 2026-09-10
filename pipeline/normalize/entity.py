@@ -159,6 +159,7 @@ __all__ = [
     "LinkList",
     "LootingDrop",
     "Measure",
+    "NoisePlacement",
     "ObtainList",
     "ProfessionInfo",
     "RandomSpreadPlacement",
@@ -1020,6 +1021,23 @@ class BiomeSpawnEntry(BaseModel, frozen=True, populate_by_name=True):
     note_name: str | None = Field(default=None, alias="noteName")
 
 
+class NoisePlacement(BaseModel, frozen=True, populate_by_name=True):
+    """One noise climate placement rule for an Overworld biome."""
+
+    route: Literal["depth", "non_inland", "direct_inland", "group", "group_terrain"]
+    group: str | None = None
+    temperature: str | None = None
+    humidity: str | None = None
+    continentalness: str | None = None
+    erosion: str | None = None
+    weirdness: str | None = None
+    pv: str | None = None
+    depth: str | None = None
+    additional_requirement: str | None = Field(default=None, alias="additionalRequirement")
+    condition: str | None = None
+    sibling: EntityRef | None = None
+
+
 class BiomeInfo(BaseModel, frozen=True, populate_by_name=True):
     """Climate, mob spawns, and generating blocks of a biome."""
 
@@ -1040,6 +1058,9 @@ class BiomeInfo(BaseModel, frozen=True, populate_by_name=True):
     spawns: tuple[BiomeSpawnEntry, ...] = ()
     blocks: tuple[EntityRef, ...] = ()
     common_blocks_count: int = Field(default=0, alias="commonBlocksCount")
+    noise_placements: tuple[NoisePlacement, ...] = Field(
+        default=(), alias="noisePlacements"
+    )
 
 
 # The discriminated union. See the module docstring for why `discriminator`

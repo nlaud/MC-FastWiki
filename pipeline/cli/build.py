@@ -126,10 +126,10 @@ which read to prime.
 import json
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from pydantic import BaseModel
 
@@ -154,6 +154,7 @@ from pipeline.enrich.resource_location import JoinTable, fetch_join_table
 from pipeline.enrich.spawn_table import fetch_spawn_tables
 from pipeline.enrich.sprite import fetch_sprite_index
 from pipeline.enrich.trade import fetch_trades
+from pipeline.enrich.worldgen_noise import NoiseReport, extract_worldgen_noise
 from pipeline.extract.advancement import extract_advancement_ids
 from pipeline.extract.biome import extract_biomes
 from pipeline.extract.enchantment import extract_enchantments
@@ -165,6 +166,7 @@ from pipeline.extract.feature_place import (
 )
 from pipeline.extract.food import extract_food
 from pipeline.extract.generation import (
+    Dimension,
     GenerationReport,
     extract_generation,
 )
@@ -217,6 +219,7 @@ from pipeline.validate import ValidationError, ValidationReport, validate_build
 __all__ = [
     "CURATED_DIRECTORY",
     "GENERATION_REPORT_NAME",
+    "NOISE_REPORT_NAME",
     "OBTAIN_REPORT_NAME",
     "PAGES_WITHOUT_INFOBOX_REPORT_NAME",
     "VALIDATION_REPORT_NAME",
@@ -255,6 +258,10 @@ VALIDATION_REPORT_NAME = "validation.json"
 # Features skipped by `pipeline.extract.generation` during natural generation
 # extraction are reported to `data/reports/generation-report.json`.
 GENERATION_REPORT_NAME = "generation-report.json"
+
+# Unplaced or upcoming biomes from World generation noise tables are reported
+# to `data/reports/noise-report.json`.
+NOISE_REPORT_NAME = "noise-report.json"
 
 
 class ObtainReport(BaseModel, frozen=True):
@@ -343,6 +350,7 @@ class BuildOutcome(BaseModel, frozen=True):
     obtain_report: ObtainReport
     validation_report: ValidationReport
     generation_report: GenerationReport | None = None
+    noise_report: NoiseReport | None = None
 
 
 def _offline_transport(cache: ContentCache) -> Transport:
@@ -423,6 +431,7 @@ def _write_reports(
     validation_report: ValidationReport,
     generation_report: GenerationReport,
     pages_without_infobox: Sequence[str],
+    noise_report: NoiseReport | None = None,
 ) -> tuple[Path, ...]:
     """Write every stage report into `reports_root`, and return the paths written.
 
@@ -431,10 +440,10 @@ def _write_reports(
     than at each module's own `data/reports/` default, so a `--reports` flag
     redirects every one of them without this function knowing anything about
     their internal shape. `pages_without_infobox`, `obtain_report`,
-    `validation_report`, and `generation_report` are not the report of any stage
-    module either, so each gets its own small file, written the same way
-    `emit.write.write_report` and its siblings write theirs: indented JSON,
-    sorted keys, one trailing newline.
+    `validation_report`, `generation_report`, and `noise_report` are not the
+    report of any stage module either, so each gets its own small file, written
+    the same way `emit.write.write_report` and its siblings write theirs: indented
+    JSON, sorted keys, one trailing newline.
     """
     reconciliation_path = reports_root / RECONCILE_REPORT_PATH.name
     merge_path = reports_root / MERGE_REPORT_PATH.name
@@ -468,7 +477,7 @@ def _write_reports(
         json.dumps(generation_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    return (
+    paths = [
         reconciliation_path,
         merge_path,
         infobox_path,
@@ -477,7 +486,16 @@ def _write_reports(
         obtain_report_path,
         validation_report_path,
         generation_report_path,
-    )
+    ]
+    if noise_report is not None:
+        noise_report_path = reports_root / NOISE_REPORT_NAME
+        noise_document = noise_report.model_dump(mode="json", by_alias=True)
+        noise_report_path.write_text(
+            json.dumps(noise_document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        paths.append(noise_report_path)
+
+    return tuple(paths)
 
 
 def run_build(
@@ -738,10 +756,58 @@ def run_build(
     )
 
     profession_pages = [entry.page_title for entry in profession_index.entries]
-    profession_wikitext = fetch_page_wikitext(
-        profession_pages, revision=version, cache=store, transport=network_transport
+    tier_b_misc_pages = list(profession_pages)
+    has_biomes = bool(registries.get("worldgen/biome", ()))
+    if has_biomes:
+        tier_b_misc_pages.append("World generation")
+
+    tier_b_misc_wikitext = fetch_page_wikitext(
+        tier_b_misc_pages, revision=version, cache=store, transport=network_transport
     )
-    profession_infoboxes = parse_profession_infoboxes(profession_wikitext.contents())
+    misc_contents = tier_b_misc_wikitext.contents()
+    profession_contents = {p: misc_contents[p] for p in profession_pages if p in misc_contents}
+    profession_infoboxes = parse_profession_infoboxes(profession_contents)
+
+    noise_placements: Mapping[str, Sequence[Any]] | None = None
+    noise_report: NoiseReport | None = None
+    if has_biomes:
+        worldgen_wikitext = misc_contents.get("World generation", "")
+        noise_result = extract_worldgen_noise(
+            worldgen_wikitext,
+            join_table=join_table,
+            biome_registry=registries.get("worldgen/biome", ()),
+        )
+        if biome_index is not None:
+            overworld_biome_ids = {
+                b_id
+                for b_id, entry in biome_index.items()
+                if entry.dimension == Dimension.OVERWORLD
+            }
+            non_overworld_biome_ids = {
+                b_id
+                for b_id, entry in biome_index.items()
+                if entry.dimension != Dimension.OVERWORLD
+            }
+            missing_noise = overworld_biome_ids - set(noise_result.placements_by_biome.keys())
+            if missing_noise:
+                raise CliError(
+                    f"expected all {len(overworld_biome_ids)} Overworld biomes to have "
+                    f"noise placements, but {len(missing_noise)} were missing: "
+                    f"{sorted(missing_noise)}"
+                )
+            invalid_noise = non_overworld_biome_ids & set(noise_result.placements_by_biome.keys())
+            if invalid_noise:
+                raise CliError(
+                    f"expected 0 non-Overworld biomes to have noise placements, "
+                    f"but {len(invalid_noise)} had placements: {sorted(invalid_noise)}"
+                )
+        noise_placements = noise_result.placements_by_biome
+        noise_report = noise_result.report
+        report(
+            f"tier B worldgen noise: {len(noise_placements)} biomes with placements, "
+            f"{sum(len(p) for p in noise_placements.values())} total placements, "
+            f"{len(noise_report.unresolved_biome_names)} unplaced/upcoming biomes"
+        )
 
     mob_pages = _select_mob_pages(
         registries=registries.get("entity_type", ()),
@@ -817,6 +883,7 @@ def run_build(
         structure_index=struct_index,
         feature_place_index=feature_place_index,
         biome_index=biome_index,
+        noise_placements=noise_placements,
         curated_chests=curated_chests,
         loot_producers=loot_result.producers,
     )
@@ -953,6 +1020,7 @@ def run_build(
         validation_report=validation_report,
         generation_report=gen_result.report,
         pages_without_infobox=without_box,
+        noise_report=noise_report,
     )
     report(f"reports: wrote {len(report_paths)} files to {options.reports}")
 
@@ -972,4 +1040,5 @@ def run_build(
         obtain_report=obtain_report,
         validation_report=validation_report,
         generation_report=gen_result.report,
+        noise_report=noise_report,
     )

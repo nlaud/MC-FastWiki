@@ -2671,6 +2671,144 @@ describe("Section renderers with real committed build data", () => {
         );
         expect(renderSection(biomeInfo, ctx)).not.toBeNull();
       });
+
+      it("renders World generation group chips and terrain table on Jungle", () => {
+        const jungle = requireItem(biomesById.get("minecraft:jungle"), "Jungle");
+        const biomeInfo = requireItem(
+          jungle.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Jungle BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        expect(worldgenEl.textContent).toContain("World Generation");
+        expect(worldgenEl.textContent).toContain(
+          "Noise generator climate parameters, distinct from the temperature and downfall properties above.",
+        );
+
+        // Group titles exist and are plain text, not links
+        const groupTitles = Array.from(worldgenEl.querySelectorAll(".biome-noise-group-title")).map(
+          (t) => t.textContent,
+        );
+        expect(groupTitles).toContain("Middle biomes");
+        expect(groupTitles).toContain("Plateau biomes");
+        expect(groupTitles).toContain("Shattered biomes");
+        expect(worldgenEl.querySelector(".biome-noise-group-title a")).toBeNull();
+
+        // Chips exist and contain temperature/humidity bands
+        const chips = Array.from(worldgenEl.querySelectorAll(".biome-noise-chip")).map(
+          (c) => c.textContent,
+        );
+        expect(chips.some((c) => c.includes("T=3") && c.includes("H=4"))).toBe(true);
+
+        // Sibling links exist in chips (e.g. Bamboo Jungle and Sparse Jungle)
+        const sibLinks = Array.from(worldgenEl.querySelectorAll(".biome-noise-sibling a")).map(
+          (a) => a.textContent,
+        );
+        expect(sibLinks).toContain("Bamboo Jungle");
+        expect(sibLinks).toContain("Sparse Jungle");
+
+        // Terrain Placement table is rendered with .table-wrapper
+        const terrainTitle = worldgenEl.querySelector(".biome-noise-subtitle");
+        expect(terrainTitle?.textContent).toBe("Terrain Placement");
+        const tableWrapper = worldgenEl.querySelector(".table-wrapper");
+        expect(tableWrapper).not.toBeNull();
+        const noiseTable = worldgenEl.querySelector(".biome-noise-table");
+        expect(noiseTable).not.toBeNull();
+        expect(noiseTable?.textContent).toContain("Middle biomes");
+      });
+
+      it("renders World generation non-inland table on Ocean", () => {
+        const ocean = requireItem(biomesById.get("minecraft:ocean"), "Ocean");
+        const biomeInfo = requireItem(
+          ocean.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Ocean BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        expect(worldgenEl.textContent).toContain("World Generation");
+        expect(worldgenEl.querySelector(".biome-noise-groups")).toBeNull();
+        const ths = Array.from(worldgenEl.querySelectorAll(".biome-noise-table th")).map(
+          (th) => th.textContent,
+        );
+        expect(ths).toEqual(["Continentalness", "Temperature Level"]);
+        expect(worldgenEl.textContent).toContain("Oceans");
+      });
+
+      it("renders World generation depth table on Deep Dark", () => {
+        const deepDark = requireItem(biomesById.get("minecraft:deep_dark"), "Deep Dark");
+        const biomeInfo = requireItem(
+          deepDark.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Deep Dark BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        expect(worldgenEl.textContent).toContain("World Generation");
+        const ths = Array.from(worldgenEl.querySelectorAll(".biome-noise-table th")).map(
+          (th) => th.textContent,
+        );
+        expect(ths).toEqual(["Depth", "Additional Requirement"]);
+        expect(worldgenEl.textContent).toContain("0");
+      });
+
+      it("renders World generation direct inland table with sibling on River", () => {
+        const river = requireItem(biomesById.get("minecraft:river"), "River");
+        const biomeInfo = requireItem(
+          river.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "River BiomeInfo",
+        );
+
+        const el = requireItem(renderBiomeInfo(biomeInfo, ctx), "BiomeInfo element");
+        const worldgenEl = requireItem(
+          el.querySelector(".biome-worldgen-container"),
+          "worldgen container",
+        );
+
+        expect(worldgenEl.textContent).toContain("World Generation");
+        const ths = Array.from(worldgenEl.querySelectorAll(".biome-noise-table th")).map(
+          (th) => th.textContent,
+        );
+        expect(ths).toEqual(["Erosion", "PV", "Continentalness", "Condition", "Sibling"]);
+        const sibLink = worldgenEl.querySelector(".biome-noise-table td a");
+        expect(sibLink?.textContent).toBe("Frozen River");
+      });
+
+      it("omits World generation on non-Overworld biomes (Nether Wastes and The End)", () => {
+        const netherWastes = requireItem(
+          biomesById.get("minecraft:nether_wastes"),
+          "Nether Wastes",
+        );
+        const nwInfo = requireItem(
+          netherWastes.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "Nether Wastes BiomeInfo",
+        );
+        const nwEl = requireItem(renderBiomeInfo(nwInfo, ctx), "NW BiomeInfo element");
+        expect(nwEl.querySelector(".biome-worldgen-container")).toBeNull();
+        expect(nwEl.textContent).not.toContain("World Generation");
+
+        const theEnd = requireItem(biomesById.get("minecraft:the_end"), "The End");
+        const endInfo = requireItem(
+          theEnd.sections.find((s): s is BiomeInfo => s.type === "BiomeInfo"),
+          "The End BiomeInfo",
+        );
+        const endEl = requireItem(renderBiomeInfo(endInfo, ctx), "End BiomeInfo element");
+        expect(endEl.querySelector(".biome-worldgen-container")).toBeNull();
+        expect(endEl.textContent).not.toContain("World Generation");
+      });
     });
   });
 });

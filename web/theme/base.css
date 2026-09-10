@@ -2572,3 +2572,104 @@ canvas,
   font-size: 0.8rem;
   color: #888;
 }
+
+.biome-worldgen-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biome-worldgen-caption {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #888;
+  line-height: 1.4;
+}
+
+.biome-noise-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biome-noise-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.biome-noise-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.biome-noise-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.biome-noise-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #ccc;
+  line-height: 1.3;
+}
+
+.biome-noise-sibling {
+  color: #888;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 0.75rem;
+}
+
+.biome-noise-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.biome-noise-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.biome-noise-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.biome-noise-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.biome-noise-table tr:last-child td {
+  border-bottom: none;
+}

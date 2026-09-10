@@ -1639,6 +1639,52 @@
         }
       }
     },
+    "noisePlacement": {
+      "title": "NoisePlacement",
+      "description": "One noise climate placement rule for an Overworld biome, sourced from World generation § Biomes -> Overworld.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route"],
+      "properties": {
+        "route": {
+          "type": "string",
+          "enum": ["depth", "non_inland", "direct_inland", "group", "group_terrain"]
+        },
+        "group": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "string"
+        },
+        "humidity": {
+          "type": "string"
+        },
+        "continentalness": {
+          "type": "string"
+        },
+        "erosion": {
+          "type": "string"
+        },
+        "weirdness": {
+          "type": "string"
+        },
+        "pv": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "string"
+        },
+        "additionalRequirement": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        },
+        "sibling": {
+          "$ref": "#/$defs/entityRef"
+        }
+      }
+    },
     "biomeInfo": {
       "title": "BiomeInfo",
       "description": "Climate, mob spawns, and generating blocks of a biome.",
@@ -1699,6 +1745,13 @@
         "commonBlocksCount": {
           "type": "integer",
           "default": 0
+        },
+        "noisePlacements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/noisePlacement"
+          },
+          "default": []
         }
       }
     }

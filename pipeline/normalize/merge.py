@@ -201,6 +201,7 @@ module's precedence names that the mcmeta payload does not publish.
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, model_validator
 
@@ -278,6 +279,7 @@ from pipeline.normalize.entity import (
     LinkList,
     LootingDrop,
     Measure,
+    NoisePlacement,
     ProfessionInfo,
     RandomSpreadPlacement,
     Ratio,
@@ -1577,6 +1579,7 @@ def merge_entities(
     structure_index: StructureIndex | None = None,
     feature_place_index: FeaturePlaceIndex | None = None,
     biome_index: BiomeIndex | None = None,
+    noise_placements: Mapping[str, Sequence[Any]] | None = None,
     curated_chests: Mapping[str, ChestSource] | None = None,
     loot_producers: Sequence[Producer] | None = None,
 ) -> MergeResult:
@@ -2344,6 +2347,37 @@ def merge_entities(
                 else 0
             )
 
+            b_noise: list[NoisePlacement] = []
+            if noise_placements and biome_id in noise_placements:
+                for p in noise_placements[biome_id]:
+                    if isinstance(p, NoisePlacement):
+                        b_noise.append(p)
+                    else:
+                        noise_sib: EntityRef | None = None
+                        if p.sibling is not None:
+                            sib_name = (
+                                drafts[p.sibling.id].name
+                                if p.sibling.id in drafts
+                                else p.sibling.name
+                            )
+                            noise_sib = EntityRef(id=p.sibling.id, name=sib_name)
+                        b_noise.append(
+                            NoisePlacement(
+                                route=p.route,
+                                group=p.group,
+                                temperature=p.temperature,
+                                humidity=p.humidity,
+                                continentalness=p.continentalness,
+                                erosion=p.erosion,
+                                weirdness=p.weirdness,
+                                pv=p.pv,
+                                depth=p.depth,
+                                additional_requirement=p.additional_requirement,
+                                condition=p.condition,
+                                sibling=noise_sib,
+                            )
+                        )
+
             biome_info = BiomeInfo(
                 dimension=(
                     biome_entry.dimension.value if biome_entry.dimension is not None else None
@@ -2358,6 +2392,7 @@ def merge_entities(
                 spawns=tuple(b_spawns),
                 blocks=tuple(b_blocks),
                 common_blocks_count=common_blocks_count,
+                noise_placements=tuple(b_noise),
             )
             biome_draft.add_section(biome_info, SourceTier.A)
 
