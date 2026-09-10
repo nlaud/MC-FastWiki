@@ -876,6 +876,7 @@ export interface BiomeInfo {
   spawns?: BiomeSpawnEntry[];
   blocks?: EntityRef[];
   commonBlocksCount?: number;
+  noisePlacements?: NoisePlacement[];
 }
 /**
  * One mob spawning in a biome, at a given weight and group size.
@@ -891,4 +892,44 @@ export interface BiomeSpawnEntry {
   totalWeight: number;
   note?: string;
   noteName?: string;
+}
+/**
+ * One noise climate placement rule for an Overworld biome, sourced from World generation § Biomes -> Overworld.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "noisePlacement".
+ */
+export interface NoisePlacement {
+  route: "depth" | "non_inland" | "direct_inland" | "group" | "group_terrain";
+  group?: string;
+  temperature?: string;
+  humidity?: string;
+  continentalness?: string;
+  erosion?: string;
+  weirdness?: string;
+  pv?: string;
+  depth?: string;
+  additionalRequirement?: string;
+  condition?: string;
+  sibling?: EntityRef;
+  /**
+   * Temperature levels this rule applies at, 0 (coldest) to 4 (hottest). The same fact as `temperature`, as integers, so a renderer can plot the axis without re-parsing the display string.
+   */
+  temperatureLevels?: number[];
+  /**
+   * Humidity levels this rule applies at, 0 (driest) to 4 (wettest).
+   */
+  humidityLevels?: number[];
+  /**
+   * Erosion levels this rule applies at, 0 to 6. Low erosion is hilly terrain and high erosion is flat, per the World generation prose.
+   */
+  erosionLevels?: number[];
+  /**
+   * Continentalness bands this rule applies at, indexing all seven bands the prose lists: 0 Mushroom fields, 1 Deep ocean, 2 Ocean, 3 Coast, 4 Near-inland, 5 Mid-inland, 6 Far-inland. One absolute axis is shared by ocean-side and inland rules.
+   */
+  continentalnessBands?: number[];
+  /**
+   * Peaks-and-valleys band name with no numeric range attached, such as `High` or `High~Peaks`.
+   */
+  pvBand?: string;
 }

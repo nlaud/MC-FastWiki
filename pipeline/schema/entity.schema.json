@@ -1639,6 +1639,80 @@
         }
       }
     },
+    "noisePlacement": {
+      "title": "NoisePlacement",
+      "description": "One noise climate placement rule for an Overworld biome, sourced from World generation § Biomes -> Overworld.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route"],
+      "properties": {
+        "route": {
+          "type": "string",
+          "enum": ["depth", "non_inland", "direct_inland", "group", "group_terrain"]
+        },
+        "group": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "string"
+        },
+        "humidity": {
+          "type": "string"
+        },
+        "continentalness": {
+          "type": "string"
+        },
+        "erosion": {
+          "type": "string"
+        },
+        "weirdness": {
+          "type": "string"
+        },
+        "pv": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "string"
+        },
+        "additionalRequirement": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        },
+        "sibling": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "temperatureLevels": {
+          "description": "Temperature levels this rule applies at, 0 (coldest) to 4 (hottest). The same fact as `temperature`, as integers, so a renderer can plot the axis without re-parsing the display string.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "default": []
+        },
+        "humidityLevels": {
+          "description": "Humidity levels this rule applies at, 0 (driest) to 4 (wettest).",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "default": []
+        },
+        "erosionLevels": {
+          "description": "Erosion levels this rule applies at, 0 to 6. Low erosion is hilly terrain and high erosion is flat, per the World generation prose.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "default": []
+        },
+        "continentalnessBands": {
+          "description": "Continentalness bands this rule applies at, indexing all seven bands the prose lists: 0 Mushroom fields, 1 Deep ocean, 2 Ocean, 3 Coast, 4 Near-inland, 5 Mid-inland, 6 Far-inland. One absolute axis is shared by ocean-side and inland rules.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "default": []
+        },
+        "pvBand": {
+          "description": "Peaks-and-valleys band name with no numeric range attached, such as `High` or `High~Peaks`.",
+          "type": "string"
+        }
+      }
+    },
     "biomeInfo": {
       "title": "BiomeInfo",
       "description": "Climate, mob spawns, and generating blocks of a biome.",
@@ -1699,6 +1773,13 @@
         "commonBlocksCount": {
           "type": "integer",
           "default": 0
+        },
+        "noisePlacements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/noisePlacement"
+          },
+          "default": []
         }
       }
     }

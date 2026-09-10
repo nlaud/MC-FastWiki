@@ -152,23 +152,23 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
       field is a tag reference (`#minecraft:has_structure/village_plains`), so resolve it through
       tag data rather than reading it as a literal (34 in 26.2, corrected from 52)
 - [x] **Biomes** (66 in 26.2, Tier A) — what spawns there, what generates there, which structures appear
-- [ ] **Biome climate — two sources, do not assume one covers it**
+- [x] **Biome climate — two sources, do not assume one covers it**
   - [x] Temperature, downfall, precipitation: take from mcmeta `worldgen/biome/<id>.json`
         (**Tier A**, no scraping). The biome infobox has a `Climate` group with the same three
         values, but there is no reason to parse it when the data is already in Tier A
-  - [ ] Continentalness, erosion, weirdness, depth: in **neither** the infobox nor mcmeta, which
+  - [x] Continentalness, erosion, weirdness, depth: in **neither** the infobox nor mcmeta, which
         gives only `{"preset": "minecraft:overworld"}`. Parse **`World generation` section 4**
         (Biomes → Overworld) — 8 tables plus the level definitions. Not the `Biome` page: that has
         only temperature/downfall/precipitation. Fandom put these on `Biome`, this wiki did not
-  - [ ] Handle the `T=`/`H=`/`PV=` shorthand and inland categories in those tables
-  - [ ] **Do not conflate the noise `temperature` parameter with the biome `temperature` property.**
+  - [x] Handle the `T=`/`H=`/`PV=` shorthand and inland categories in those tables
+  - [x] **Do not conflate the noise `temperature` parameter with the biome `temperature` property.**
         Jungle's infobox says `0.95`; the noise level is `T=0`..`T=4`. Different things that
         correlate — an easy and very plausible-looking bug
-  - [ ] Render the matching table rows per biome rather than inverting the full 6D space into one
+  - [x] Render the matching table rows per biome rather than inverting the full 6D space into one
         scalar per biome. The tables are conditional; pretending otherwise would be wrong
-  - [ ] Do not try to extract erosion/depth from biome page prose — mentions like "bordering
+  - [x] Do not try to extract erosion/depth from biome page prose — mentions like "bordering
         mangrove swamps at high erosion" are not structured values
-  - [ ] Source from minecraft.wiki, not Fandom — Fandom lags (last edit 2026-06-18 vs 2026-08-02
+  - [x] Source from minecraft.wiki, not Fandom — Fandom lags (last edit 2026-06-18 vs 2026-08-02
         here) and was already missing 26.x content like Poplar
 - [x] **Per-biome mob lists** — sourced from Tier A mcmeta biome `spawners` (64 biomes, 677 spawners,
       52 unique mobs), with wiki `spawn_table` demoted to an overlay for conditional notes.

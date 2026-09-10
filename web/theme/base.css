@@ -2572,3 +2572,240 @@ canvas,
   font-size: 0.8rem;
   color: #888;
 }
+
+.biome-worldgen-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biome-worldgen-caption {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #888;
+  line-height: 1.4;
+}
+
+/* Noise axes: the plain-language summary that leads the World Generation block.
+   Each axis is a name, the two ends of its scale in words, a segment track with
+   the matching levels filled, and the level itself. The exact numeric range is a
+   tooltip on the value rather than inline text, because those ranges are noise
+   space internals a player never observes and they crowded out the answer. */
+/* One grid for all four rows, not one grid per row. Each axis was its own grid
+   at first, so a wider end label on one row ("inland") pushed that row's value
+   out of line with the rest and left a ragged right edge. `display: contents`
+   on the rows lets every cell share the parent's columns instead. */
+.biome-noise-axes {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, auto) minmax(4rem, 17rem) minmax(0, auto) minmax(
+      0,
+      auto
+    );
+  align-items: center;
+  justify-content: start;
+  gap: 5px 8px;
+  padding: 9px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  /* Capped rather than full-bleed. A track free to take the whole window turned
+     a five-step scale into a bar the width of the screen, which reads as a
+     progress meter instead of a position on an axis. */
+  max-width: 44rem;
+}
+
+.noise-axis {
+  display: contents;
+  font-size: 0.8rem;
+}
+
+.noise-axis-name {
+  color: #888;
+  min-width: 0;
+}
+
+.noise-axis-end {
+  color: #6a6a6a;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.noise-axis-track {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noise-axis-seg {
+  flex: 1 1 0;
+  min-width: 4px;
+  height: 8px;
+  border-radius: 2px;
+  background: #2c2c2c;
+}
+
+.noise-axis-seg.is-on {
+  background: #5c85d6;
+}
+
+.noise-axis-value {
+  color: #e0e0e0;
+  font-weight: 500;
+  min-width: 0;
+  padding-left: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* Below the axes: the depth line, the variant links, and the group naming. */
+.biome-noise-depth,
+.biome-noise-placed-as {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #b8b8b8;
+}
+
+.biome-noise-variants {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 0.82rem;
+}
+
+.biome-noise-variants-label {
+  color: #888;
+}
+
+.biome-noise-variant-note {
+  color: #6a6a6a;
+  font-size: 0.75rem;
+}
+
+/* The exact-values disclosure starts closed: the axes above already answer the
+   question, and this is the depth behind it. */
+.biome-noise-detail {
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  background: #181818;
+}
+
+.biome-noise-detail > summary {
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+
+.biome-noise-detail > summary:hover {
+  color: #b0bec5;
+}
+
+.biome-noise-detail > summary:focus-visible {
+  outline: 2px solid #5c85d6;
+  outline-offset: -2px;
+}
+
+/* The disclosure body scrolls rather than growing without limit. The terrain
+   table runs to 40 rows on the most-searched biomes, and an open disclosure
+   that pushes Mob Spawns off the page trades one problem for another. */
+.biome-noise-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+  max-height: 26rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333333 transparent;
+}
+
+.biome-noise-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biome-noise-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.biome-noise-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.biome-noise-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.biome-noise-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #ccc;
+  line-height: 1.3;
+}
+
+.biome-noise-sibling {
+  color: #888;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 0.75rem;
+}
+
+.biome-noise-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.biome-noise-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.biome-noise-table th {
+  color: #888;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.biome-noise-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #282828;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.biome-noise-table tr:last-child td {
+  border-bottom: none;
+}

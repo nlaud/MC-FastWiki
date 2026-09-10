@@ -1,0 +1,387 @@
+=== Overworld ===
+[[Biome]] generation in the [[Overworld]] is based on 6 parameters: '''temperature''', '''humidity''' (aka. vegetation), '''continentalness''' (aka. continents), '''erosion''', '''weirdness''' (aka. ridges), and '''depth'''. Except for "depth", the other 5 parameters are based only on horizontal coordinates.
+
+They can be thought of as a six-dimensional (6D) space, where multiple intervals are defined for each biome, as described below. If the 6 parameters at a location fall outside all the defined biome intervals, the game uses the closest biome interval in the 6D space.
+
+'''Temperature''' is a noise parameter used only in biome generation and does not affect terrain generation. Temperature values are divided into 5 levels. The corresponding ranges from level 0 to level 4 are: -1.0~-0.45, -0.45~-0.15, -0.15~0.2, 0.2~0.55, 0.55~1.0.
+
+Note that the temperature parameter is not the same as the [[Biome#Temperature|temperature]] property of a biome, but they roughly correspond each other, e.g. if a location's temperature parameter is level 0, the base temperature of the biome here is usually low enough or the terrain is high enough, that the surface is covered in snow and ice.
+
+'''Humidity''' (also known as '''vegetation''') is a noise parameter used only in biome generation and does not affect terrain generation. Humidity values are also divided into 5 levels. The corresponding ranges from level 0 to level 4 are: -1.0~-0.35, -0.35~-0.1, -0.1~0.1, 0.1~0.3, 0.3~1.0.
+
+'''Continentalness''' (also known as '''continents''') is used to decide between ocean/beach/land biomes. Higher values correspond to more inland biomes.
+* If -1.2~-1.05: Mushroom fields
+* If -1.05~-0.455: Deep ocean
+* If -0.455~-0.19: Ocean
+* If -0.19~-0.11: Coast
+* If -0.11~0.03: Near-inland
+* If 0.03~0.3: Mid-inland
+* If 0.3~1.0: Far-inland
+
+'''Erosion''' is used to decide between flat and mountainous terrain. When erosion is high the landscape is generally flat, and where erosion is low the landscape is hilly. Areas with low erosion also tend to generate [[meadow]]s, [[snowy slopes]], [[stony peaks]], [[jagged peaks]], and [[frozen peaks]]. Erosion values are divided into 7 levels. The corresponding ranges from level 0 to level 6 are: -1.0~-0.78, -0.78~-0.375, -0.375~-0.2225, -0.2225~0.05, 0.05~0.45, 0.45~0.55, 0.55~1.0.
+
+'''Weirdness''' (also known as '''ridges''') affects whether to generate a biome variant or not, as well as whether or not terrain generates shattered. If the weirdness value is greater than 0, the generated biome becomes weirder. For example, weirdness could cause a [[jungle]] biome to become a [[bamboo jungle]] instead, or could cause a [[taiga]] to generate with more shattered terrain akin to a [[windswept savanna]]. A biome and its variant often do not appear on the same bank of a river.
+
+[[File:Ridges folded diagram.png|200px|thumb|A diagram of peaks and valleys (Y-axis) calculated from weirdness (X-axis)]]
+
+The '''PV''' ('''peaks and valleys''', aka. '''ridges folded''') value is calculated through the formula <math>1-\vert (3 \vert weirdness \vert) - 2 \vert</math>.
+* If -1.0~-0.85: Valleys
+* If -0.85~-0.2: Low
+* If -0.2~0.2: Mid
+* If 0.2~0.7: High
+* If 0.7~1.0: Peaks
+
+'''Depth''' is a parameter not based directly on noise, instead it corresponds approximately to the terrain height. It is roughly 0 at the surface and increases by {{frac|1|128}} (0.0078125) for every 1 block down. The depth parameter affects whether a surface biome or a cave biome is placed.
+
+The table below lists the defined depth values for Overworld biomes, and any additional noise values required for cave biomes to generate. Any other values result in the closest biome interval being used instead. Note that regions of lush caves and dripstone caves overlap.<ref>{{bug|MC-262252||The generation of lush caves and dripstone caves is poorly defined}}</ref>
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Depth
+!Additional requirement
+!Biomes
+|-
+|D=0.0
+|N/A
+|Surface biomes
+|-
+|D=0.2~0.9
+|Continentalness=0.8~1.0
+|{{BiomeLink|Dripstone Caves}}
+|-
+|D=0.2~0.9
+|Humidity=0.7~1.0
+|{{BiomeLink|Lush Caves}}
+|-
+|D=0.2~0.9
+|Weirdness=-1.1~-0.85
+
+Continentalness=-0.19~0.55
+
+Erosion=0.45~1
+|{{BiomeLink|Sulfur Caves}}
+|-
+|D=1.0
+|N/A
+|Surface biomes
+|-
+|D=1.1
+|Erosion=-1.0~-0.375
+|{{BiomeLink|Deep Dark}}
+|-
+|}
+
+The generation of '''non-inland biomes''' is not based on humidity, erosion, or weirdness. The following table lists the relation between non-inland surface biomes and continentalness and temperature. 
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Temperature
+!{{Tooltip|Oceans|C{{=}}-0.455~-0.19}}
+!{{Tooltip|Deep oceans|C{{=}}-1.05~-0.455}}
+!{{Tooltip|Mushroom fields|C{{=}}-1.2~-1.05}}
+|-
+|{{Tooltip|T{{=}}0|T{{=}}-1.0~0.45}}
+|{{BiomeLink|Frozen Ocean}}
+|{{BiomeLink|Deep Frozen Ocean}}
+| rowspan="5" | {{BiomeLink|Mushroom Fields}}
+|-
+|{{Tooltip|T{{=}}1|T{{=}}-0.45~-0.15}}
+|{{BiomeLink|Cold Ocean}}
+|{{BiomeLink|Deep Cold Ocean}}
+|-
+|{{Tooltip|T{{=}}2|T{{=}}-0.15~0.2}}
+|{{BiomeLink|Ocean}}
+|{{BiomeLink|Deep Ocean}}
+|-
+|{{Tooltip|T{{=}}3|T{{=}}0.2~0.55}}
+|{{BiomeLink|Lukewarm Ocean}}
+|{{BiomeLink|Deep Lukewarm Ocean}}
+|-
+|{{Tooltip|T{{=}}4|T{{=}}0.55~1.0}}
+| colspan="2" |{{BiomeLink|Warm Ocean}}
+|}
+
+The following table lists the relation between '''inland surface biomes''' and continentalness, erosion and PV.
+
+{| class="wikitable stikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Erosion
+!PV
+!Coast
+!Near-inland
+!Mid-inland
+!Far-inland
+|-
+| rowspan="5" |E=0
+|Valleys
+| colspan="2" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0）
+| colspan="2" |Middle biomes<ref group="bo" name="always-w-gt-0">Always generates as if W>0</ref>（T<4）<br>Badland biomes<ref group="bo" name="always-w-gt-0">Always generates as if W>0</ref>（T=4）
+|-
+|Low
+| rowspan="2" |{{BiomeLink|Stony Shore}}
+|Middle biomes（T<4）<br>Badland biomes（T=4）
+| colspan="2" |{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Middle biomes（0<T<4）<br>Badland biomes（T=4）
+|-
+|Mid
+| colspan="3" |{{BiomeLink|Snowy Slopes}}（T<3; H=0,1）<br>{{BiomeLink|Grove}}（T<3; H=2,3,4）<br>Plateau biomes（T=3,4）
+|-
+|High
+|Middle biomes
+|{{BiomeLink|Snowy Slopes}}（T<3; H=0,1）<br>{{BiomeLink|Grove}}（T<3; H=2,3,4）<br>Plateau biomes（T=3,4）
+| colspan="2" |{{BiomeLink|Jagged Peaks}}（T=0,1,2; W<0）<br>{{BiomeLink|Frozen Peaks}}（T=0,1,2; W>0）<br>{{BiomeLink|Stony Peaks}}（T=3）<br>Badland biomes（T=4）
+|-
+|Peaks
+| colspan="4" |{{BiomeLink|Jagged Peaks}}（T=0,1,2; W<0）<br>{{BiomeLink|Frozen Peaks}}（T=0,1,2; W>0）<br>{{BiomeLink|Stony Peaks}}（T=3）<br>Badland biomes（T=4）
+|-
+| rowspan="5" |E=1
+|Valleys
+| colspan="2" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0）
+| colspan="2" |Middle biomes<ref group="bo" name="always-w-gt-0">Always generates as if W>0</ref>（T<4）<br>Badland biomes<ref group="bo" name="always-w-gt-0">Always generates as if W>0</ref>（T=4）
+|-
+|Low
+| rowspan="2" |{{BiomeLink|Stony Shore}}
+|Middle biomes（T<4）<br>Badland biomes（T=4）
+| colspan="2" |{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Middle biomes（0<T<4）<br>Badland biomes（T=4）
+|-
+|Mid
+| colspan="2" |{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Middle biomes（0<T<4）<br>Badland biomes（T=4）
+|{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Plateau biomes（T>0）
+|-
+|High
+|Middle biomes
+|{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Middle biomes（0<T<4）<br>Badland biomes（T=4）
+| colspan="2" |{{BiomeLink|Snowy Slopes}}（T<3; H=0,1）<br>{{BiomeLink|Grove}}（T<3; H=2,3,4）<br>Plateau biomes（T=3,4）
+|-
+|Peaks
+| colspan="2" |{{BiomeLink|Snowy Slopes}}（T=0; H=0,1）<br>{{BiomeLink|Grove}}（T=0; H=2,3,4）<br>Middle biomes（0<T<4）<br>Badland biomes（T=4）
+| colspan="2" |{{BiomeLink|Jagged Peaks}}（T=0,1,2; W<0）<br>{{BiomeLink|Frozen Peaks}}（T=0,1,2; W>0）<br>{{BiomeLink|Stony Peaks}}（T=3）<br>Badland biomes（T=4）
+|-
+| rowspan="4" |E=2
+|Valleys
+| colspan="4" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0）
+|-
+|Low
+| rowspan="2" |{{BiomeLink|Stony Shore}}
+| rowspan="2" |Middle biomes
+| colspan="2" |Middle biomes（T<4）<br>Badland biomes（T=4）
+|-
+|Mid
+|Middle biomes (T<4) <br>Badland biomes (T=4)
+|Plateau biomes
+|-
+|High~Peaks
+| colspan="2" |Middle biomes
+| colspan="2" |Plateau biomes
+|-
+| rowspan="4" |E=3
+|Valleys
+| colspan="4" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0）
+|-
+|Low
+|Beach biomes
+|Middle biomes
+| colspan="2" rowspan="2" |Middle biomes（T<4）<br>Badland biomes（T=4）
+|-
+|Mid
+| colspan="2" rowspan="2" |Middle biomes
+|-
+|High~Peaks
+|Middle biomes (T<4) <br>Badland biomes (T=4)
+|Plateau biomes
+|-
+| rowspan="4" |E=4
+|Valleys
+| colspan="4" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0）
+|-
+|Low
+|Beach biomes
+| colspan="3" rowspan="2" |Middle biomes
+|-
+|Mid
+|Beach biomes（W<0）<br>Middle biomes（W>0）
+|-
+|High~Peaks
+| colspan="4" |Middle biomes
+|-
+| rowspan="5" |E=5
+|Valleys
+| colspan="4" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}}（T>0)
+|-
+|Low
+| rowspan="2" |Beach biomes（W<0）<br>Middle biomes（W>0; T=0,1 OR H=4）<br>{{BiomeLink|Windswept Savanna}}（W>0; T=2,3,4; H=0,1,2,3）
+| rowspan="2" |Middle biomes（W<0 OR T=0,1 OR H=4）<br>{{BiomeLink|Windswept Savanna}}（W>0; T=2,3,4; H=0,1,2,3）
+| colspan="2" |Middle biomes
+|-
+|Mid
+| colspan="2" rowspan="3" |Shattered biomes
+|-
+|High
+| colspan="2" |Middle biomes（W<0 OR T=0,1 OR H=4）<br>{{BiomeLink|Windswept Savanna}}（W>0; T=2,3,4; H=0,1,2,3）
+|-
+|Peaks
+| colspan="2" |Shattered biomes (W<0 OR T=0,1 OR H=4) <br>{{BiomeLink|Windswept Savanna}} (W>0; T=2,3,4; H=0,1,2,3)
+|-
+| rowspan="4" |E=6
+|Valleys
+|{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|River}} (T>0)
+| colspan="3" |{{BiomeLink|Frozen River}}（T=0）<br>{{BiomeLink|Swamp}}（T=1,2）<br>{{BiomeLink|Mangrove Swamp}}（T=3,4）
+|-
+|Low
+|Beach biomes
+| colspan="3" rowspan="2" |Middle biomes（T=0）<br>{{BiomeLink|Swamp}}（T=1,2）<br>{{BiomeLink|Mangrove Swamp}}（T=3,4）
+|-
+|Mid
+|Beach biomes（W<0）<br>Middle biomes（W>0）
+|-
+|High~Peaks
+| colspan="4" |Middle biomes
+|}
+
+In which, the specific biome generation of beach biomes, badland biomes, middle biomes, plateau biomes, and shattered biomes is determined by the temperature, humidity, and weirdness values.
+
+'''Beach biomes''' generate in low lying terrain along the coast, and the specific biome generation is related only to the temperature value.
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Temperature
+!Biomes
+|-
+|T=0
+|{{BiomeLink|Snowy Beach}}
+|-
+|T=1,2,3
+|{{BiomeLink|Beach}}
+|-
+|T=4
+|{{BiomeLink|Desert}}
+|}
+
+'''Badland biomes''' usually generate inland with low erosion value, and can also generate along the coast with high terrain and low erosion. The specific biome generation is related to humidity and weirdness.
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Humidity
+!Biomes
+|-
+|H=0,1
+|{{BiomeLink|Badlands}}（W<0）<br>{{BiomeLink|Eroded Badlands}}（W>0）
+|-
+|H=2
+|{{BiomeLink|Badlands}}
+|-
+|H=3,4 
+|{{BiomeLink|Wooded Badlands}}
+|}
+
+'''Middle biomes''' are the most extensive biomes inland. The specific biome generation depends on temperature, humidity, and weirdness.
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!{{Diagonal split header|Humidity|Temperature}}
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+|{{BiomeLink|Snowy Plains}}（W<0）<br>{{BiomeLink|Ice Spikes}}（W>0）
+|{{BiomeLink|Plains}}（W<0）<br>{{BiomeLink|Dappled Forest}}（W>0）{{upcoming}}
+|{{BiomeLink|Flower Forest}}（W<0）<br>{{BiomeLink|Sunflower Plains}}（W>0）
+| rowspan="2" |{{BiomeLink|Savanna}}
+| rowspan="5" |{{BiomeLink|Desert}}
+|-
+|H=1
+|{{BiomeLink|Snowy Plains}}
+| colspan="2" |{{BiomeLink|Plains}}
+|-
+|H=2
+|{{BiomeLink|Snowy Plains}}（W<0）<br>{{BiomeLink|Snowy Taiga}}（W>0）
+| colspan="2" |{{BiomeLink|Forest}}
+|{{BiomeLink|Forest}}（W<0）<br>{{BiomeLink|Plains}}（W>0）
+|-
+|H=3 
+|{{BiomeLink|Snowy Taiga}}
+|{{BiomeLink|Taiga}}
+|{{BiomeLink|Birch Forest}}（W<0）<br>{{BiomeLink|Old Growth Birch Forest}}（W>0）
+|{{BiomeLink|Jungle}}（W<0）<br>{{BiomeLink|Sparse Jungle}}（W>0）
+|-
+|H=4
+|{{BiomeLink|Taiga}}
+|{{BiomeLink|Old Growth Spruce Taiga}}（W<0）<br>{{BiomeLink|Old Growth Pine Taiga}}（W>0）
+|{{BiomeLink|Dark Forest}}
+|{{BiomeLink|Jungle}}（W<0）<br>{{BiomeLink|Bamboo Jungle}}（W>0）
+|}
+
+'''Plateau biomes''' generate at inland high terrain with moderate erosion, which results in biomes like [[meadow]]s and [[savanna plateau]]s. The specific biome generation depends on temperature, humidity, and weirdness.
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!{{Diagonal split header|Humidity|Temperature}}
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+|{{BiomeLink|Snowy Plains}}（W<0）<br>{{BiomeLink|Ice Spikes}}（W>0）
+|{{BiomeLink|Meadow}}（W<0）<br>{{BiomeLink|Cherry Grove}}（W>0）
+| rowspan="2" |{{BiomeLink|Meadow}}（W<0）<br>{{BiomeLink|Cherry Grove}}（W>0）
+| rowspan="2" |{{BiomeLink|Savanna Plateau}}
+| rowspan="2" |{{BiomeLink|Badlands}}（W<0）<br>{{BiomeLink|Eroded Badlands}}（W>0）
+|-
+|H=1
+| rowspan="2" |{{BiomeLink|Snowy Plains}}
+|{{BiomeLink|Meadow}}
+|-
+|H=2
+|{{BiomeLink|Forest}}（W<0）<br>{{BiomeLink|Meadow}}（W>0）
+|{{BiomeLink|Meadow}}（W<0）<br>{{BiomeLink|Forest}}（W>0）
+| rowspan="2" |{{BiomeLink|Forest}}
+|{{BiomeLink|Badlands}}
+|-
+|H=3
+| rowspan="2" |{{BiomeLink|Snowy Taiga}}
+|{{BiomeLink|Taiga}}（W<0）<br>{{BiomeLink|Meadow}}（W>0）
+|{{BiomeLink|Meadow}}（W<0）<br>{{BiomeLink|Birch Forest}}（W>0）
+| rowspan="2" |{{BiomeLink|Wooded Badlands}}
+|-
+|H=4
+|{{BiomeLink|Old Growth Spruce Taiga}}（W<0）<br>{{BiomeLink|Old Growth Pine Taiga}}（W>0）
+|{{BiomeLink|Pale Garden}}
+|{{BiomeLink|Jungle}}
+|}
+
+'''Shattered biomes''' are generated at inland places with high erosion. The specific biome generation depends on temperature, humidity, and weirdness.
+
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!{{Diagonal split header|Humidity|Temperature}}
+!T=0~1
+!T=2
+!T=3
+!T=4
+|-
+|H=0~1
+|{{BiomeLink|Windswept Gravelly Hills}}
+| rowspan="2" |{{BiomeLink|Windswept Hills}}
+|{{BiomeLink|Savanna}}
+| rowspan="4" |{{BiomeLink|Desert}}
+|-
+|H=2
+|{{BiomeLink|Windswept Hills}}
+|{{BiomeLink|Forest}}（W<0）<br>{{BiomeLink|Plains}}（W>0）
+|-
+|H=3
+| colspan="2" rowspan="2" |{{BiomeLink|Windswept Forest}}
+|{{BiomeLink|Jungle}}（W<0）<br>{{BiomeLink|Sparse Jungle}}（W>0）
+|-
+|H=4
+|{{BiomeLink|Jungle}}（W<0）<br>{{BiomeLink|Bamboo Jungle}}（W>0）
+|}
+
+{{reflist|group=bo}}
+
+{{Calculator|chunkbase|terrain=false}}
+
