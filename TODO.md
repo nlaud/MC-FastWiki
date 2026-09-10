@@ -173,7 +173,7 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 - [x] **Per-biome mob lists** — sourced from Tier A mcmeta biome `spawners` (64 biomes, 677 spawners,
       52 unique mobs), with wiki `spawn_table` demoted to an overlay for conditional notes.
       (The previous claim that `spawners` was empty was false; see Decision 29).
-- [ ] **Brewing folded into the recipe tree** — not a separate renderer. See Phase 3
+- [x] **Brewing folded into the recipe tree** — not a separate renderer. See Phase 3
 
 ### Cross-linking
 
@@ -183,20 +183,35 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 - [x] Trade → the item traded; item → the professions that sell it
 - [x] Enchantment → the items that accept it. Rendered on the enchantment page; the item-page reverse
       lookup is deferred, per the Phase 6c record above
-- [ ] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
-      The named cases this bullet was written for are resolved: `Potato`, `Pufferfish (item)`,
-      `Arrow of Poison` and `Music Disc <Song>` all carry an `itemRef` now, through the rules
-      Decision 20 records. What is left is the general case, and it is still worth a lint, because
-      the rules were found by reading a rendered page rather than by any check that would have
-      reported them.
-      The remaining ref-less names are the ones a lint has to learn not to flag, and the 33 the
-      26.2 build still reports fall into three groups, none of them a fault: `Any color Wool`,
-      `Any color Bed` and the rest of that family name a variant group rather than one registry
-      entry; `Explorer Map`, `Ocean Explorer Map` and `Banner` name map or pattern data carried on
-      a stack; and `Cold Chicken`, `Pale Wolf` and the other mob-variant names are wiki names for
-      a texture variant that shares one `entity_type`.
-      `data/reports/merge-report.json` lists all 33 as `unplaced`, which is where such a lint
-      should read from rather than re-deriving the set.
+- [x] Lint pass: flag any renderer printing a known entity name as plain text instead of a link.
+      Built as two complementary lints:
+      - **Lint A (`pipeline/validate/references.py`):** a third half of the build gate, beside
+        conformance and regression, reading `MergeReport.unplaced`.
+        The 26.2 build reports 16 rows and every one classifies: `variant_group` (6), `stack_data`
+        (5), and `not_in_this_version` (5).
+        Anything outside those groups fails the build, downgradeable with `--allow-regression`.
+        Every group is a rule rather than a list of names, so a variant-group name a later snapshot
+        adds classifies itself while `Potato` still fails and names itself.
+        Two rules carry the weight: a name the merge resolved to a real ID this build has no entity
+        for is `not_in_this_version`, and a table whose registry this build left empty is skipped
+        the way regression skips a `None` baseline, which is what keeps a 3-entity smoke-test build
+        from reporting all 40 wiki effect names as misses.
+        The count corrects this bullet's earlier claim of 33 rows in three groups: the mob-variant
+        group it named (`Cold Chicken`, `Pale Wolf`) no longer appears at all.
+        `Dappled Forest` was checked against the pinned archive before being called benign; it is
+        absent from mcmeta 26.2 and reaches the build only through the wiki.
+      - **Lint B (`web/render/cross-link.test.ts`):** renders all 2176 entities from the 17
+        committed shards and asserts that every ref the search index can resolve came out as an
+        `a.entity-link`.
+        No section type is skipped, and the one documented exemption is the self-referential
+        `professionRef` on a seller's own trade table.
+      - Lint B found two renderer bugs on its first run, both fixed here.
+        `StructureInfo` gated its sibling row on `siblings.length > 1`, but
+        `pipeline/extract/structure.py` excludes self from that list, so all 8 single-sibling
+        structures rendered no link at all -- Bastion Remnant never linked to Nether Fortress.
+        `RENDERERS.TradeTable` returned `null` for any page that was not the seller's own, so the
+        170 item and block pages carrying a populated trade table showed nothing, which is also why
+        the "item → the professions that sell it" bullet above was only half true.
 
 ## Phase 7 — Collections (the special search terms)
 
