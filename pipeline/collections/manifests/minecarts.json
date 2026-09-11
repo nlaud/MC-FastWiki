@@ -1,0 +1,22 @@
+{
+  "id": "minecarts",
+  "title": "Minecarts",
+  "blurb": "Rail-riding vehicles for transport, storage, and utility. Five variants can be crafted from an ordinary minecart and an installed block; spawner and command block minecarts are creative-only.",
+  "aliases": ["minecart", "minecart variants", "rail vehicles", "carts"],
+  "iconFrom": "minecraft:minecart",
+  "rule": {
+    "type": "list",
+    "ids": [
+      "minecraft:minecart",
+      "minecraft:chest_minecart",
+      "minecraft:furnace_minecart",
+      "minecraft:hopper_minecart",
+      "minecraft:tnt_minecart",
+      "minecraft:spawner_minecart",
+      "minecraft:command_block_minecart"
+    ]
+  },
+  "columns": [],
+  "sortBy": "name",
+  "note": "Tier C list rule covering all 7 minecart items. No item tag covers minecart variants (#minecraft:furnace_minecart_fuel covers furnace fuel, not carts). Spawner and command block minecarts have no recipe and are creative-only, but are included so the collection presents the complete set of minecart items. Guarded by tests/test_collections_drift.py. Icon borrowed from Minecart."
+}

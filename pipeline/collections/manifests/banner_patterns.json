@@ -1,0 +1,14 @@
+{
+  "id": "banner_patterns",
+  "title": "Banner Patterns",
+  "blurb": "Patterns used at a loom to apply special designs to banners. A pattern item is kept in the pattern slot and is not consumed when crafting.",
+  "aliases": ["banner pattern", "loom patterns", "banners"],
+  "iconFrom": "minecraft:loom",
+  "rule": {
+    "type": "component",
+    "component": "minecraft:provides_banner_patterns"
+  },
+  "columns": [],
+  "sortBy": "name",
+  "note": "Tier A. Component rule on minecraft:provides_banner_patterns selected over a list because it re-derives itself on every build. Exactly 10 items carry this component in 26.2, representing the full set of physical pattern items; the other 33 banner_pattern registry entries require no item and are crafted directly from dyes at the loom. Icon borrowed from the Loom."
+}

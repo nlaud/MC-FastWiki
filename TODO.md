@@ -241,10 +241,23 @@ dependency.
 - [x] Mob type groups — `undead` (17) and `arthropods` (5), both from `entity_type` tags. The rest
       are one manifest file each whenever they are wanted: `illager` (4), `raiders` (6),
       `skeletons` (6), `zombies` (9), and `aquatic` (14) all exist as tags and need no code.
-- [ ] `armor_trims` — every trim, how to obtain it, and which chests it generates in
-- [ ] `banner_patterns` — all unique banner pattern recipes
-- [ ] `workstations` — all workstation block recipes
-- [ ] `minecarts` — all minecart recipes
+- [x] `armor_trims` — all 18 trim templates, with a "Found in" column reading the same obtain graph
+      the member pages render. 13 trims come from chest loot across structures, 4 from brushing
+      suspicious gravel in Trail Ruins, and Tide from the Elder Guardian drop. Stated as an explicit
+      18-ID list rule because no tag or component separates trim templates from the Netherite Upgrade,
+      guarded against upstream drift by `tests/test_collections_drift.py`. Borrowed icon from the
+      Smithing Table.
+- [x] `banner_patterns` — all 10 physical pattern items, selected via a component rule on
+      `minecraft:provides_banner_patterns`. A pattern item is used at a loom and is not consumed
+      when crafting. Selected via component rule so it re-derives itself on every build; the other 33
+      registry entries require no item and are crafted directly from dyes. Borrowed icon from the Loom.
+- [x] `workstations` — all 13 villager job site blocks, titled "Villager Workstations" so utility
+      blocks like crafting tables are not expected. Sourced from the workstation ref each profession
+      entity carries in `profession-0.json` (13 job sites across 14 professions, the nitwit having
+      none). Guarded by `tests/test_collections_drift.py`. Borrowed icon from the Villager.
+- [x] `minecarts` — all 7 minecart variants (the standard minecart, 4 craftable variants with installed
+      blocks, plus the creative-only spawner and command block minecarts, stated clearly in the blurb).
+      Guarded by `tests/test_collections_drift.py`. Borrowed icon from the Minecart.
 - [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in.
       Needs a tree-shaped section; the flat member list cannot express it
 - [x] Every member renders as a link that opens the real entity window — enforced by lint B

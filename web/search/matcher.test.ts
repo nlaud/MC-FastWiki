@@ -300,4 +300,24 @@ describe("matcher", () => {
       expect(p95Duration).toBeLessThan(16);
     });
   });
+
+  describe("four new collection aliases", () => {
+    it("finds each new collection by curated alias", () => {
+      const cases: [string, string][] = [
+        ["banner pattern", "collection:banner_patterns"],
+        ["loom patterns", "collection:banner_patterns"],
+        ["armor trim", "collection:armor_trims"],
+        ["trim templates", "collection:armor_trims"],
+        ["workstations", "collection:workstations"],
+        ["job sites", "collection:workstations"],
+        ["minecart variants", "collection:minecarts"],
+        ["rail vehicles", "collection:minecarts"],
+      ];
+      for (const [query, expectedId] of cases) {
+        const results = search(realCorpus, query);
+        const match = results.find((r) => r.id === expectedId);
+        expect(match, `expected ${expectedId} to match query "${query}"`).toBeDefined();
+      }
+    });
+  });
 });

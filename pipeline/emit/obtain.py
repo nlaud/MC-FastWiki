@@ -125,6 +125,7 @@ __all__ = [
     "ObtainProducer",
     "ObtainProducerInput",
     "build_obtain_graph",
+    "load_merged_sources",
     "producer_index_from_graph",
 ]
 
@@ -237,6 +238,45 @@ def _to_obtain_producer(producer: Producer) -> ObtainProducer:
     )
 
 
+def load_merged_sources(
+    chests: Mapping[str, ChestSource] | None = None,
+    loot: Mapping[str, ChestSource] | None = None,
+) -> dict[str, ChestSource]:
+    """Merge chest sources, loot sources, and curated producer sources into one mapping."""
+    merged_sources: dict[str, ChestSource] = {}
+    if chests is not None:
+        merged_sources.update(chests)
+    else:
+        try:
+            from pipeline.obtain.chests import DEFAULT_CHEST_SOURCES_PATH, load_chest_sources
+
+            if DEFAULT_CHEST_SOURCES_PATH.is_file():
+                merged_sources.update(load_chest_sources(DEFAULT_CHEST_SOURCES_PATH))
+        except Exception:
+            pass
+
+    if loot is not None:
+        merged_sources.update(loot)
+    else:
+        try:
+            from pipeline.obtain.loot import DEFAULT_LOOT_SOURCES_PATH, load_loot_sources
+
+            if DEFAULT_LOOT_SOURCES_PATH.is_file():
+                merged_sources.update(load_loot_sources(DEFAULT_LOOT_SOURCES_PATH))
+        except Exception:
+            pass
+
+    try:
+        from pipeline.obtain.curated import DEFAULT_PRODUCERS_PATH, load_curated_sources
+
+        if DEFAULT_PRODUCERS_PATH.is_file():
+            merged_sources.update(load_curated_sources(DEFAULT_PRODUCERS_PATH))
+    except Exception:
+        pass
+
+    return merged_sources
+
+
 def build_obtain_graph(
     index: ProducerIndex, sources: Mapping[str, ChestSource] | None = None
 ) -> ObtainGraph:
@@ -249,29 +289,7 @@ def build_obtain_graph(
     returns it.
     """
     if sources is None:
-        merged_sources: dict[str, ChestSource] = {}
-        try:
-            from pipeline.obtain.chests import DEFAULT_CHEST_SOURCES_PATH, load_chest_sources
-
-            if DEFAULT_CHEST_SOURCES_PATH.is_file():
-                merged_sources.update(load_chest_sources(DEFAULT_CHEST_SOURCES_PATH))
-        except Exception:
-            pass
-        try:
-            from pipeline.obtain.loot import DEFAULT_LOOT_SOURCES_PATH, load_loot_sources
-
-            if DEFAULT_LOOT_SOURCES_PATH.is_file():
-                merged_sources.update(load_loot_sources(DEFAULT_LOOT_SOURCES_PATH))
-        except Exception:
-            pass
-        try:
-            from pipeline.obtain.curated import DEFAULT_PRODUCERS_PATH, load_curated_sources
-
-            if DEFAULT_PRODUCERS_PATH.is_file():
-                merged_sources.update(load_curated_sources(DEFAULT_PRODUCERS_PATH))
-        except Exception:
-            pass
-        sources = merged_sources
+        sources = load_merged_sources()
 
     sorted_sources = {k: sources[k] for k in sorted(sources)}
     producers = {

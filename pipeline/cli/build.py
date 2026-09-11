@@ -139,6 +139,7 @@ from pipeline.collections.resolve import resolve_collections
 from pipeline.emit import EmitError
 from pipeline.emit.atlas import DecodedSprite, collect_sprite_files, decode_sprite, pack_atlas
 from pipeline.emit.manifest import BuildInfo
+from pipeline.emit.obtain import load_merged_sources
 from pipeline.emit.shard import DEFAULT_SHARD_SIZE
 from pipeline.emit.write import DEFAULT_DIST_PATH, EmitReport, emit_build
 from pipeline.emit.write import DEFAULT_REPORT_PATH as EMIT_REPORT_PATH
@@ -901,12 +902,15 @@ def run_build(
     # stage 7 (merge_entities) and before stage 7b (the sprite atlas), which is the first
     # stage that reads the finished entity list.
     collection_manifests = load_manifests(options.collections_dir)
+    obtain_sources = load_merged_sources(curated_chests, curated_loot)
     collection_entities = (
         resolve_collections(
             manifests=collection_manifests,
             entities=result.entities,
             item_components=item_components,
             tag_indexes={"item": item_tags, "entity_type": entity_type_tags},
+            producer_index=producer_index,
+            sources=obtain_sources,
         )
         if collection_manifests
         else []
