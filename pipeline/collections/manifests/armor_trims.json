@@ -1,0 +1,38 @@
+{
+  "id": "armor_trims",
+  "title": "Armor Trims",
+  "blurb": "Smithing templates used to apply decorative trim patterns to armor pieces at a smithing table.",
+  "aliases": ["armor trim", "trim templates", "smithing templates", "trims"],
+  "iconFrom": "minecraft:smithing_table",
+  "rule": {
+    "type": "list",
+    "ids": [
+      "minecraft:bolt_armor_trim_smithing_template",
+      "minecraft:coast_armor_trim_smithing_template",
+      "minecraft:dune_armor_trim_smithing_template",
+      "minecraft:eye_armor_trim_smithing_template",
+      "minecraft:flow_armor_trim_smithing_template",
+      "minecraft:host_armor_trim_smithing_template",
+      "minecraft:raiser_armor_trim_smithing_template",
+      "minecraft:rib_armor_trim_smithing_template",
+      "minecraft:sentry_armor_trim_smithing_template",
+      "minecraft:shaper_armor_trim_smithing_template",
+      "minecraft:silence_armor_trim_smithing_template",
+      "minecraft:snout_armor_trim_smithing_template",
+      "minecraft:spire_armor_trim_smithing_template",
+      "minecraft:tide_armor_trim_smithing_template",
+      "minecraft:vex_armor_trim_smithing_template",
+      "minecraft:ward_armor_trim_smithing_template",
+      "minecraft:wayfinder_armor_trim_smithing_template",
+      "minecraft:wild_armor_trim_smithing_template"
+    ]
+  },
+  "columns": [
+    {
+      "fact": "obtain.foundIn",
+      "label": "Found in"
+    }
+  ],
+  "sortBy": "name",
+  "note": "Tier C list rule. The mcmeta 26.2 archive provides no item tag covering trim templates (only trim_materials and trimmable_armor exist), and netherite_upgrade_smithing_template shares every component the 18 trim templates carry. An explicit 18-ID list rule is therefore used, guarded by tests/test_collections_drift.py to ensure this list remains identical to upstream. Icon borrowed from Smithing Table."
+}

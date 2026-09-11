@@ -16,11 +16,21 @@ from pipeline.collections.manifest import (
 )
 
 
-def test_load_default_manifests_loads_all_five() -> None:
+def test_load_default_manifests_loads_all_nine() -> None:
     manifests = load_manifests()
-    assert len(manifests) == 5
+    assert len(manifests) == 9
     ids = [m.id for m in manifests]
-    assert ids == ["arthropods", "enchantments", "structures", "undead", "unique_food"]
+    assert ids == [
+        "armor_trims",
+        "arthropods",
+        "banner_patterns",
+        "enchantments",
+        "minecarts",
+        "structures",
+        "undead",
+        "unique_food",
+        "workstations",
+    ]
 
 
 def test_manifest_rule_discriminated_union() -> None:

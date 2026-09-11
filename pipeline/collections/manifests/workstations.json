@@ -1,0 +1,28 @@
+{
+  "id": "workstations",
+  "title": "Villager Workstations",
+  "blurb": "Job site blocks used by unemployed villagers to acquire professions and replenish trades.",
+  "aliases": ["workstations", "job sites", "job site blocks", "villager jobs"],
+  "iconFrom": "minecraft:villager",
+  "rule": {
+    "type": "list",
+    "ids": [
+      "minecraft:barrel",
+      "minecraft:blast_furnace",
+      "minecraft:brewing_stand",
+      "minecraft:cartography_table",
+      "minecraft:cauldron",
+      "minecraft:composter",
+      "minecraft:fletching_table",
+      "minecraft:grindstone",
+      "minecraft:lectern",
+      "minecraft:loom",
+      "minecraft:smithing_table",
+      "minecraft:smoker",
+      "minecraft:stonecutter"
+    ]
+  },
+  "columns": [],
+  "sortBy": "name",
+  "note": "Tier C list rule. The 13 job site blocks are taken from the workstation ref each villager profession entity carries in data/dist/entities/profession-0.json. There are 13 workstations across 14 professions because the nitwit has no profession and no job site. The acquirable_job_site POI tag was not used because it resolves point-of-interest types rather than blocks, and the pipeline wires TagIndex only for the item and entity_type registries. Guarded by tests/test_collections_drift.py. Icon borrowed from Villager."
+}

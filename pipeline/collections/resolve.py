@@ -33,6 +33,8 @@ from pipeline.normalize.entity import (
     MemberColumn,
     SourceTier,
 )
+from pipeline.obtain.chests import ChestSource
+from pipeline.obtain.producer import ProducerIndex
 
 __all__ = ["resolve_collections"]
 
@@ -161,6 +163,8 @@ def _build_collection_entity(
     manifest: CollectionManifest,
     member_ids: list[str],
     entities_by_id: Mapping[str, Entity],
+    producer_index: ProducerIndex | None = None,
+    sources: Mapping[str, ChestSource] | None = None,
 ) -> Entity:
     """Build one collection ``Entity`` from a resolved manifest."""
     entity_id = f"{COLLECTION_NAMESPACE}:{manifest.id}"
@@ -185,7 +189,12 @@ def _build_collection_entity(
         member_entity = entities_by_id[mid]
         values: dict[str, str] = {}
         for col in manifest.columns:
-            value = extract_fact(member_entity, col.fact)
+            value = extract_fact(
+                member_entity,
+                col.fact,
+                producer_index=producer_index,
+                sources=sources,
+            )
             if value:
                 values[col.fact] = value
 
@@ -277,6 +286,9 @@ def resolve_collections(
     entities: Sequence[Entity],
     item_components: Mapping[str, Mapping[str, object]],
     tag_indexes: Mapping[str, TagIndex],
+    *,
+    producer_index: ProducerIndex | None = None,
+    sources: Mapping[str, ChestSource] | None = None,
 ) -> list[Entity]:
     """Resolve all manifests into collection ``Entity`` objects.
 
@@ -303,7 +315,11 @@ def resolve_collections(
             manifest, item_components, tag_indexes, entities_by_id
         )
         collection_entity = _build_collection_entity(
-            manifest, member_ids, entities_by_id
+            manifest,
+            member_ids,
+            entities_by_id,
+            producer_index=producer_index,
+            sources=sources,
         )
         collections.append(collection_entity)
 

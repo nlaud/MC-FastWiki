@@ -128,4 +128,42 @@ describe("renderCollectionMembers", () => {
     expect(cells?.[1]?.textContent).toBe("2");
     expect(cells?.[2]?.textContent).toBe("");
   });
+
+  it("renders armor trims table with Found in column and Tide note", () => {
+    const section: CollectionMembers = {
+      type: "CollectionMembers",
+      columns: [{ key: "obtain.foundIn", label: "Found in" }],
+      members: [
+        {
+          ref: {
+            id: "minecraft:bolt_armor_trim_smithing_template",
+            name: "Bolt Armor Trim",
+          },
+          values: {
+            "obtain.foundIn": "Trial Chambers",
+          },
+        },
+        {
+          ref: {
+            id: "minecraft:tide_armor_trim_smithing_template",
+            name: "Tide Armor Trim",
+          },
+          values: {
+            "obtain.foundIn": "dropped by Elder Guardian",
+          },
+        },
+      ],
+    };
+
+    const el = renderCollectionMembers(section, ctx);
+    expect(el).not.toBeNull();
+    const rows = el?.querySelectorAll("tbody tr");
+    expect(rows?.length).toBe(2);
+
+    const firstRowCells = rows?.[0]?.querySelectorAll("td");
+    expect(firstRowCells?.[1]?.textContent).toBe("Trial Chambers");
+
+    const secondRowCells = rows?.[1]?.querySelectorAll("td");
+    expect(secondRowCells?.[1]?.textContent).toBe("dropped by Elder Guardian");
+  });
 });
