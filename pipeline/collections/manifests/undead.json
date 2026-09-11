@@ -1,0 +1,14 @@
+{
+  "id": "undead",
+  "title": "Undead Mobs",
+  "blurb": "Mobs in the #minecraft:undead entity type tag. Undead mobs take extra damage from Smite, are hurt by Instant Health, and are healed by Instant Damage. Knowing which mobs qualify matters when choosing between Smite and Sharpness.",
+  "aliases": ["undead", "smite mobs", "smite targets"],
+  "iconFrom": "minecraft:zombie",
+  "rule": {
+    "type": "tag",
+    "registry": "entity_type",
+    "tag": "minecraft:undead"
+  },
+  "columns": [],
+  "note": "Tier A. 17 entity types carry #minecraft:undead in 26.2. Icon borrowed from the Zombie, the archetypal undead mob."
+}

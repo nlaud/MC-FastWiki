@@ -57,6 +57,7 @@ export type Section =
   | EnchantInfo
   | GenerationInfo
   | LinkList
+  | CollectionMembers
   | ProfessionInfo
   | StructureInfo
   | BiomeInfo;
@@ -763,6 +764,40 @@ export interface LinkList {
   type: "LinkList";
   title?: string;
   links: EntityRef[];
+}
+/**
+ * The member list of a collection page. With columns it renders as a table; with none it renders a flat link row.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "collectionMembers".
+ */
+export interface CollectionMembers {
+  type: "CollectionMembers";
+  title?: string;
+  columns?: MemberColumn[];
+  members?: CollectionMember[];
+}
+/**
+ * One column header in a collection member table.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "memberColumn".
+ */
+export interface MemberColumn {
+  key: string;
+  label: string;
+}
+/**
+ * One row in a collection member table. Values are pre-formatted strings.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "collectionMember".
+ */
+export interface CollectionMember {
+  ref: EntityRef;
+  values?: {
+    [k: string]: string;
+  };
 }
 /**
  * Villager profession details: workstation block and trade count.

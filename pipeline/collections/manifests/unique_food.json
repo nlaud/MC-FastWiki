@@ -1,0 +1,24 @@
+{
+  "id": "unique_food",
+  "title": "Food",
+  "blurb": "Every edible item, with what it restores. Nutrition is the hunger points restored on eating; saturation is the hidden value that delays hunger from ticking down again.",
+  "aliases": ["foods", "edible", "hunger"],
+  "iconFrom": "minecraft:bread",
+  "rule": {
+    "type": "component",
+    "component": "minecraft:food"
+  },
+  "columns": [
+    {
+      "fact": "food.nutrition",
+      "label": "Hunger"
+    },
+    {
+      "fact": "food.saturation",
+      "label": "Saturation"
+    }
+  ],
+  "sortBy": "food.nutrition",
+  "sortDirection": "descending",
+  "note": "Tier A. 44 items carry minecraft:food in 26.2. Icon borrowed from Bread, the archetypal food item. The hunger shank from data/curated/hud-sprites.json would say 'food' without picking one of the 44 items, but it is a 9x9 HUD sprite and every other icon in a window header and suggestion row is 16x16. It rendered visibly smaller than its neighbours, and scaling it up needs a non-integer 1.78x that would blur a pixel sprite."
+}

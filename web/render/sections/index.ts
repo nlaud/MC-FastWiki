@@ -3,6 +3,7 @@ import type {
   BiomeInfo,
   BreedingInfo,
   ChestLoot,
+  CollectionMembers,
   DropTable,
   EffectSources,
   EnchantInfo,
@@ -24,6 +25,7 @@ import { renderAdvancementInfo } from "./advancement-info.js";
 import { renderBiomeInfo } from "./biome-info.js";
 import { renderBreedingInfo } from "./breeding-info.js";
 import { renderChestLoot } from "./chest-loot.js";
+import { renderCollectionMembers } from "./collection-members.js";
 import { renderDropTable } from "./drop-table.js";
 import { renderEffectSources } from "./effect-sources.js";
 import { renderEnchantInfo } from "./enchant-info.js";
@@ -79,6 +81,7 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   EnchantInfo: (s, ctx) => renderEnchantInfo(s as EnchantInfo, ctx),
   ChestLoot: (s, ctx) => renderChestLoot(s as ChestLoot, ctx),
   LinkList: (s, ctx) => renderLinkList(s as LinkList, ctx),
+  CollectionMembers: (s, ctx) => renderCollectionMembers(s as CollectionMembers, ctx),
   StructureInfo: (s, ctx) => renderStructureInfo(s as StructureInfo, ctx),
   BiomeInfo: (s, ctx) => renderBiomeInfo(s as BiomeInfo, ctx),
 };

@@ -110,20 +110,21 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2176
+    assert snapshot.total == 2181
     assert snapshot.by_kind == {
         "block": 1195,
         "item": 540,
         "advancement": 126,
         "mob": 91,
         "biome": 66,
+        "collection": 5,
         "enchantment": 43,
         "effect": 39,
         "structure": 35,
         "entity": 28,
         "profession": 13,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2176)
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2181)
     # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
     # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
     # 2144 wikiUrl, 2015 blurb, 2049 icon after 34 structures were added, when a structure carried
@@ -132,7 +133,11 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     # Taiga Village carry its prose (+3), and all 34 structures borrow a curated Tier C icon (+34).
     # 2145/2019/2084 now: the dungeon is a 35th place, enumerated from the configured feature the
     # game files it under, and it carries all three.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2019, "icon": 2084}
+    # 2145/2024/2084 after Phase 7: all 5 collections carry a manifest blurb (+5).
+    # 2145/2024/2089 once each collection also borrowed an icon (+5). A collection has no sprite
+    # of its own, so its manifest names the one it borrows -- four from a member entity, and the
+    # Food page from the curated hunger shank, which belongs to no entity at all.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2024, "icon": 2089}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -163,6 +168,7 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         # 30 of the 34 structures hold a container, plus the dungeon's chest.
         "ChestLoot": 31,
         "LinkList": 62,
+        "CollectionMembers": 5,
         # All 66 enumerated biomes carry climate, spawns, and generating blocks.
         "BiomeInfo": 66,
     }

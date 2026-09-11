@@ -125,6 +125,8 @@ __all__ = [
     "ChestLoot",
     "ChestLootContainer",
     "ChestLootItem",
+    "CollectionMember",
+    "CollectionMembers",
     "ConcentricRingsPlacement",
     "DamageValue",
     "DistributionEntry",
@@ -159,6 +161,7 @@ __all__ = [
     "LinkList",
     "LootingDrop",
     "Measure",
+    "MemberColumn",
     "NoisePlacement",
     "ObtainList",
     "ProfessionInfo",
@@ -935,6 +938,39 @@ class LinkList(BaseModel, frozen=True, populate_by_name=True):
     links: tuple[EntityRef, ...] = ()
 
 
+class MemberColumn(BaseModel, frozen=True, populate_by_name=True):
+    """One column header in a collection member table."""
+
+    key: str
+    label: str
+
+
+class CollectionMember(BaseModel, frozen=True, populate_by_name=True):
+    """One row in a collection member table.
+
+    ``ref`` links to the member entity. ``values`` maps column keys to
+    pre-formatted display strings. The pipeline decides how many digits it
+    trusts, once, and the renderer prints what it is given.
+    """
+
+    ref: EntityRef
+    values: Mapping[str, str] = {}
+
+
+class CollectionMembers(BaseModel, frozen=True, populate_by_name=True):
+    """The member list of a collection page.
+
+    With columns it renders as a table; with none it renders a flat link row,
+    the same form the existing ``LinkList`` already draws. Both forms put
+    every member through ``entityLink`` from ``web/render/link.ts``.
+    """
+
+    type: Literal["CollectionMembers"] = "CollectionMembers"
+    title: str | None = None
+    columns: tuple[MemberColumn, ...] = ()
+    members: tuple[CollectionMember, ...] = ()
+
+
 class ProfessionInfo(BaseModel, frozen=True, populate_by_name=True):
     """Villager profession details: workstation block and trade count."""
 
@@ -1093,6 +1129,7 @@ Section = Annotated[
     | EnchantInfo
     | GenerationInfo
     | LinkList
+    | CollectionMembers
     | ProfessionInfo
     | StructureInfo
     | BiomeInfo,
@@ -1109,7 +1146,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The eighteen `type` values a `sections.<Type>` provenance key may name,
+# The nineteen `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -1129,6 +1166,7 @@ _SECTION_TYPES = frozenset(
         "EnchantInfo",
         "GenerationInfo",
         "LinkList",
+        "CollectionMembers",
         "ProfessionInfo",
         "StructureInfo",
         "BiomeInfo",

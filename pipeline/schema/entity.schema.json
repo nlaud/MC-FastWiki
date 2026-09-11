@@ -335,6 +335,9 @@
           "$ref": "#/$defs/linkList"
         },
         {
+          "$ref": "#/$defs/collectionMembers"
+        },
+        {
           "$ref": "#/$defs/professionInfo"
         },
         {
@@ -1403,6 +1406,71 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/entityRef"
+          },
+          "default": []
+        }
+      }
+    },
+    "memberColumn": {
+      "title": "MemberColumn",
+      "description": "One column header in a collection member table.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "collectionMember": {
+      "title": "CollectionMember",
+      "description": "One row in a collection member table. Values are pre-formatted strings.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "collectionMembers": {
+      "title": "CollectionMembers",
+      "description": "The member list of a collection page. With columns it renders as a table; with none it renders a flat link row.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "CollectionMembers"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/memberColumn"
+          },
+          "default": []
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/collectionMember"
           },
           "default": []
         }

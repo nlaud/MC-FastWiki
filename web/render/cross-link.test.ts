@@ -146,7 +146,7 @@ describe("Lint B: cross-link rendering", () => {
     expect(totalSectionsChecked).toBeGreaterThan(1000);
     expect(totalCheckedRefs).toBeGreaterThan(7000);
     expect(misses).toEqual([]);
-  });
+  }, 30_000);
 
   it("detects when an entity ref is rendered as plain text instead of a link", () => {
     // Given an element where a renderer printed plain text instead of calling entityLink

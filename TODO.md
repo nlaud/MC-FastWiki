@@ -215,30 +215,52 @@ Decision 3 forbids, since it chooses one arbitrary member of a 28-item set.
 
 ## Phase 7 — Collections (the special search terms)
 
-Build these data-driven from a `/pipeline/collections/*.yaml` manifest — a title, a blurb, and a
-member-resolution rule (a vanilla tag, a Bucket query, or an explicit list). Adding a new
-collection should mean adding one manifest file, never writing code.
+Build these data-driven from a `/pipeline/collections/manifests/*.json` manifest — a title, a blurb,
+and a member-resolution rule. Adding a new collection should mean adding one manifest file, never
+writing code.
 
-- [ ] Collection manifest format and resolver
-- [ ] `compostable` — all compostable items with their tier, straight from the
-      `minecraft:compostable` component (**122 items, Tier A** — no curation needed)
-- [ ] `unique_food` — all food items with nutrition and saturation, from the `minecraft:food`
-      component (**44 items, Tier A**)
-- [ ] Consider a `fuel` collection too — `minecraft:cooking_fuel` covers 347 items and comes free
-- [ ] Mob type groups: `arthropods`, `undead`, and the rest — prefer `entity_type` tags, fall back
-      to curated lists where no tag exists
+The manifests are JSON, not the YAML this section originally specified. Every hand-maintained file
+in `/data/curated` is already JSON, the repository has no YAML parser and its dependency list is
+held to three packages with a written justification each, and this file's own convention for
+explaining a curation choice is a `"note"` field rather than a comment. One data format, no new
+dependency.
+
+- [x] Collection manifest format and resolver — `pipeline/collections`, running as build stage 7a,
+      between `merge_entities` and the sprite atlas. Four rules: `component`, `tag`, `kind`, and
+      `list`. A tag rule names its own registry, because `arrows` and `frog_food` are each both an
+      item tag and an `entity_type` tag in 26.2 and resolve differently in each, which is the same
+      trap `TagIndex` refuses a default registry over. Two faults raise rather than shipping a
+      broken page: a member ID with no entity, and a rule that resolves to zero members.
+- [ ] `compostable` — all compostable items with their composting chance. **Not Tier A.** See
+      Decision 30: `minecraft:compostable` does not exist in 26.2, and neither does a wiki Bucket.
+      Needs a curated file or a parse of the Composter page table.
+- [x] `unique_food` — all food items with nutrition and saturation, from the `minecraft:food`
+      component (**44 items, Tier A** — the one claim of the original three that holds)
+- [ ] Consider a `fuel` collection too — **not Tier A either.** `minecraft:cooking_fuel` does not
+      exist in 26.2. Same options and same blocker as `compostable`; see Decision 30.
+- [x] Mob type groups — `undead` (17) and `arthropods` (5), both from `entity_type` tags. The rest
+      are one manifest file each whenever they are wanted: `illager` (4), `raiders` (6),
+      `skeletons` (6), `zombies` (9), and `aquatic` (14) all exist as tags and need no code.
 - [ ] `armor_trims` — every trim, how to obtain it, and which chests it generates in
 - [ ] `banner_patterns` — all unique banner pattern recipes
 - [ ] `workstations` — all workstation block recipes
 - [ ] `minecarts` — all minecart recipes
-- [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in
-- [ ] Every member renders as a link that opens the real entity window
+- [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in.
+      Needs a tree-shaped section; the flat member list cannot express it
+- [x] Every member renders as a link that opens the real entity window — enforced by lint B
+      (`web/render/cross-link.test.ts`), which picked up the new shard with no exemption added
 
 New collections the added data makes nearly free:
 
-- [ ] `fuel` — its own search keyword, 347 items with burn times, from `minecraft:cooking_fuel`
-- [ ] `enchantments` — the full list, grouped by what they apply to
-- [ ] `structures` — every structure and its biome
+- [ ] `fuel` — its own search keyword, with burn times. Blocked on the same missing source as the
+      bullet above; it is not free after all
+- [x] `enchantments` — the full list (43), with each one's maximum level. Flat rather than grouped
+      by what they apply to: an enchantment applies to a set of items, so the grouping is
+      many-to-many and wants its own section type rather than a member list
+- [x] `structures` — every structure (35). That is the 34 worldgen structures plus Monster Room,
+      which has a page of its own per Decision 27, because the collection lists structure *pages*
+      rather than `worldgen/structure` registry entries. Each member links to its own page, which
+      already carries the biomes
 - [ ] `chest_loot` — every lootable chest, as a hub into the structures that contain them
 - [ ] `villager_trades` — professions as an index into the trade tables
 - [ ] `bartering` — the full bartering table for piglin bartering
@@ -367,8 +389,13 @@ New collections the added data makes nearly free:
     sounds like it removes the reason for mcmeta. It does not. mcmeta is one JSON fetch with no
     Java, and it is what supplies exhaustive item enumeration, entity tags for the mob-group
     collections, all 43 enchantments, 52 structures, 67 biomes, 31 chest loot tables, and the
-    food/compostable/fuel components. Dropping it would push five of the planned pages back onto
+    `minecraft:food` component. Dropping it would push five of the planned pages back onto
     hand-curation to save one HTTP fetch.
+
+    This entry used to say "the food/compostable/fuel components". Only food is true, and the
+    correction is recorded here rather than quietly deleted: see Decision 30. It does not weaken
+    the decision, because every other item on the list still holds and the mob-group entity tags
+    named above are what `undead` and `arthropods` are actually built from.
 
 11. **Obtaining comes from the wiki's own section, not from inverted loot tables.** I had planned
     to build reverse indexes off the raw loot tables. Unnecessary — every item page already has an
@@ -790,6 +817,35 @@ New collections the added data makes nearly free:
     such as slime chunk requirements. Mob texture variants in the wiki (e.g. Cold Chicken, Pale Wolf)
     which share an underlying `entity_type` are deferred until mob variants have first-class pages.
 
+30. **`compostable` and `cooking_fuel` are not data in 26.2, so both collections move to the
+    curated tier.** Phase 7 was written expecting three item components to carry three collections
+    for free: `minecraft:food`, `minecraft:compostable`, and `minecraft:cooking_fuel`. Only the
+    first exists. Composting chance and furnace burn time are hardcoded in the game in this
+    version, exposed through no component, no registry, and no wiki Bucket.
+
+    Three independent checks agree, and each is cheap to repeat:
+
+    - Every component key in `item_components/data.json` at mcmeta `711a353`, counted.
+      `minecraft:food` appears on 44 items and `minecraft:consumable` on 43. Neither
+      `minecraft:compostable` nor `minecraft:cooking_fuel` appears at all.
+    - All 9,030 files of the `26.2-data` tarball scanned for the strings `compostable`,
+      `cooking_fuel`, and `burn_time`. Zero files matched. The only near hits by filename are the
+      composter block's own loot table and recipe.
+    - Live Bucket queries for `composting`, `compost`, `fuel`, and `smelting`. Each answered
+      `"Bucket <name> does not exist."` This is the half the earlier data-source correction did not
+      have, and it is what rules out the Tier B route as well as the Tier A one.
+
+    The `122 items` and `347 items` figures the phase quoted are not wrong about Minecraft; they
+    are counts of a thing this pipeline cannot read. Both collections therefore need either a
+    curated file under `/data/curated` or a parse of the wiki's Composter and Smelting page tables,
+    each with its own verification burden, and both are deferred rather than half-built.
+
+    What it costs: two of the eight collections the phase opened with are not free, and the "no
+    curation needed" claim beside `compostable` was the load-bearing part of it. What it does not
+    cost: `unique_food` is exactly as free as promised, at exactly the 44 items named, and the
+    manifest and resolver this phase actually needed were never blocked on any of it.
+
+
 ## Still open
 
 1. **Match-specific extras.** Since this is for draftout matches — is there value in pinning
@@ -809,12 +865,19 @@ Findings that contradict the data-source notes in `CLAUDE.md` and `AGENTS.md`. R
 than fixed in place, because the two files are byte-identical mirrors and a correction needs its
 replacement source decided first.
 
-- [ ] **`compostable` and `cooking_fuel` are not in `summary/item_components`.** `CLAUDE.md` states
+- [x] **`compostable` and `cooking_fuel` are not in `summary/item_components`.** `CLAUDE.md` stated
       that file carries `minecraft:compostable` for 122 items and `minecraft:cooking_fuel` for 347.
       Checked against the live `26.2-summary` tag on 2026-08-26: it carries neither component, and
       the `data` branch holds no equivalent list either. `minecraft:food` (44 items) does match, so
       only two of the three claims are wrong. This removes the stated Tier A source for the Phase 7
-      `compostable` and `fuel` collections.
-  - [ ] Find where 26.x exposes composter chance and furnace burn time
-  - [ ] Correct the claim in `CLAUDE.md` and `AGENTS.md` in one commit, or move both collections to
-        the curated tier when no Tier A source exists
+      `compostable` and `fuel` collections. Re-confirmed against the pinned archive on 2026-09-10
+      and resolved in full; see Decision 30.
+  - [x] Find where 26.x exposes composter chance and furnace burn time. **It does not.** Beyond the
+        two checks above, the wiki Bucket API answers `"Bucket <name> does not exist."` for
+        `composting`, `compost`, `fuel`, and `smelting`, so there is no Tier B route either. The
+        remaining options are a curated file or a parse of the Composter and Smelting page tables.
+  - [x] Correct the claim in `CLAUDE.md` and `AGENTS.md` in one commit, or move both collections to
+        the curated tier when no Tier A source exists. **Both mirrors needed no edit:** each is 53
+        lines today and carries no `item_components` claim at all, so a later rewrite had already
+        removed it. Do not go looking for that text. Both collections are moved to the curated tier
+        and Phase 7 now says so.

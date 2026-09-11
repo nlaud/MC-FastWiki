@@ -1,0 +1,15 @@
+{
+  "id": "structures",
+  "title": "Structures",
+  "blurb": "Every structure that generates in the world, as listed in the worldgen/structure registry. Each one links to its own page with placement details, biomes, and loot tables.",
+  "aliases": ["all structures", "structure list", "generated structures"],
+  "iconFrom": "minecraft:filled_map",
+  "rule": {
+    "type": "kind",
+    "kind": "structure"
+  },
+  "columns": [],
+  "sortBy": "name",
+  "sortDirection": "ascending",
+  "note": "35 structure pages in 26.2: the 34 worldgen structures plus Monster Room, the dungeon, which has a page per Decision 27. Icon borrowed from the Map. An explorer map is how a player finds a structure, so the map says 'structures' without picking one of the 35 to stand for the rest."
+}
