@@ -121,6 +121,42 @@ def _resolve_members(
     return member_ids
 
 
+def _resolve_icon(
+    manifest: CollectionManifest,
+    entities_by_id: Mapping[str, Entity],
+) -> str | None:
+    """Return the icon key this collection borrows, or None when it declares none.
+
+    `iconFrom` is checked against this build rather than trusted: an entity
+    that is absent, or that resolved no icon of its own, raises here and names
+    itself. The alternative is an icon key that reaches the atlas, fails to
+    resolve, and surfaces as one more line in the unresolved-icon report that
+    nobody reads per-build.
+
+    `icon` cannot be checked the same way, because the whole point of it is a
+    key no entity owns, and this stage holds no sprite index. It stays the
+    narrower field for that reason.
+    """
+    if manifest.icon is not None:
+        return manifest.icon
+    if manifest.icon_from is None:
+        return None
+
+    source = entities_by_id.get(manifest.icon_from)
+    if source is None:
+        raise CollectionError(
+            f"Manifest {manifest.id!r} borrows its icon from {manifest.icon_from!r}, "
+            f"which this build has no entity for."
+        )
+    if source.icon is None:
+        raise CollectionError(
+            f"Manifest {manifest.id!r} borrows its icon from {manifest.icon_from!r}, "
+            f"which resolved no icon of its own. Name an entity that has one, or use "
+            f"'icon' to state a sprite key outright."
+        )
+    return source.icon
+
+
 def _build_collection_entity(
     manifest: CollectionManifest,
     member_ids: list[str],
@@ -218,12 +254,17 @@ def _build_collection_entity(
     if aliases:
         source_tiers["aliases"] = SourceTier.C
 
+    icon = _resolve_icon(manifest, entities_by_id)
+    if icon is not None:
+        # Tier C: a person chose which icon stands for this page, in the manifest.
+        source_tiers["icon"] = SourceTier.C
+
     return Entity(
         id=entity_id,
         kind=EntityKind.COLLECTION,
         name=manifest.title,
         aliases=aliases,
-        icon=None,
+        icon=icon,
         blurb=manifest.blurb,
         wiki_url=None,
         source_tiers=source_tiers,

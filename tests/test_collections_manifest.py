@@ -125,3 +125,25 @@ def test_manifest_invalid_sort_by_raises(tmp_path: Path) -> None:
     (tmp_path / "test.json").write_text(json.dumps(m), encoding="utf-8")
     with pytest.raises(CollectionError, match="sortBy='invalid_fact_key' does not name 'name'"):
         load_manifests(tmp_path)
+
+
+def test_manifest_setting_both_icon_fields_raises(tmp_path: Path) -> None:
+    manifest = {
+        "id": "both",
+        "title": "Both",
+        "blurb": "Blurb",
+        "icon": "HudSprite:hunger-full",
+        "iconFrom": "minecraft:zombie",
+        "rule": {"type": "kind", "kind": "mob"},
+    }
+    (tmp_path / "both.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(CollectionError, match="sets both 'icon'"):
+        load_manifests(tmp_path)
+
+
+def test_every_shipped_manifest_declares_an_icon() -> None:
+    """A collection with no icon is a blank row in the suggestion list."""
+    for manifest in load_manifests():
+        assert (manifest.icon is not None) or (manifest.icon_from is not None), (
+            f"{manifest.id} declares neither 'icon' nor 'iconFrom'"
+        )

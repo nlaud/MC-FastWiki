@@ -134,7 +134,10 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     # 2145/2019/2084 now: the dungeon is a 35th place, enumerated from the configured feature the
     # game files it under, and it carries all three.
     # 2145/2024/2084 after Phase 7: all 5 collections carry a manifest blurb (+5).
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2024, "icon": 2084}
+    # 2145/2024/2089 once each collection also borrowed an icon (+5). A collection has no sprite
+    # of its own, so its manifest names the one it borrows -- four from a member entity, and the
+    # Food page from the curated hunger shank, which belongs to no entity at all.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2024, "icon": 2089}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`

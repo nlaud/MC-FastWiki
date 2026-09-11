@@ -1,9 +1,14 @@
 {
   "id": "arthropods",
   "title": "Arthropod Mobs",
-  "blurb": "Mobs in the #minecraft:arthropod entity type tag. Arthropods take extra damage from Bane of Arthropods, which also applies Slowness IV. The list is shorter than most players expect.",
+  "blurb": "Mobs in the #minecraft:arthropod entity type tag. Arthropods take extra damage from Bane of Arthropods, which also applies Slowness IV.",
   "aliases": ["arthropod", "bane of arthropods mobs", "bane targets"],
-  "rule": { "type": "tag", "registry": "entity_type", "tag": "minecraft:arthropod" },
+  "iconFrom": "minecraft:spider",
+  "rule": {
+    "type": "tag",
+    "registry": "entity_type",
+    "tag": "minecraft:arthropod"
+  },
   "columns": [],
-  "note": "Tier A. 5 entity types carry #minecraft:arthropod in 26.2."
+  "note": "Tier A. 5 entity types carry #minecraft:arthropod in 26.2. Icon borrowed from the Spider, the arthropod a player meets first and the mob the Bane of Arthropods enchantment is named around."
 }

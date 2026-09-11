@@ -246,3 +246,68 @@ def test_tag_rule_naming_an_absent_registry_raises() -> None:
     entities = [_minimal_entity("minecraft:zombie", "Zombie", EntityKind.MOB)]
     with pytest.raises(CollectionError, match="tag registry 'block'"):
         resolve_collections([manifest], entities, {}, {})
+
+
+def test_icon_from_borrows_the_named_entity_icon() -> None:
+    manifest = CollectionManifest(
+        id="undead",
+        title="Undead Mobs",
+        blurb="Blurb",
+        icon_from="minecraft:zombie",
+        rule=ListRule(ids=("minecraft:zombie",)),
+    )
+    entities = [
+        _minimal_entity("minecraft:zombie", "Zombie", EntityKind.MOB, icon="EntitySprite:zombie")
+    ]
+    collection = resolve_collections([manifest], entities, {}, {})[0]
+    assert collection.icon == "EntitySprite:zombie"
+    assert collection.source_tiers["icon"] == SourceTier.C
+
+
+def test_icon_states_a_key_no_entity_owns() -> None:
+    manifest = CollectionManifest(
+        id="unique_food",
+        title="Food",
+        blurb="Blurb",
+        icon="HudSprite:hunger-full",
+        rule=ListRule(ids=("minecraft:apple",)),
+    )
+    entities = [_minimal_entity("minecraft:apple", "Apple")]
+    collection = resolve_collections([manifest], entities, {}, {})[0]
+    assert collection.icon == "HudSprite:hunger-full"
+
+
+def test_a_collection_may_declare_no_icon() -> None:
+    manifest = CollectionManifest(
+        id="plain", title="Plain", blurb="Blurb", rule=ListRule(ids=("minecraft:apple",))
+    )
+    entities = [_minimal_entity("minecraft:apple", "Apple")]
+    collection = resolve_collections([manifest], entities, {}, {})[0]
+    assert collection.icon is None
+    assert "icon" not in collection.source_tiers
+
+
+def test_icon_from_an_absent_entity_raises() -> None:
+    manifest = CollectionManifest(
+        id="undead",
+        title="Undead Mobs",
+        blurb="Blurb",
+        icon_from="minecraft:not_a_thing",
+        rule=ListRule(ids=("minecraft:apple",)),
+    )
+    entities = [_minimal_entity("minecraft:apple", "Apple")]
+    with pytest.raises(CollectionError, match="no entity for"):
+        resolve_collections([manifest], entities, {}, {})
+
+
+def test_icon_from_an_iconless_entity_raises() -> None:
+    manifest = CollectionManifest(
+        id="undead",
+        title="Undead Mobs",
+        blurb="Blurb",
+        icon_from="minecraft:apple",
+        rule=ListRule(ids=("minecraft:apple",)),
+    )
+    entities = [_minimal_entity("minecraft:apple", "Apple")]
+    with pytest.raises(CollectionError, match="resolved no icon of its own"):
+        resolve_collections([manifest], entities, {}, {})

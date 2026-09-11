@@ -412,6 +412,19 @@ def collect_sprite_files(
         icon = entity.icon
         if icon is None:
             continue
+        if icon in icon_to_file:
+            # Already resolved, so there is nothing to look up. For a second entity
+            # carrying an icon a previous one resolved, skipping only saves a repeated
+            # lookup that would write back the same answer.
+            #
+            # For an `extra_icons` key it is a correctness fix. Those arrive as verified
+            # `File:` titles precisely because the `spritefile` bucket cannot answer for
+            # the family at all, so looking one up reports it in `unresolved_icons` while
+            # it sits in the atlas -- a permanent phantom entry in the build's own failure
+            # count. No entity references one today. The Food collection did for one
+            # commit, which is how this surfaced, and it now borrows a 16x16 item icon
+            # instead for reasons of size rather than resolution.
+            continue
         family, separator, sprite_id = icon.partition(":")
         sprite = sprite_index.lookup(family, sprite_id) if separator else None
         if sprite is None:

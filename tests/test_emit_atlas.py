@@ -281,6 +281,27 @@ def test_collect_sprite_files_resolves_icons_and_reports_gaps() -> None:
     assert selection.unresolved_icons == ("InvSprite:Nothing Here",)
 
 
+def test_collect_sprite_files_does_not_report_an_extra_icon_as_unresolved() -> None:
+    """An `extra_icons` key an entity also carries is resolved, not a gap.
+
+    `extra_icons` arrives as a verified `File:` title precisely because the
+    `spritefile` bucket cannot answer for the family. Looking one up anyway
+    reported it as unresolved while it sat in the atlas, which is a permanent
+    phantom entry in the build's own failure count. No shipped entity carries
+    such an icon today, so this test is the only thing holding the branch.
+    """
+    index = SpriteIndex.build([])
+    entities = (_entity("collection:unique_food", "HudSprite:hunger-full"),)
+
+    selection = collect_sprite_files(
+        entities, index, extra_icons={"HudSprite:hunger-full": "File:Hunger (icon).png"}
+    )
+
+    assert selection.icon_to_file == {"HudSprite:hunger-full": "File:Hunger (icon).png"}
+    assert selection.file_titles == ("File:Hunger (icon).png",)
+    assert selection.unresolved_icons == ()
+
+
 def test_collect_sprite_files_over_no_entities_returns_an_empty_selection() -> None:
     index = SpriteIndex.build([])
     selection = collect_sprite_files((), index)

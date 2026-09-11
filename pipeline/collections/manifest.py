@@ -103,12 +103,33 @@ class CollectionManifest(BaseModel, frozen=True, populate_by_name=True):
     ``sortBy`` accepts ``"name"`` or any fact key named in ``columns``.
     ``sortDirection`` defaults to ``"ascending"``.
     ``note`` is the repo's established stand-in for a comment.
+
+    A collection has no sprite of its own -- the wiki publishes no
+    ``Invicon Food.png`` -- so its icon is borrowed, and the manifest states
+    which one it borrows rather than any code deriving it. Decision 3 forbids
+    *constructing* a sprite filename, and neither field does: both name a key
+    that something else already resolved through the ``spritefile`` bucket.
+
+    ``iconFrom`` names an entity ID and borrows that entity's own icon. This
+    is the safer of the two, because the build fails when the entity is
+    absent or iconless, so a typo cannot reach the atlas as a quietly
+    unresolved key.
+
+    ``icon`` names a sprite key outright, for a key that belongs to no entity,
+    such as one of the curated HUD icons in ``data/curated/hud-sprites.json``.
+    No shipped manifest needs it today. It stays because the alternative for
+    the first collection that wants a non-entity icon is to widen ``iconFrom``
+    into something that no longer means what its name says.
+
+    At most one of the two may be set.
     """
 
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     blurb: str = Field(min_length=1)
     aliases: tuple[str, ...] = ()
+    icon: str | None = None
+    icon_from: str | None = Field(default=None, alias="iconFrom")
     rule: MemberRule
     columns: tuple[ColumnDef, ...] = ()
     sort_by: str | None = Field(default=None, alias="sortBy")
@@ -158,6 +179,13 @@ def load_manifests(
             raise CollectionError(
                 f"Manifest {path.name} is malformed: {exc}"
             ) from exc
+
+        if manifest.icon is not None and manifest.icon_from is not None:
+            raise CollectionError(
+                f"Manifest {path.name} sets both 'icon' ({manifest.icon!r}) and 'iconFrom' "
+                f"({manifest.icon_from!r}). A collection borrows one icon, so name it one way: "
+                f"'iconFrom' to borrow an entity's icon, 'icon' for a key no entity owns."
+            )
 
         if manifest.id in seen_ids:
             raise CollectionError(
