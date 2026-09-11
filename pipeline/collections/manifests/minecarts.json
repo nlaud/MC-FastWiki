@@ -1,7 +1,7 @@
 {
   "id": "minecarts",
   "title": "Minecarts",
-  "blurb": "Rail-riding vehicles for transport, storage, and utility. Five variants can be crafted from an ordinary minecart and an installed block; spawner and command block minecarts are creative-only.",
+  "blurb": "Rail-riding vehicles for transport, storage, and utility. Four variants are crafted from an ordinary minecart and an installed block; the spawner and command block minecarts are creative-only.",
   "aliases": ["minecart", "minecart variants", "rail vehicles", "carts"],
   "iconFrom": "minecraft:minecart",
   "rule": {
