@@ -20,13 +20,16 @@ from pydantic import BaseModel, Field
 from pipeline.collections import CollectionError
 
 __all__ = [
+    "CollectionLayout",
     "CollectionManifest",
     "ColumnDef",
     "ComponentRule",
     "KindRule",
+    "ListLayout",
     "ListRule",
     "MemberRule",
     "TagRule",
+    "TreeLayout",
     "load_manifests",
 ]
 
@@ -73,6 +76,31 @@ class ListRule(BaseModel, frozen=True, populate_by_name=True):
 
 MemberRule = Annotated[
     ComponentRule | TagRule | KindRule | ListRule,
+    Field(discriminator="type"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Layout definition
+# ---------------------------------------------------------------------------
+
+
+class ListLayout(BaseModel, frozen=True, populate_by_name=True):
+    """Flat member list layout (default)."""
+
+    type: Literal["list"] = "list"
+
+
+class TreeLayout(BaseModel, frozen=True, populate_by_name=True):
+    """Tree layout grouped by root entity."""
+
+    type: Literal["tree"] = "tree"
+    section: str = Field(min_length=1)
+    group_order: tuple[str, ...] = Field(default=(), alias="groupOrder")
+
+
+CollectionLayout = Annotated[
+    ListLayout | TreeLayout,
     Field(discriminator="type"),
 ]
 
@@ -131,6 +159,7 @@ class CollectionManifest(BaseModel, frozen=True, populate_by_name=True):
     icon: str | None = None
     icon_from: str | None = Field(default=None, alias="iconFrom")
     rule: MemberRule
+    layout: CollectionLayout = Field(default_factory=ListLayout)
     columns: tuple[ColumnDef, ...] = ()
     sort_by: str | None = Field(default=None, alias="sortBy")
     sort_direction: Literal["ascending", "descending"] = Field(
@@ -201,6 +230,18 @@ def load_manifests(
                 raise CollectionError(
                     f"Manifest {path.name}: sortBy={manifest.sort_by!r} does not name "
                     f"'name' or any column fact key. Valid keys: {sorted(valid_keys)}."
+                )
+
+        if isinstance(manifest.layout, TreeLayout):
+            if manifest.columns:
+                raise CollectionError(
+                    f"Manifest {path.name}: tree layout does not support 'columns'. "
+                    f"Tree collections render as an indented hierarchy without tabular columns."
+                )
+            if manifest.sort_by is not None:
+                raise CollectionError(
+                    f"Manifest {path.name}: tree layout does not support 'sortBy'. "
+                    f"Tree collections are ordered by their hierarchy."
                 )
 
         manifests.append(manifest)

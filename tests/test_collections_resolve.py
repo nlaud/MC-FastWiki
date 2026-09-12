@@ -10,13 +10,17 @@ from pipeline.collections.manifest import (
     KindRule,
     ListRule,
     TagRule,
+    TreeLayout,
 )
 from pipeline.collections.resolve import resolve_collections
 from pipeline.extract.tags import TagIndex
 from pipeline.normalize.entity import (
+    AdvancementInfo,
     CollectionMembers,
+    CollectionTree,
     Entity,
     EntityKind,
+    EntityRef,
     FoodInfo,
     SourceTier,
 )
@@ -311,3 +315,77 @@ def test_icon_from_an_iconless_entity_raises() -> None:
     entities = [_minimal_entity("minecraft:apple", "Apple")]
     with pytest.raises(CollectionError, match="resolved no icon of its own"):
         resolve_collections([manifest], entities, {}, {})
+
+
+def test_resolve_tree_manifest() -> None:
+    manifest = CollectionManifest(
+        id="advancements",
+        title="Advancements",
+        blurb="All advancements",
+        rule=KindRule(kind="advancement"),
+        layout=TreeLayout(
+            section="AdvancementInfo",
+            group_order=("minecraft:story/root", "minecraft:nether/root"),
+        ),
+    )
+    entities = [
+        _minimal_entity(
+            "minecraft:story/root",
+            "Minecraft",
+            kind=EntityKind.ADVANCEMENT,
+            sections=(
+                AdvancementInfo(
+                    internal_id="minecraft:story/root",
+                    title="Minecraft",
+                    children=(EntityRef(id="minecraft:story/stone_age", name="Stone Age"),),
+                ),
+            ),
+        ),
+        _minimal_entity(
+            "minecraft:story/stone_age",
+            "Stone Age",
+            kind=EntityKind.ADVANCEMENT,
+            sections=(
+                AdvancementInfo(
+                    internal_id="minecraft:story/stone_age",
+                    title="Stone Age",
+                    parent=EntityRef(id="minecraft:story/root", name="Minecraft"),
+                ),
+            ),
+        ),
+        _minimal_entity(
+            "minecraft:nether/root",
+            "Nether",
+            kind=EntityKind.ADVANCEMENT,
+            sections=(
+                AdvancementInfo(
+                    internal_id="minecraft:nether/root",
+                    title="Nether",
+                ),
+            ),
+        ),
+    ]
+
+    result = resolve_collections([manifest], entities, {}, {})
+    assert len(result) == 1
+    col = result[0]
+    assert col.id == "collection:advancements"
+    assert col.name == "Advancements"
+    assert col.source_tiers["sections.CollectionTree"] == SourceTier.A
+    assert len(col.sections) == 2
+
+    sec0 = col.sections[0]
+    assert isinstance(sec0, CollectionTree)
+    assert sec0.title == "Minecraft"
+    assert [(m.ref.id, m.depth) for m in sec0.members] == [
+        ("minecraft:story/root", 0),
+        ("minecraft:story/stone_age", 1),
+    ]
+
+    sec1 = col.sections[1]
+    assert isinstance(sec1, CollectionTree)
+    assert sec1.title == "Nether"
+    assert [(m.ref.id, m.depth) for m in sec1.members] == [
+        ("minecraft:nether/root", 0),
+    ]
+

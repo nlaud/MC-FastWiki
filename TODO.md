@@ -258,8 +258,11 @@ dependency.
 - [x] `minecarts` — all 7 minecart variants (the standard minecart, 4 craftable variants with installed
       blocks, plus the creative-only spawner and command block minecarts, stated clearly in the blurb).
       Guarded by `tests/test_collections_drift.py`. Borrowed icon from the Minecart.
-- [ ] 'advancements' -- All minecraft advancements, ordered via the tree depth first, separated by what menu they are in.
-      Needs a tree-shaped section; the flat member list cannot express it
+- [x] `advancements` — all 126 advancements, ordered depth-first across the 5 in-game root tabs
+      (Minecraft: 16, Nether: 23, The End: 9, Adventure: 47, Husbandry: 31). Sourced from `AdvancementInfo`
+      sections on each advancement entity. Emitted as a tree layout with grouped `CollectionTree` sections,
+      rendered with depth-based indentation (`--depth`) and guide lines. Guarded by
+      `tests/test_collections_drift.py`. Borrowed icon from `minecraft:story/root`.
 - [x] Every member renders as a link that opens the real entity window — enforced by lint B
       (`web/render/cross-link.test.ts`), which picked up the new shard with no exemption added
 
@@ -857,6 +860,19 @@ New collections the added data makes nearly free:
     curation needed" claim beside `compostable` was the load-bearing part of it. What it does not
     cost: `unique_food` is exactly as free as promised, at exactly the 44 items named, and the
     manifest and resolver this phase actually needed were never blocked on any of it.
+
+31. **TreeLayout for hierarchical collections like `advancements`.** Collections previously only supported
+    flat member tables (`ListLayout`) with optional custom columns and sort keys. Advancements require
+    representing the in-game progression trees across 5 root tabs (Minecraft, Nether, The End, Adventure,
+    Husbandry), where order, depth, and parent-child hierarchy are critical to mid-match navigation.
+
+    Manifests now support a discriminated `layout` union (`ListLayout` vs `TreeLayout`). `TreeLayout`
+    specifies the section type to traverse (`AdvancementInfo`), explicit `groupOrder` for root IDs, and
+    forbids `columns` and `sortBy`. The tree resolver performs depth-first traversal of each tree component,
+    sorting sibling branches alphabetically by entity name to guarantee deterministic ordering across runs,
+    and computes the indentation depth for each member. A new `CollectionTree` section type (`collectionTree`
+    in JSON schema) emits grouped trees rendered with indented CSS custom property styling (`--depth`)
+    and repeating 1px guide rules, ensuring clear hierarchy without horizontal overflow in narrow viewports.
 
 
 ## Still open

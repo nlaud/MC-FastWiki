@@ -58,6 +58,7 @@ export type Section =
   | GenerationInfo
   | LinkList
   | CollectionMembers
+  | CollectionTree
   | ProfessionInfo
   | StructureInfo
   | BiomeInfo;
@@ -798,6 +799,27 @@ export interface CollectionMember {
   values?: {
     [k: string]: string;
   };
+}
+/**
+ * One group of a tree-shaped collection, in depth-first order.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "collectionTree".
+ */
+export interface CollectionTree {
+  type: "CollectionTree";
+  title?: string;
+  members?: CollectionTreeMember[];
+}
+/**
+ * One row of a tree-shaped collection. Depth is the distance from the group root.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "collectionTreeMember".
+ */
+export interface CollectionTreeMember {
+  ref: EntityRef;
+  depth: number;
 }
 /**
  * Villager profession details: workstation block and trade count.
