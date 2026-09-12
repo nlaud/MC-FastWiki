@@ -310,9 +310,20 @@ New collections the added data makes nearly free:
       (entities added, removed, changed)
 - [ ] Validation gate blocks the PR on suspicious diffs rather than auto-merging
 - [ ] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release
-- [ ] Deploy to Cloudflare Pages on merge to `main` (see Decision 4)
-- [ ] Assert the build stays under 20,000 files and 25 MiB per file, so a deploy never fails on a
-      platform limit that a passing local build would not catch
+- [ ] Deploy to GitHub Pages on merge to `main` (see Decision 4).
+      One workflow runs the web build and publishes `web/dist` through
+      `actions/upload-pages-artifact` and `actions/deploy-pages`.
+      The site ships straight out of the Actions run rather than from a committed `gh-pages` branch
+- [ ] Set the repository's Pages source to "GitHub Actions" once, by hand.
+      It is the one step of the deploy that no workflow file can do for itself
+- [ ] Assert the build stays under the limits a deploy can fail on: 1 GB per published site, and
+      GitHub's 100 MB ceiling on any single committed file, which `data/dist` is subject to because
+      it is committed.
+      Today's output is 4.7 MB across 23 files with the largest at 761 KB, so the assertion is a
+      tripwire rather than a constraint
+- [ ] Smoke-test the deployed URL, not just the build output.
+      A project site is served from `https://nlaud.github.io/MC-FastWiki/`, and a root-absolute
+      asset URL 404s there while passing every local check
 
 ## Phase 10 — Performance and offline
 
@@ -345,19 +356,48 @@ New collections the added data makes nearly free:
 
    The font is a separate matter — use an open pixel typeface rather than shipping Mojang's.
 
-4. **Deploy to Cloudflare Pages.** For a purely static site it is strictly better than Vercel:
-   static bandwidth and requests are unmetered, where Vercel's Hobby plan caps at 100 GB/month and
-   *pauses the project* when exceeded, with no option to pay the overage. Vercel Hobby also forbids
-   commercial use, defined broadly enough to cover a paid contributor. Vercel's whole pricing model
-   is built around function invocations, and this project has none.
+4. **Deploy to GitHub Pages.** The site is static, the repository is already on GitHub, and the
+   whole deploy is one workflow that builds and calls `actions/deploy-pages`.
+   No second account, no second dashboard, and no API token to store or rotate: the deploy identity
+   is the repository's own `GITHUB_TOKEN`, scoped by the workflow's `pages: write` permission.
 
-   Cloudflare's free-plan limits that actually shape the build: **20,000 files per site** (which is
-   why sprites are atlased and entity JSON is sharded into tens of files), **25 MiB per file**, and
-   500 builds/month. None of these bind us in practice, but CI asserts them so a deploy never fails
-   on a limit a passing local build would not catch.
+   This reverses an earlier choice of Cloudflare Pages, and the reversal is worth recording because
+   the old rationale is still quoted in code.
+   `pipeline/emit/atlas.py` and `pipeline/emit/shard.py` both justify atlasing and sharding by
+   Cloudflare's 20,000-file cap, which no longer applies.
+   Both remain right for the reason that outlives the host: 1,900 PNG requests to open one window
+   misses the two-second budget on its own, and a handful of shard files beats five thousand entity
+   files on any host at all.
+   Those comments need rewording; the code they describe does not.
 
-   GitHub Pages stays a viable fallback if you would rather not add an account — the cost is a 1 GB
-   site limit and softer bandwidth guarantees.
+   GitHub Pages limits that actually shape the build: **1 GB per published site**, a **soft 100
+   GB/month** bandwidth limit, and **10 builds per hour** for sites published from a branch.
+   That last one does not apply to an Actions-published site, which is bounded by the account's
+   Actions minutes instead.
+   Today's output is 4.7 MB across 23 files, so none of these bind in practice, but CI asserts the
+   size ceilings anyway, because the failure they prevent is a red deploy after a green build.
+
+   What GitHub Pages will not give us, and what the project does not need: custom response headers
+   or redirect rules (there is no `_headers` and no `_redirects`), anything server-side, and
+   per-branch preview URLs.
+   Two constraints are real.
+   The repository has to stay public, because publishing Pages from a private repository needs a
+   paid plan.
+   And a project site is served from a path prefix rather than a root, so every asset URL has to be
+   relative: `vite.config.ts` already sets `base: "./"` and the loaders already read
+   `import.meta.env.BASE_URL`.
+   That costs nothing today and would cost a blank unstyled page to forget, because every local
+   check passes without it.
+   A custom domain would move the site back to a root, where a relative base still works.
+
+   Cloudflare Pages stays the fallback for the day bandwidth stops being theoretical: its static
+   bandwidth and requests are unmetered, where the GitHub Pages 100 GB is a documented soft limit.
+   Vercel is not a candidate either way.
+   Its Hobby plan caps static bandwidth at 100 GB/month and *pauses the project* past that with no
+   option to pay the overage, it forbids commercial use broadly enough to cover a paid contributor,
+   and its whole pricing model is built around function invocations, which this project has none of.
+   The build is host-agnostic in any case - a directory of static files with a relative base - so
+   moving hosts means changing which workflow publishes it.
 
 5. **No UI framework.** Vanilla TypeScript, with Vite as a build tool rather than a runtime. The
    deployed artifact is plain HTML, CSS, and JS. The app is a search bar, a suggestion list, four
