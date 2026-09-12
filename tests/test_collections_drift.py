@@ -169,3 +169,89 @@ def test_advancements_drift_guard() -> None:
 
     assert total_members == 126, f"Expected 126 total advancement members, got {total_members}"
 
+
+def test_compostable_drift_guard() -> None:
+    """The built compostable page holds exactly 116 items sorted descending by chance."""
+    collection_entities = _load_shard_entities("collection-0")
+    compost_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:compostable"),
+        None,
+    )
+    assert compost_entity is not None, "collection:compostable not found in collection-0 shard"
+
+    members_section = next(
+        (
+            s
+            for s in compost_entity.get("sections", [])
+            if isinstance(s, dict) and s.get("type") == "CollectionMembers"
+        ),
+        None,
+    )
+    assert members_section is not None, "CollectionMembers section not found on compostable"
+
+    members = members_section.get("members", [])
+    assert len(members) == 116, f"Expected 116 compostable members, got {len(members)}"
+
+    # Check anchors and formatting
+    members_by_id = {m["ref"]["id"]: m for m in members}
+    assert members_by_id["minecraft:cake"]["values"]["compost.chance"] == "100%"
+    assert members_by_id["minecraft:baked_potato"]["values"]["compost.chance"] == "85%"
+    assert members_by_id["minecraft:flowering_azalea"]["values"]["compost.chance"] == "85%"
+    assert members_by_id["minecraft:azalea"]["values"]["compost.chance"] == "65%"
+    assert members_by_id["minecraft:flowering_azalea_leaves"]["values"]["compost.chance"] == "50%"
+    assert members_by_id["minecraft:oak_leaves"]["values"]["compost.chance"] == "30%"
+
+    # Check sort order: chance is descending
+    chances = [int(m["values"]["compost.chance"].rstrip("%")) for m in members]
+    assert chances == sorted(chances, reverse=True)
+
+
+def test_fuel_drift_guard() -> None:
+    """The built fuel page holds exactly 280 items sorted descending by burn time."""
+    collection_entities = _load_shard_entities("collection-0")
+    fuel_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:fuel"),
+        None,
+    )
+    assert fuel_entity is not None, "collection:fuel not found in collection-0 shard"
+
+    members_section = next(
+        (
+            s
+            for s in fuel_entity.get("sections", [])
+            if isinstance(s, dict) and s.get("type") == "CollectionMembers"
+        ),
+        None,
+    )
+    assert members_section is not None, "CollectionMembers section not found on fuel"
+
+    members = members_section.get("members", [])
+    assert len(members) == 280, f"Expected 280 fuel members, got {len(members)}"
+
+    # Check anchors and formatting
+    members_by_id = {m["ref"]["id"]: m for m in members}
+    lava = members_by_id["minecraft:lava_bucket"]["values"]
+    assert lava["fuel.burnTime"] == "1000s"
+    assert lava["fuel.operations"] == "100"
+
+    coal = members_by_id["minecraft:coal"]["values"]
+    assert coal["fuel.burnTime"] == "80s"
+    assert coal["fuel.operations"] == "8"
+
+    stick = members_by_id["minecraft:stick"]["values"]
+    assert stick["fuel.burnTime"] == "5s"
+    assert stick["fuel.operations"] == "0.5"
+
+    carpet = members_by_id["minecraft:white_carpet"]["values"]
+    assert carpet["fuel.burnTime"] == "3.35s"
+    assert carpet["fuel.operations"] == "0.34"
+
+    scaffold = members_by_id["minecraft:scaffolding"]["values"]
+    assert scaffold["fuel.burnTime"] == "2.5s"
+    assert scaffold["fuel.operations"] == "0.25"
+
+    # Check sort order: burnTime is descending
+    burn_seconds = [float(m["values"]["fuel.burnTime"].rstrip("s")) for m in members]
+    assert burn_seconds == sorted(burn_seconds, reverse=True)
+
+

@@ -348,6 +348,12 @@
         },
         {
           "$ref": "#/$defs/biomeInfo"
+        },
+        {
+          "$ref": "#/$defs/compostInfo"
+        },
+        {
+          "$ref": "#/$defs/fuelInfo"
         }
       ]
     },
@@ -1889,6 +1895,41 @@
             "$ref": "#/$defs/noisePlacement"
           },
           "default": []
+        }
+      }
+    },
+    "compostInfo": {
+      "title": "CompostInfo",
+      "description": "Composting chance when placed in a composter.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "chance"],
+      "properties": {
+        "type": {
+          "const": "CompostInfo"
+        },
+        "chance": {
+          "description": "Composting chance in percent, from 1 to 100.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "fuelInfo": {
+      "title": "FuelInfo",
+      "description": "Furnace burn time in game ticks.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "burnTime"],
+      "properties": {
+        "type": {
+          "const": "FuelInfo"
+        },
+        "burnTime": {
+          "description": "Furnace burn time in game ticks. 20 ticks is one second, 200 ticks is one smelting operation.",
+          "type": "integer",
+          "exclusiveMinimum": 0
         }
       }
     }

@@ -28,6 +28,7 @@ __all__ = [
     "ListLayout",
     "ListRule",
     "MemberRule",
+    "SectionRule",
     "TagRule",
     "TreeLayout",
     "load_manifests",
@@ -74,8 +75,15 @@ class ListRule(BaseModel, frozen=True, populate_by_name=True):
     ids: tuple[str, ...] = ()
 
 
+class SectionRule(BaseModel, frozen=True, populate_by_name=True):
+    """Select every entity that carries a named section."""
+
+    type: Literal["section"] = "section"
+    section: str = Field(min_length=1)
+
+
 MemberRule = Annotated[
-    ComponentRule | TagRule | KindRule | ListRule,
+    ComponentRule | TagRule | KindRule | ListRule | SectionRule,
     Field(discriminator="type"),
 ]
 

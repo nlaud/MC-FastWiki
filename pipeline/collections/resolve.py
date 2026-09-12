@@ -20,6 +20,7 @@ from pipeline.collections.manifest import (
     ComponentRule,
     KindRule,
     ListRule,
+    SectionRule,
     TagRule,
     TreeLayout,
 )
@@ -87,6 +88,18 @@ def _resolve_list_rule(rule: ListRule) -> list[str]:
     return list(rule.ids)
 
 
+def _resolve_section_rule(
+    rule: SectionRule,
+    entities_by_id: Mapping[str, Entity],
+) -> list[str]:
+    """Return every entity ID that carries a section of type *rule.section*."""
+    return sorted(
+        eid
+        for eid, entity in entities_by_id.items()
+        if any(s.type == rule.section for s in entity.sections)
+    )
+
+
 def _resolve_members(
     manifest: CollectionManifest,
     item_components: Mapping[str, Mapping[str, object]],
@@ -111,6 +124,8 @@ def _resolve_members(
         member_ids = _resolve_kind_rule(rule, entities_by_id)
     elif isinstance(rule, ListRule):
         member_ids = _resolve_list_rule(rule)
+    elif isinstance(rule, SectionRule):
+        member_ids = _resolve_section_rule(rule, entities_by_id)
     else:
         raise CollectionError(
             f"Manifest {manifest.id!r}: unknown rule type {type(rule).__name__!r}."
@@ -243,7 +258,14 @@ def _build_collection_entity(
                     # A member missing the fact sorts last whichever way the column runs.
                     return (2, 0.0, m.ref.name.casefold())
                 try:
-                    return (0, sign * float(raw), m.ref.name.casefold())
+                    # A unit-bearing fact formats as "65%" or "15s", and the column
+                    # sorts on the number underneath it. `removesuffix` rather than
+                    # `rstrip`, because `rstrip("%s")` strips a character *set*: it
+                    # would turn a future "Ruins" into "Ruin" and a "100ss" typo into
+                    # "100", quietly, where this raises ValueError and falls through
+                    # to the text tie-break below.
+                    clean_raw = raw.removesuffix("%").removesuffix("s")
+                    return (0, sign * float(clean_raw), m.ref.name.casefold())
                 except ValueError:
                     return (1, 0.0, raw.casefold())
 

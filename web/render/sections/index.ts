@@ -5,11 +5,13 @@ import type {
   ChestLoot,
   CollectionMembers,
   CollectionTree,
+  CompostInfo,
   DropTable,
   EffectSources,
   EnchantInfo,
   Entity,
   FoodInfo,
+  FuelInfo,
   GenerationInfo,
   HarvestInfo,
   LinkList,
@@ -28,10 +30,12 @@ import { renderBreedingInfo } from "./breeding-info.js";
 import { renderChestLoot } from "./chest-loot.js";
 import { renderCollectionMembers } from "./collection-members.js";
 import { renderCollectionTree } from "./collection-tree.js";
+import { renderCompostInfo } from "./compost-info.js";
 import { renderDropTable } from "./drop-table.js";
 import { renderEffectSources } from "./effect-sources.js";
 import { renderEnchantInfo } from "./enchant-info.js";
 import { renderFoodInfo } from "./food-info.js";
+import { renderFuelInfo } from "./fuel-info.js";
 import { renderGenerationInfo } from "./generation-info.js";
 import { renderHarvestInfo } from "./harvest-info.js";
 import { renderLinkList } from "./link-list.js";
@@ -87,6 +91,8 @@ export const RENDERERS: Record<string, SectionRenderer> = {
   CollectionTree: (s, ctx) => renderCollectionTree(s as CollectionTree, ctx),
   StructureInfo: (s, ctx) => renderStructureInfo(s as StructureInfo, ctx),
   BiomeInfo: (s, ctx) => renderBiomeInfo(s as BiomeInfo, ctx),
+  CompostInfo: (s, ctx) => renderCompostInfo(s as CompostInfo, ctx),
+  FuelInfo: (s, ctx) => renderFuelInfo(s as FuelInfo, ctx),
 };
 
 /**

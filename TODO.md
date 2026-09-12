@@ -231,13 +231,16 @@ dependency.
       item tag and an `entity_type` tag in 26.2 and resolve differently in each, which is the same
       trap `TagIndex` refuses a default registry over. Two faults raise rather than shipping a
       broken page: a member ID with no entity, and a rule that resolves to zero members.
-- [ ] `compostable` — all compostable items with their composting chance. **Not Tier A.** See
-      Decision 30: `minecraft:compostable` does not exist in 26.2, and neither does a wiki Bucket.
-      Needs a curated file or a parse of the Composter page table.
+- [x] `compostable` — all 116 compostable items with their composting chance (30%, 50%, 65%, 85%,
+      100%). Hand-maintained tier map in `data/curated/compostable.json` expanding item tags via
+      `TagIndex` with explicit ID precedence, loaded at build time to attach `CompostInfo` sections to
+      item entities, and resolved into a collection via a new `section` membership rule. See Decision 32.
 - [x] `unique_food` — all food items with nutrition and saturation, from the `minecraft:food`
       component (**44 items, Tier A** — the one claim of the original three that holds)
-- [ ] Consider a `fuel` collection too — **not Tier A either.** `minecraft:cooking_fuel` does not
-      exist in 26.2. Same options and same blocker as `compostable`; see Decision 30.
+- [x] `fuel` — all 280 furnace fuel items with burn duration in seconds/ticks and smelted items count.
+      Curated tier map in `data/curated/fuel.json` with tag expansion and `excludeTags` filtering
+      (stripping `minecraft:non_flammable_wood`), attaching `FuelInfo` sections to item entities and
+      resolved into a collection via the `section` rule. See Decision 32.
 - [x] Mob type groups — `undead` (17) and `arthropods` (5), both from `entity_type` tags. The rest
       are one manifest file each whenever they are wanted: `illager` (4), `raiders` (6),
       `skeletons` (6), `zombies` (9), and `aquatic` (14) all exist as tags and need no code.
@@ -310,9 +313,20 @@ New collections the added data makes nearly free:
       (entities added, removed, changed)
 - [ ] Validation gate blocks the PR on suspicious diffs rather than auto-merging
 - [ ] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release
-- [ ] Deploy to Cloudflare Pages on merge to `main` (see Decision 4)
-- [ ] Assert the build stays under 20,000 files and 25 MiB per file, so a deploy never fails on a
-      platform limit that a passing local build would not catch
+- [ ] Deploy to GitHub Pages on merge to `main` (see Decision 4).
+      One workflow runs the web build and publishes `web/dist` through
+      `actions/upload-pages-artifact` and `actions/deploy-pages`.
+      The site ships straight out of the Actions run rather than from a committed `gh-pages` branch
+- [ ] Set the repository's Pages source to "GitHub Actions" once, by hand.
+      It is the one step of the deploy that no workflow file can do for itself
+- [ ] Assert the build stays under the limits a deploy can fail on: 1 GB per published site, and
+      GitHub's 100 MB ceiling on any single committed file, which `data/dist` is subject to because
+      it is committed.
+      Today's output is 4.7 MB across 23 files with the largest at 761 KB, so the assertion is a
+      tripwire rather than a constraint
+- [ ] Smoke-test the deployed URL, not just the build output.
+      A project site is served from `https://nlaud.github.io/MC-FastWiki/`, and a root-absolute
+      asset URL 404s there while passing every local check
 
 ## Phase 10 — Performance and offline
 
@@ -345,19 +359,48 @@ New collections the added data makes nearly free:
 
    The font is a separate matter — use an open pixel typeface rather than shipping Mojang's.
 
-4. **Deploy to Cloudflare Pages.** For a purely static site it is strictly better than Vercel:
-   static bandwidth and requests are unmetered, where Vercel's Hobby plan caps at 100 GB/month and
-   *pauses the project* when exceeded, with no option to pay the overage. Vercel Hobby also forbids
-   commercial use, defined broadly enough to cover a paid contributor. Vercel's whole pricing model
-   is built around function invocations, and this project has none.
+4. **Deploy to GitHub Pages.** The site is static, the repository is already on GitHub, and the
+   whole deploy is one workflow that builds and calls `actions/deploy-pages`.
+   No second account, no second dashboard, and no API token to store or rotate: the deploy identity
+   is the repository's own `GITHUB_TOKEN`, scoped by the workflow's `pages: write` permission.
 
-   Cloudflare's free-plan limits that actually shape the build: **20,000 files per site** (which is
-   why sprites are atlased and entity JSON is sharded into tens of files), **25 MiB per file**, and
-   500 builds/month. None of these bind us in practice, but CI asserts them so a deploy never fails
-   on a limit a passing local build would not catch.
+   This reverses an earlier choice of Cloudflare Pages, and the reversal is worth recording because
+   the old rationale is still quoted in code.
+   `pipeline/emit/atlas.py` and `pipeline/emit/shard.py` both justify atlasing and sharding by
+   Cloudflare's 20,000-file cap, which no longer applies.
+   Both remain right for the reason that outlives the host: 1,900 PNG requests to open one window
+   misses the two-second budget on its own, and a handful of shard files beats five thousand entity
+   files on any host at all.
+   Those comments need rewording; the code they describe does not.
 
-   GitHub Pages stays a viable fallback if you would rather not add an account — the cost is a 1 GB
-   site limit and softer bandwidth guarantees.
+   GitHub Pages limits that actually shape the build: **1 GB per published site**, a **soft 100
+   GB/month** bandwidth limit, and **10 builds per hour** for sites published from a branch.
+   That last one does not apply to an Actions-published site, which is bounded by the account's
+   Actions minutes instead.
+   Today's output is 4.7 MB across 23 files, so none of these bind in practice, but CI asserts the
+   size ceilings anyway, because the failure they prevent is a red deploy after a green build.
+
+   What GitHub Pages will not give us, and what the project does not need: custom response headers
+   or redirect rules (there is no `_headers` and no `_redirects`), anything server-side, and
+   per-branch preview URLs.
+   Two constraints are real.
+   The repository has to stay public, because publishing Pages from a private repository needs a
+   paid plan.
+   And a project site is served from a path prefix rather than a root, so every asset URL has to be
+   relative: `vite.config.ts` already sets `base: "./"` and the loaders already read
+   `import.meta.env.BASE_URL`.
+   That costs nothing today and would cost a blank unstyled page to forget, because every local
+   check passes without it.
+   A custom domain would move the site back to a root, where a relative base still works.
+
+   Cloudflare Pages stays the fallback for the day bandwidth stops being theoretical: its static
+   bandwidth and requests are unmetered, where the GitHub Pages 100 GB is a documented soft limit.
+   Vercel is not a candidate either way.
+   Its Hobby plan caps static bandwidth at 100 GB/month and *pauses the project* past that with no
+   option to pay the overage, it forbids commercial use broadly enough to cover a paid contributor,
+   and its whole pricing model is built around function invocations, which this project has none of.
+   The build is host-agnostic in any case - a directory of static files with a relative base - so
+   moving hosts means changing which workflow publishes it.
 
 5. **No UI framework.** Vanilla TypeScript, with Vite as a build tool rather than a runtime. The
    deployed artifact is plain HTML, CSS, and JS. The app is a search bar, a suggestion list, four
@@ -873,6 +916,44 @@ New collections the added data makes nearly free:
     and computes the indentation depth for each member. A new `CollectionTree` section type (`collectionTree`
     in JSON schema) emits grouped trees rendered with indented CSS custom property styling (`--depth`)
     and repeating 1px guide rules, ensuring clear hierarchy without horizontal overflow in narrow viewports.
+
+
+32. **Curated tiers, section attachment, and member resolution for `compostable` and `fuel`.**
+    Decision 30 deferred `compostable` and `fuel` because upstream mcmeta 26.2 and wiki buckets omit
+    composting chances and furnace burn times. However, mid-match players urgently need these lookup
+    targets (e.g. finding quick smelting fuel or composter odds). Both mechanics are game constants
+    that rarely shift between releases.
+
+    Rather than hand-writing flat 116- and 280-item manifests, we established a tiered curated data
+    pattern under `data/curated/` (`compostable.json` with 5 chance tiers; `fuel.json` with 12 tick
+    tiers). Tiers reference item tags (`minecraft:leaves`, `minecraft:saplings`, `minecraft:planks`,
+    `minecraft:wooden_doors`, etc.) expanded through `TagIndex`. `fuel.json` supports `excludeTags`
+    to strip non-fuel wooden items (e.g. `minecraft:non_flammable_wood` Nether stems and doors).
+    Explicit item IDs override tag expansions, which is how `flowering_azalea_leaves` sits at 50%
+    while the rest of `minecraft:leaves` sits at 30%.
+    Every such override is named in the build report rather than applied silently: this build applies
+    four, and all four are compost tiers.
+
+    A strict loader (`pipeline/normalize/curated_facts.py`) guards data integrity with five
+    deterministic faults, listed in that module's own docstring: an ID stated explicitly in two tiers,
+    an ID or tag member naming no entity in this build, a tag resolving to zero members, a chance
+    outside 1 to 100 or a burn time that is not a positive integer, and a `verifiedFor` release
+    `release_order` does not contain.
+    The last of these reuses the Decision D3 position check rather than adding a second version
+    comparison.
+
+    The build pipeline loads curated facts after `merge_entities` (Stage 7) and attaches `CompostInfo`
+    and `FuelInfo` sections directly onto member entities before collections run. Collections resolve
+    members via a new `section` membership rule (`"rule": {"type": "section", "section": "CompostInfo"}`
+    and `"rule": {"type": "section", "section": "FuelInfo"}`), eliminating duplicate member lists.
+
+    The section is the single source for both surfaces, which is the point of attaching it to the
+    entity rather than keeping a side table: an item page and the collection row read the same number,
+    so Coal cannot say 80s in one place and something else in the other.
+    Member entities render `CompostInfo` and `FuelInfo` cards in the web UI with burn duration, smelt
+    count, and composting chance. In the collection views, members sort descending by the numeric value
+    underneath the formatted cell. Drift tests (`tests/test_collections_drift.py`) enforce the exact
+    116 and 280 item baselines.
 
 
 ## Still open

@@ -61,7 +61,9 @@ export type Section =
   | CollectionTree
   | ProfessionInfo
   | StructureInfo
-  | BiomeInfo;
+  | BiomeInfo
+  | CompostInfo
+  | FuelInfo;
 /**
  * The tool that breaks a block, from the mineable tags.
  *
@@ -989,4 +991,30 @@ export interface NoisePlacement {
    * Peaks-and-valleys band name with no numeric range attached, such as `High` or `High~Peaks`.
    */
   pvBand?: string;
+}
+/**
+ * Composting chance when placed in a composter.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "compostInfo".
+ */
+export interface CompostInfo {
+  type: "CompostInfo";
+  /**
+   * Composting chance in percent, from 1 to 100.
+   */
+  chance: number;
+}
+/**
+ * Furnace burn time in game ticks.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "fuelInfo".
+ */
+export interface FuelInfo {
+  type: "FuelInfo";
+  /**
+   * Furnace burn time in game ticks. 20 ticks is one second, 200 ticks is one smelting operation.
+   */
+  burnTime: number;
 }

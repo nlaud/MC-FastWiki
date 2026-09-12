@@ -129,6 +129,7 @@ __all__ = [
     "CollectionMembers",
     "CollectionTree",
     "CollectionTreeMember",
+    "CompostInfo",
     "ConcentricRingsPlacement",
     "DamageValue",
     "DistributionEntry",
@@ -148,6 +149,7 @@ __all__ = [
     "ExclusionZone",
     "FoodEffect",
     "FoodInfo",
+    "FuelInfo",
     "GenerationInfo",
     "GenerationScope",
     "HarvestDrop",
@@ -1141,6 +1143,20 @@ class BiomeInfo(BaseModel, frozen=True, populate_by_name=True):
     )
 
 
+class CompostInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Composting chance when placed in a composter."""
+
+    type: Literal["CompostInfo"] = "CompostInfo"
+    chance: int = Field(ge=1, le=100)
+
+
+class FuelInfo(BaseModel, frozen=True, populate_by_name=True):
+    """Furnace burn time in game ticks."""
+
+    type: Literal["FuelInfo"] = "FuelInfo"
+    burn_time: int = Field(gt=0, alias="burnTime")
+
+
 # The discriminated union. See the module docstring for why `discriminator`
 # rather than a plain `Union`.
 Section = Annotated[
@@ -1163,7 +1179,9 @@ Section = Annotated[
     | CollectionTree
     | ProfessionInfo
     | StructureInfo
-    | BiomeInfo,
+    | BiomeInfo
+    | CompostInfo
+    | FuelInfo,
     Field(discriminator="type"),
 ]
 
@@ -1177,7 +1195,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The twenty `type` values a `sections.<Type>` provenance key may name,
+# The twenty-two `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -1202,6 +1220,8 @@ _SECTION_TYPES = frozenset(
         "ProfessionInfo",
         "StructureInfo",
         "BiomeInfo",
+        "CompostInfo",
+        "FuelInfo",
     }
 )
 
