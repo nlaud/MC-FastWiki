@@ -1,0 +1,24 @@
+{
+  "id": "fuel",
+  "title": "Furnace Fuel",
+  "blurb": "Every item that can be burned in furnaces, smokers, and blast furnaces, with its burn duration and smelting capacity.",
+  "aliases": ["fuels", "burn time", "furnace", "smelting"],
+  "iconFrom": "minecraft:furnace",
+  "rule": {
+    "type": "section",
+    "section": "FuelInfo"
+  },
+  "columns": [
+    {
+      "fact": "fuel.burnTime",
+      "label": "Burns for"
+    },
+    {
+      "fact": "fuel.operations",
+      "label": "Items smelted"
+    }
+  ],
+  "sortBy": "fuel.burnTime",
+  "sortDirection": "descending",
+  "note": "Tier C curated tiers expanded against vanilla tags. Java Edition only: excludes Bedrock-only potion fuels and non-burning Nether wood."
+}

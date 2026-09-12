@@ -1,0 +1,113 @@
+{
+  "verifiedFor": "26.2",
+  "source": "https://minecraft.wiki/w/Composter",
+  "note": "Composting chance tiers for Java Edition 26.2 in percent (30, 50, 65, 85, 100), verified against https://minecraft.wiki/w/Composter. Excludes Bedrock-only Grass Block and upcoming Red Shrub, Shelf Mushroom, and Straw Bed. Explicit IDs override tag membership (e.g. flowering_azalea_leaves sits at 50% while leaves sits at 30%).",
+  "tiers": [
+    {
+      "chance": 30,
+      "tags": ["minecraft:leaves", "minecraft:saplings"],
+      "items": [
+        "minecraft:beetroot_seeds",
+        "minecraft:bush",
+        "minecraft:cactus_flower",
+        "minecraft:dried_kelp",
+        "minecraft:firefly_bush",
+        "minecraft:glow_berries",
+        "minecraft:hanging_roots",
+        "minecraft:kelp",
+        "minecraft:leaf_litter",
+        "minecraft:mangrove_propagule",
+        "minecraft:mangrove_roots",
+        "minecraft:melon_seeds",
+        "minecraft:moss_carpet",
+        "minecraft:pale_hanging_moss",
+        "minecraft:pale_moss_carpet",
+        "minecraft:pink_petals",
+        "minecraft:pitcher_pod",
+        "minecraft:pumpkin_seeds",
+        "minecraft:seagrass",
+        "minecraft:short_grass",
+        "minecraft:short_dry_grass",
+        "minecraft:small_dripleaf",
+        "minecraft:sweet_berries",
+        "minecraft:tall_dry_grass",
+        "minecraft:torchflower_seeds",
+        "minecraft:wheat_seeds",
+        "minecraft:wildflowers"
+      ]
+    },
+    {
+      "chance": 50,
+      "items": [
+        "minecraft:cactus",
+        "minecraft:dried_kelp_block",
+        "minecraft:flowering_azalea_leaves",
+        "minecraft:glow_lichen",
+        "minecraft:melon_slice",
+        "minecraft:nether_sprouts",
+        "minecraft:sugar_cane",
+        "minecraft:tall_grass",
+        "minecraft:twisting_vines",
+        "minecraft:vine",
+        "minecraft:weeping_vines"
+      ]
+    },
+    {
+      "chance": 65,
+      "tags": ["minecraft:small_flowers"],
+      "items": [
+        "minecraft:apple",
+        "minecraft:azalea",
+        "minecraft:beetroot",
+        "minecraft:big_dripleaf",
+        "minecraft:brown_mushroom",
+        "minecraft:carrot",
+        "minecraft:carved_pumpkin",
+        "minecraft:cocoa_beans",
+        "minecraft:crimson_fungus",
+        "minecraft:crimson_roots",
+        "minecraft:fern",
+        "minecraft:large_fern",
+        "minecraft:lilac",
+        "minecraft:lily_pad",
+        "minecraft:melon",
+        "minecraft:moss_block",
+        "minecraft:mushroom_stem",
+        "minecraft:nether_wart",
+        "minecraft:pale_moss_block",
+        "minecraft:peony",
+        "minecraft:potato",
+        "minecraft:pumpkin",
+        "minecraft:red_mushroom",
+        "minecraft:rose_bush",
+        "minecraft:sea_pickle",
+        "minecraft:shroomlight",
+        "minecraft:spore_blossom",
+        "minecraft:sunflower",
+        "minecraft:warped_fungus",
+        "minecraft:warped_roots",
+        "minecraft:wheat"
+      ]
+    },
+    {
+      "chance": 85,
+      "items": [
+        "minecraft:baked_potato",
+        "minecraft:bread",
+        "minecraft:brown_mushroom_block",
+        "minecraft:cookie",
+        "minecraft:flowering_azalea",
+        "minecraft:hay_block",
+        "minecraft:nether_wart_block",
+        "minecraft:pitcher_plant",
+        "minecraft:red_mushroom_block",
+        "minecraft:torchflower",
+        "minecraft:warped_wart_block"
+      ]
+    },
+    {
+      "chance": 100,
+      "items": ["minecraft:cake", "minecraft:pumpkin_pie"]
+    }
+  ]
+}

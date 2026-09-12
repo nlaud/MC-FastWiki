@@ -186,6 +186,12 @@ from pipeline.fetch.sprites import download_sprites
 from pipeline.fetch.version_manifest import fetch_version_manifest
 from pipeline.fetch.wikitext import fetch_page_wikitext
 from pipeline.normalize.curated import load_curated
+from pipeline.normalize.curated_facts import (
+    COMPOSTABLE_FILENAME,
+    FUEL_FILENAME,
+    load_curated_facts,
+)
+from pipeline.normalize.entity import CompostInfo, Entity, FuelInfo, SourceTier
 from pipeline.normalize.merge import DEFAULT_REPORT_PATH as MERGE_REPORT_PATH
 from pipeline.normalize.merge import (
     WIKI_KIND,
@@ -322,6 +328,7 @@ class BuildOptions(BaseModel, frozen=True):
     # validate`'s own module docstring for why that half stays absolute.
     allow_regression: bool = False
     collections_dir: Path | None = None
+    curated_facts_dir: Path | None = None
 
 
 class BuildOutcome(BaseModel, frozen=True):
@@ -894,6 +901,80 @@ def run_build(
         loot_producers=loot_result.producers,
     )
     report(f"normalize: {len(result.entities)} entities merged")
+
+    # --- 7-curated-facts. attach curated facts (compostable & fuel) ------------------
+    #
+    # Curated compost and fuel facts sit on the item's own entity, attached before
+    # stage 7a so that collections can select members with the section rule and
+    # extract facts through the uniform fact registry.
+    curated_facts_dir = (
+        options.curated_facts_dir
+        if options.curated_facts_dir is not None
+        else CURATED_DIRECTORY
+    )
+    should_load_curated_facts = (
+        curated_facts_dir / COMPOSTABLE_FILENAME
+    ).is_file() and (curated_facts_dir / FUEL_FILENAME).is_file()
+
+    if should_load_curated_facts:
+        curated_facts = load_curated_facts(
+            curated_facts_dir,
+            item_tags=item_tags,
+            known_entity_ids=set(result.by_id.keys()),
+            release_order=release_order,
+            target_version=version,
+        )
+        if curated_facts.report.overrides:
+            override_list = ", ".join(
+                f"{o.entity_id} -> {o.to_value}" for o in curated_facts.report.overrides
+            )
+            report(
+                f"curated facts: {len(curated_facts.report.overrides)} explicit ID "
+                f"overrides applied ({override_list})"
+            )
+        compost_count = 0
+        fuel_count = 0
+        updated_entities: list[Entity] = []
+        for entity in result.entities:
+            has_compost = entity.id in curated_facts.compostable
+            has_fuel = entity.id in curated_facts.fuel
+            if not (has_compost or has_fuel):
+                updated_entities.append(entity)
+                continue
+
+            new_sections = list(entity.sections)
+            new_source_tiers = dict(entity.source_tiers)
+            if has_compost:
+                new_sections.append(
+                    CompostInfo(chance=curated_facts.compostable[entity.id])
+                )
+                new_source_tiers["sections.CompostInfo"] = SourceTier.C
+                compost_count += 1
+            if has_fuel:
+                new_sections.append(
+                    FuelInfo(burn_time=curated_facts.fuel[entity.id])
+                )
+                new_source_tiers["sections.FuelInfo"] = SourceTier.C
+                fuel_count += 1
+
+            updated_entities.append(
+                entity.model_copy(
+                    update={
+                        "sections": tuple(new_sections),
+                        "source_tiers": new_source_tiers,
+                    }
+                )
+            )
+
+        result = MergeResult(
+            entities=tuple(updated_entities),
+            by_id={e.id: e for e in updated_entities},
+            report=result.report,
+        )
+        report(
+            f"curated facts: {compost_count} compostable items, "
+            f"{fuel_count} fuel items attached"
+        )
 
     # --- 7a. collections ---------------------------------------------------------------
     #

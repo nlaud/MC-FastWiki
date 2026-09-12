@@ -12,22 +12,25 @@ from pipeline.collections.manifest import (
     KindRule,
     ListLayout,
     ListRule,
+    SectionRule,
     TagRule,
     TreeLayout,
     load_manifests,
 )
 
 
-def test_load_default_manifests_loads_all_ten() -> None:
+def test_load_default_manifests_loads_all_twelve() -> None:
     manifests = load_manifests()
-    assert len(manifests) == 10
+    assert len(manifests) == 12
     ids = [m.id for m in manifests]
     assert ids == [
         "advancements",
         "armor_trims",
         "arthropods",
         "banner_patterns",
+        "compostable",
         "enchantments",
+        "fuel",
         "minecarts",
         "structures",
         "undead",
@@ -81,6 +84,17 @@ def test_manifest_rule_discriminated_union() -> None:
     )
     assert isinstance(list_rule.rule, ListRule)
     assert list_rule.rule.ids == ("minecraft:zombie",)
+
+    section_rule = CollectionManifest.model_validate(
+        {
+            "id": "test_section",
+            "title": "Test Section",
+            "blurb": "Test blurb",
+            "rule": {"type": "section", "section": "CompostInfo"},
+        }
+    )
+    assert isinstance(section_rule.rule, SectionRule)
+    assert section_rule.rule.section == "CompostInfo"
 
 
 def test_load_manifests_missing_directory_raises(tmp_path: Path) -> None:

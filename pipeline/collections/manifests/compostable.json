@@ -1,0 +1,20 @@
+{
+  "id": "compostable",
+  "title": "Compostable Items",
+  "blurb": "Every item that can be placed into a composter to produce bone meal, and its chance to add a composting layer.",
+  "aliases": ["compost", "composter", "bone meal"],
+  "iconFrom": "minecraft:composter",
+  "rule": {
+    "type": "section",
+    "section": "CompostInfo"
+  },
+  "columns": [
+    {
+      "fact": "compost.chance",
+      "label": "Chance"
+    }
+  ],
+  "sortBy": "compost.chance",
+  "sortDirection": "descending",
+  "note": "Tier C curated tiers expanded against vanilla tags. Java Edition only: excludes Bedrock-only Grass Block and unreleased Red Shrub and Shelf Mushroom."
+}

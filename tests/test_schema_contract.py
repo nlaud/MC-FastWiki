@@ -35,12 +35,14 @@ from pipeline.normalize.entity import (
     ChestLoot,
     CollectionMembers,
     CollectionTree,
+    CompostInfo,
     DropTable,
     EffectSources,
     EnchantInfo,
     Entity,
     EntityKind,
     FoodInfo,
+    FuelInfo,
     GenerationInfo,
     HarvestInfo,
     LinkList,
@@ -81,6 +83,8 @@ SECTION_TYPES = {
     "ProfessionInfo",
     "StructureInfo",
     "BiomeInfo",
+    "CompostInfo",
+    "FuelInfo",
 }
 
 # `pipeline.normalize.entity.EntityKind` is the source of truth for this
@@ -417,6 +421,8 @@ PYDANTIC_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "professionInfo": ProfessionInfo,
     "structureInfo": StructureInfo,
     "biomeInfo": BiomeInfo,
+    "compostInfo": CompostInfo,
+    "fuelInfo": FuelInfo,
 }
 
 # Decision D2's seven sections, plus `foodInfo` and `harvestInfo`: the schema closes these with
@@ -441,6 +447,8 @@ REAL_SECTION_MODELS: dict[str, type[BaseModel]] = {
     "collectionTree": CollectionTree,
     "structureInfo": StructureInfo,
     "biomeInfo": BiomeInfo,
+    "compostInfo": CompostInfo,
+    "fuelInfo": FuelInfo,
 }
 
 

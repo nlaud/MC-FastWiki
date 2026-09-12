@@ -517,12 +517,15 @@ def _fake_transport(fixtures: Mapping[str, bytes]) -> Transport:
 def _base_options(tmp_path: Path) -> BuildOptions:
     empty_manifests = tmp_path / "manifests"
     empty_manifests.mkdir(parents=True, exist_ok=True)
+    empty_curated = tmp_path / "curated_facts"
+    empty_curated.mkdir(parents=True, exist_ok=True)
     return BuildOptions(
         minecraft_version=VERSION,
         dist=tmp_path / "dist",
         cache=tmp_path / "cache",
         reports=tmp_path / "reports",
         collections_dir=empty_manifests,
+        curated_facts_dir=empty_curated,
         quiet=True,
     )
 

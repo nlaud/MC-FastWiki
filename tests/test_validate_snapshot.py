@@ -110,21 +110,21 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     snapshot = BuildSnapshot.from_dist(DIST)
 
     assert snapshot is not None
-    assert snapshot.total == 2186
+    assert snapshot.total == 2188
     assert snapshot.by_kind == {
         "block": 1195,
         "item": 540,
         "advancement": 126,
         "mob": 91,
         "biome": 66,
-        "collection": 10,
+        "collection": 12,
         "enchantment": 43,
         "effect": 39,
         "structure": 35,
         "entity": 28,
         "profession": 13,
     }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2186)
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2188)
     # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
     # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
     # 2144 wikiUrl, 2015 blurb, 2049 icon after 34 structures were added, when a structure carried
@@ -137,7 +137,8 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     # 2145/2024/2089 once each collection also borrowed an icon (+5).
     # 2145/2028/2093 after four more Phase 7 collections: +4 blurbs, +4 borrowed icons.
     # 2145/2029/2094 after advancements collection: +1 blurb, +1 borrowed icon.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2029, "icon": 2094}
+    # 2145/2031/2096 after compostable and fuel collections: +2 blurbs, +2 borrowed icons.
+    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2031, "icon": 2096}
     assert snapshot.section_type_counts == {
         "AdvancementInfo": 126,
         # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
@@ -168,10 +169,12 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
         # 30 of the 34 structures hold a container, plus the dungeon's chest.
         "ChestLoot": 31,
         "LinkList": 62,
-        "CollectionMembers": 9,
+        "CollectionMembers": 11,
         "CollectionTree": 5,
         # All 66 enumerated biomes carry climate, spawns, and generating blocks.
         "BiomeInfo": 66,
+        "CompostInfo": 116,
+        "FuelInfo": 280,
     }
     # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
     # 4001 before 10 unread loot table families added 267 producers.

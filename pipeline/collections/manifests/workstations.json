@@ -2,7 +2,7 @@
   "id": "workstations",
   "title": "Villager Workstations",
   "blurb": "Job site blocks used by unemployed villagers to acquire professions and replenish trades.",
-  "aliases": ["workstations", "job sites", "job site blocks", "villager jobs"],
+  "aliases": ["workstations", "job sites", "job site blocks", "villager jobs", "professions"],
   "iconFrom": "minecraft:villager",
   "rule": {
     "type": "list",

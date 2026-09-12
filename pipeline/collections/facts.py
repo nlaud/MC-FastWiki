@@ -38,6 +38,7 @@ class SectionFact(BaseModel, frozen=True):
     type: Literal["section"] = "section"
     section_type: str
     attr_name: str
+    unit: Literal["percent", "ticks_as_time", "ticks_as_operations"] | None = None
 
 
 class ObtainFact(BaseModel, frozen=True):
@@ -56,6 +57,15 @@ _FACT_REGISTRY: dict[str, FactSource] = {
     "food.saturation": SectionFact(section_type="FoodInfo", attr_name="saturation"),
     "enchant.maxLevel": SectionFact(section_type="EnchantInfo", attr_name="max_level"),
     "obtain.foundIn": ObtainFact(field="foundIn"),
+    "compost.chance": SectionFact(
+        section_type="CompostInfo", attr_name="chance", unit="percent"
+    ),
+    "fuel.burnTime": SectionFact(
+        section_type="FuelInfo", attr_name="burn_time", unit="ticks_as_time"
+    ),
+    "fuel.operations": SectionFact(
+        section_type="FuelInfo", attr_name="burn_time", unit="ticks_as_operations"
+    ),
 }
 
 
@@ -89,6 +99,21 @@ def _extract_section_fact(entity: Entity, spec: SectionFact) -> str:
     value = getattr(section, spec.attr_name, None)
     if value is None:
         return ""
+
+    if spec.unit == "percent":
+        return f"{value}%"
+    if spec.unit == "ticks_as_time":
+        if isinstance(value, (int, float)):
+            if value % 20 == 0:
+                return f"{int(value // 20)}s"
+            return f"{_format_number(value / 20)}s"
+        return f"{value}s"
+    if spec.unit == "ticks_as_operations":
+        if isinstance(value, (int, float)):
+            if value % 200 == 0:
+                return str(int(value // 200))
+            return _format_number(value / 200)
+        return str(value)
 
     if isinstance(value, (int, float)):
         return _format_number(value)

@@ -6,6 +6,42 @@ import { buildObtainTree } from "./obtain-tree.js";
 import { renderSection } from "./sections/index.js";
 
 /**
+ * Section types that render below the obtain tree rather than above it.
+ *
+ * Composting chance and furnace burn time are things you do *with* an item you
+ * already have, so they read after "how do I get one", not before it. The
+ * obtain tree is appended asynchronously once the graph loads, so these cannot
+ * simply be ordered in `entity.sections` -- they are held back and appended
+ * once that load settles, whether it produced a tree or not.
+ *
+ * CSS `order` would also move them visually, but it would leave them early in
+ * the DOM, so a screen reader and the tab sequence would still meet them before
+ * the obtain tree. The ordering is done here so that reading order and visual
+ * order stay the same thing.
+ */
+const TRAILING_SECTION_TYPES = new Set<string>(["CompostInfo", "FuelInfo"]);
+
+/**
+ * Returns the `.entity-sections` element, creating it before the attribution
+ * block if no section rendered synchronously.
+ */
+function ensureSectionsContainer(container: HTMLElement): HTMLElement {
+  const existing = container.querySelector<HTMLElement>(".entity-sections");
+  if (existing) {
+    return existing;
+  }
+  const created = document.createElement("div");
+  created.className = "entity-sections";
+  const attribution = container.querySelector<HTMLElement>(".entity-attribution");
+  if (attribution) {
+    container.insertBefore(created, attribution);
+  } else {
+    container.append(created);
+  }
+  return created;
+}
+
+/**
  * Renders the full entity content inside a window body:
  * - Loading state while shard is loading
  * - Entity kind badge
@@ -49,6 +85,9 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
             entity.kind !== "profession" &&
             entity.kind !== "mob"
           ) {
+            continue;
+          }
+          if (TRAILING_SECTION_TYPES.has(section.type)) {
             continue;
           }
           const el = renderSection(section, ctx, entity);
@@ -97,22 +136,24 @@ export function renderEntity(container: HTMLElement, entry: IndexEntry, ctx: Ren
           } as unknown as Section;
           const el = renderSection(recipeTreeSection, ctx, entity);
           if (el) {
-            let sectionsEl = container.querySelector<HTMLElement>(".entity-sections");
-            if (!sectionsEl) {
-              sectionsEl = document.createElement("div");
-              sectionsEl.className = "entity-sections";
-              const attribution = container.querySelector<HTMLElement>(".entity-attribution");
-              if (attribution) {
-                container.insertBefore(sectionsEl, attribution);
-              } else {
-                container.append(sectionsEl);
-              }
-            }
-            sectionsEl.append(el);
+            ensureSectionsContainer(container).append(el);
           }
         })
         .catch(() => {
           // Failure to load obtain graph does not affect the rest of the entity page
+        })
+        .finally(() => {
+          // The trailing sections go last whether or not an obtain tree landed,
+          // so this runs on the early return and on the failure path too.
+          for (const section of entity.sections) {
+            if (!TRAILING_SECTION_TYPES.has(section.type)) {
+              continue;
+            }
+            const el = renderSection(section, ctx, entity);
+            if (el) {
+              ensureSectionsContainer(container).append(el);
+            }
+          }
         });
     })
     .catch((err: unknown) => {

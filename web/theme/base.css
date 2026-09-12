@@ -1054,6 +1054,51 @@ canvas,
 }
 
 /* ---------------------------------------------------------------------------
+   CompostInfo and FuelInfo sections
+   --------------------------------------------------------------------------- */
+.compost-info-section,
+.fuel-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compost-box,
+.fuel-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.compost-metric,
+.fuel-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compost-chance-value,
+.fuel-burn-duration,
+.fuel-smelt-count {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffb74d;
+}
+
+.compost-chance-label,
+.fuel-burn-label,
+.fuel-smelt-label {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+/* ---------------------------------------------------------------------------
    HarvestInfo section
    --------------------------------------------------------------------------- */
 .harvest-info-section {
