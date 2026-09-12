@@ -127,6 +127,8 @@ __all__ = [
     "ChestLootItem",
     "CollectionMember",
     "CollectionMembers",
+    "CollectionTree",
+    "CollectionTreeMember",
     "ConcentricRingsPlacement",
     "DamageValue",
     "DistributionEntry",
@@ -971,6 +973,34 @@ class CollectionMembers(BaseModel, frozen=True, populate_by_name=True):
     members: tuple[CollectionMember, ...] = ()
 
 
+class CollectionTreeMember(BaseModel, frozen=True, populate_by_name=True):
+    """One row of a tree-shaped collection.
+
+    `depth` is the distance from the group's root, computed once by
+    `pipeline.collections.tree`. The renderer indents by it and never
+    rebuilds the nesting, so the shard JSON stays flat.
+    """
+
+    ref: EntityRef
+    depth: int = Field(ge=0)
+
+
+class CollectionTree(BaseModel, frozen=True, populate_by_name=True):
+    """One group of a tree-shaped collection, in depth-first order.
+
+    A collection whose manifest declares a tree layout carries one of these
+    per root rather than a single `CollectionMembers`. `title` is the root
+    entity's own name -- the in-game tab name, for advancements. Members are
+    already ordered; the renderer prints them in the order it is given, the
+    same rule `CollectionMembers` follows for its sorted rows.
+    """
+
+    type: Literal["CollectionTree"] = "CollectionTree"
+    title: str | None = None
+    members: tuple[CollectionTreeMember, ...] = ()
+
+
+
 class ProfessionInfo(BaseModel, frozen=True, populate_by_name=True):
     """Villager profession details: workstation block and trade count."""
 
@@ -1130,6 +1160,7 @@ Section = Annotated[
     | GenerationInfo
     | LinkList
     | CollectionMembers
+    | CollectionTree
     | ProfessionInfo
     | StructureInfo
     | BiomeInfo,
@@ -1146,7 +1177,7 @@ Section = Annotated[
 # the literal key `"sections"`.
 _PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
 
-# The nineteen `type` values a `sections.<Type>` provenance key may name,
+# The twenty `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
 # own `Section` union members exactly.
 _SECTION_TYPES = frozenset(
@@ -1167,6 +1198,7 @@ _SECTION_TYPES = frozenset(
         "GenerationInfo",
         "LinkList",
         "CollectionMembers",
+        "CollectionTree",
         "ProfessionInfo",
         "StructureInfo",
         "BiomeInfo",

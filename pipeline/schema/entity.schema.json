@@ -338,6 +338,9 @@
           "$ref": "#/$defs/collectionMembers"
         },
         {
+          "$ref": "#/$defs/collectionTree"
+        },
+        {
           "$ref": "#/$defs/professionInfo"
         },
         {
@@ -1471,6 +1474,44 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/collectionMember"
+          },
+          "default": []
+        }
+      }
+    },
+    "collectionTreeMember": {
+      "title": "CollectionTreeMember",
+      "description": "One row of a tree-shaped collection. Depth is the distance from the group root.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "depth"],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/entityRef"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "collectionTree": {
+      "title": "CollectionTree",
+      "description": "One group of a tree-shaped collection, in depth-first order.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "CollectionTree"
+        },
+        "title": {
+          "type": "string"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/collectionTreeMember"
           },
           "default": []
         }

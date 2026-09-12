@@ -1,0 +1,23 @@
+{
+  "id": "advancements",
+  "title": "Advancements",
+  "blurb": "Every advancement in the game, laid out as the five in-game tabs and the order they unlock in. Each one links to its own page with the requirement, the flavour text, and the experience reward.",
+  "aliases": ["advancement", "achievements", "advancement tree", "all advancements"],
+  "iconFrom": "minecraft:story/root",
+  "rule": {
+    "type": "kind",
+    "kind": "advancement"
+  },
+  "layout": {
+    "type": "tree",
+    "section": "AdvancementInfo",
+    "groupOrder": [
+      "minecraft:story/root",
+      "minecraft:nether/root",
+      "minecraft:end/root",
+      "minecraft:adventure/root",
+      "minecraft:husbandry/root"
+    ]
+  },
+  "note": "Tier A membership: the kind rule selects all 126 advancement entities, which is every file under advancement/ in the 26.2 data pack minus the recipes/ subtree pipeline/extract/advancement.py excludes on purpose. The tree comes from the parent and children refs the wiki join already resolved onto AdvancementInfo. groupOrder is Tier C: the five tabs render in the order the game's own advancement screen shows them, which no data source publishes. Siblings sort by display name because the game's sibling order is a screen position, not data. Icon borrowed from the Grass Block on story/root, the first advancement anyone earns. Guarded by tests/test_collections_drift.py."
+}

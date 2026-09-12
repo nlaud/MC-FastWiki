@@ -2828,3 +2828,32 @@ canvas,
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* CollectionTree */
+.collection-tree-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-tree-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.collection-tree-row {
+  display: block;
+  padding-left: calc(var(--depth) * 14px);
+  background: repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent 6px,
+      #333 6px,
+      #333 7px,
+      transparent 7px,
+      transparent 14px
+    )
+    no-repeat;
+  background-size: calc(var(--depth) * 14px) 100%;
+}

@@ -21,7 +21,9 @@ from pipeline.collections.manifest import (
     KindRule,
     ListRule,
     TagRule,
+    TreeLayout,
 )
+from pipeline.collections.tree import build_collection_tree_sections
 from pipeline.extract.tags import TagIndex
 from pipeline.normalize.aliases import generate_aliases
 from pipeline.normalize.entity import (
@@ -31,6 +33,7 @@ from pipeline.normalize.entity import (
     EntityKind,
     EntityRef,
     MemberColumn,
+    Section,
     SourceTier,
 )
 from pipeline.obtain.chests import ChestSource
@@ -178,72 +181,84 @@ def _build_collection_entity(
             f"A member with no entity would render as a missing row nobody sees."
         )
 
-    # Build column definitions
-    columns = tuple(
-        MemberColumn(key=col.fact, label=col.label) for col in manifest.columns
-    )
-
-    # Build member rows with fact values
-    members_list: list[CollectionMember] = []
-    for mid in member_ids:
-        member_entity = entities_by_id[mid]
-        values: dict[str, str] = {}
-        for col in manifest.columns:
-            value = extract_fact(
-                member_entity,
-                col.fact,
-                producer_index=producer_index,
-                sources=sources,
-            )
-            if value:
-                values[col.fact] = value
-
-        members_list.append(
-            CollectionMember(
-                ref=EntityRef(id=mid, name=member_entity.name),
-                values=values,
-            )
+    sections: tuple[Section, ...]
+    if isinstance(manifest.layout, TreeLayout):
+        sections = build_collection_tree_sections(
+            layout=manifest.layout,
+            member_ids=member_ids,
+            entities_by_id=entities_by_id,
+        )
+        section_provenance_key = "sections.CollectionTree"
+    else:
+        # Build column definitions
+        columns = tuple(
+            MemberColumn(key=col.fact, label=col.label) for col in manifest.columns
         )
 
-    # Sort members
-    sort_key = manifest.sort_by
-    descending = manifest.sort_direction == "descending"
+        # Build member rows with fact values
+        members_list: list[CollectionMember] = []
+        for mid in member_ids:
+            member_entity = entities_by_id[mid]
+            values: dict[str, str] = {}
+            for col in manifest.columns:
+                value = extract_fact(
+                    member_entity,
+                    col.fact,
+                    producer_index=producer_index,
+                    sources=sources,
+                )
+                if value:
+                    values[col.fact] = value
 
-    if sort_key == "name":
-        members_list.sort(key=lambda m: m.ref.name.casefold(), reverse=descending)
-    elif sort_key is not None:
-        # Sort by fact value, numerically where the value parses as a number.
-        #
-        # The direction is applied by negating the numeric key rather than by passing
-        # `reverse=True`, so that the name tie-break stays alphabetical in both
-        # directions. `reverse=True` reverses the whole composite key, which put the
-        # three 8-nutrition foods on the Food page in the order Steak, Pumpkin Pie,
-        # Cooked Porkchop -- backwards, for rows the reader scans as a group.
-        #
-        # A value that is not a number keeps its own text as the tie-break and sorts
-        # after every numeric one, so a mixed column stays deterministic instead of
-        # collapsing every non-numeric row onto the same key.
-        sign = -1.0 if descending else 1.0
+            members_list.append(
+                CollectionMember(
+                    ref=EntityRef(id=mid, name=member_entity.name),
+                    values=values,
+                )
+            )
 
-        def _sort_value(m: CollectionMember) -> tuple[int, float, str]:
-            raw = m.values.get(sort_key, "")
-            if not raw:
-                # A member missing the fact sorts last whichever way the column runs.
-                return (2, 0.0, m.ref.name.casefold())
-            try:
-                return (0, sign * float(raw), m.ref.name.casefold())
-            except ValueError:
-                return (1, 0.0, raw.casefold())
+        # Sort members
+        sort_key = manifest.sort_by
+        descending = manifest.sort_direction == "descending"
 
-        members_list.sort(key=_sort_value)
-    else:
-        # Default: sort by name ascending
-        members_list.sort(key=lambda m: m.ref.name.casefold())
+        if sort_key == "name":
+            members_list.sort(key=lambda m: m.ref.name.casefold(), reverse=descending)
+        elif sort_key is not None:
+            # Sort by fact value, numerically where the value parses as a number.
+            #
+            # The direction is applied by negating the numeric key rather than by passing
+            # `reverse=True`, so that the name tie-break stays alphabetical in both
+            # directions. `reverse=True` reverses the whole composite key, which put the
+            # three 8-nutrition foods on the Food page in the order Steak, Pumpkin Pie,
+            # Cooked Porkchop -- backwards, for rows the reader scans as a group.
+            #
+            # A value that is not a number keeps its own text as the tie-break and sorts
+            # after every numeric one, so a mixed column stays deterministic instead of
+            # collapsing every non-numeric row onto the same key.
+            sign = -1.0 if descending else 1.0
 
-    section = CollectionMembers(
-        columns=columns,
-        members=tuple(members_list),
-    )
+            def _sort_value(m: CollectionMember) -> tuple[int, float, str]:
+                raw = m.values.get(sort_key, "")
+                if not raw:
+                    # A member missing the fact sorts last whichever way the column runs.
+                    return (2, 0.0, m.ref.name.casefold())
+                try:
+                    return (0, sign * float(raw), m.ref.name.casefold())
+                except ValueError:
+                    return (1, 0.0, raw.casefold())
+
+            members_list.sort(key=_sort_value)
+        else:
+            # Default: sort by name ascending
+            members_list.sort(key=lambda m: m.ref.name.casefold())
+
+        sections = (
+            CollectionMembers(
+                columns=columns,
+                members=tuple(members_list),
+            ),
+        )
+        section_provenance_key = "sections.CollectionMembers"
 
     # Generate aliases
     alias_pairs = generate_aliases(
@@ -258,7 +273,7 @@ def _build_collection_entity(
     source_tiers: dict[str, SourceTier] = {
         "name": SourceTier.C,
         "blurb": SourceTier.C,
-        "sections.CollectionMembers": SourceTier.A,
+        section_provenance_key: SourceTier.A,
     }
     if aliases:
         source_tiers["aliases"] = SourceTier.C
@@ -277,7 +292,7 @@ def _build_collection_entity(
         blurb=manifest.blurb,
         wiki_url=None,
         source_tiers=source_tiers,
-        sections=(section,),
+        sections=sections,
     )
 
 

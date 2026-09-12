@@ -114,3 +114,58 @@ def test_armor_trims_all_resolve_non_empty_found_in() -> None:
         assert found_in, f"Member {mid} resolved an empty obtain.foundIn cell"
         if mid == "minecraft:tide_armor_trim_smithing_template":
             assert found_in == "dropped by Elder Guardian"
+
+
+def test_advancements_drift_guard() -> None:
+    """The built advancements page holds exactly 126 advancement entities across 5 groups."""
+    collection_entities = _load_shard_entities("collection-0")
+    adv_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:advancements"),
+        None,
+    )
+    assert adv_entity is not None, "collection:advancements not found in collection-0 shard"
+
+    tree_sections = [
+        s
+        for s in adv_entity.get("sections", [])
+        if isinstance(s, dict) and s.get("type") == "CollectionTree"
+    ]
+    assert len(tree_sections) == 5, f"Expected 5 CollectionTree sections, got {len(tree_sections)}"
+
+    expected_groups = [
+        ("minecraft:story/root", "Minecraft"),
+        ("minecraft:nether/root", "Nether"),
+        ("minecraft:end/root", "The End"),
+        ("minecraft:adventure/root", "Adventure"),
+        ("minecraft:husbandry/root", "Husbandry"),
+    ]
+
+    total_members = 0
+    all_member_ids: set[str] = set()
+
+    for idx, (expected_root_id, expected_title) in enumerate(expected_groups):
+        section = tree_sections[idx]
+        assert section.get("title") == expected_title, (
+            f"Group {idx} title mismatch: expected {expected_title!r}, got {section.get('title')!r}"
+        )
+        members = section.get("members", [])
+        assert len(members) > 0, f"Group {expected_title} has no members"
+
+        root_member = members[0]
+        assert root_member["depth"] == 0
+        assert root_member["ref"]["id"] == expected_root_id
+
+        for m in members[1:]:
+            assert m["depth"] > 0, (
+                f"Member {m['ref']['id']} in {expected_title} has non-positive depth"
+            )
+
+        for m in members:
+            mid = m["ref"]["id"]
+            assert mid not in all_member_ids, f"Duplicate member {mid} across advancement trees"
+            all_member_ids.add(mid)
+
+        total_members += len(members)
+
+    assert total_members == 126, f"Expected 126 total advancement members, got {total_members}"
+

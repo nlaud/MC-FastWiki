@@ -10,17 +10,20 @@ from pipeline.collections.manifest import (
     CollectionManifest,
     ComponentRule,
     KindRule,
+    ListLayout,
     ListRule,
     TagRule,
+    TreeLayout,
     load_manifests,
 )
 
 
-def test_load_default_manifests_loads_all_nine() -> None:
+def test_load_default_manifests_loads_all_ten() -> None:
     manifests = load_manifests()
-    assert len(manifests) == 9
+    assert len(manifests) == 10
     ids = [m.id for m in manifests]
     assert ids == [
+        "advancements",
         "armor_trims",
         "arthropods",
         "banner_patterns",
@@ -157,3 +160,74 @@ def test_every_shipped_manifest_declares_an_icon() -> None:
         assert (manifest.icon is not None) or (manifest.icon_from is not None), (
             f"{manifest.id} declares neither 'icon' nor 'iconFrom'"
         )
+
+
+def test_manifest_layout_default_and_parsing() -> None:
+    # Omitted layout defaults to ListLayout
+    default_manifest = CollectionManifest.model_validate(
+        {
+            "id": "test_default",
+            "title": "Default Layout",
+            "blurb": "Blurb",
+            "rule": {"type": "kind", "kind": "item"},
+        }
+    )
+    assert isinstance(default_manifest.layout, ListLayout)
+    assert default_manifest.layout.type == "list"
+
+    # Explicit tree layout parses with groupOrder
+    tree_manifest = CollectionManifest.model_validate(
+        {
+            "id": "test_tree",
+            "title": "Tree Layout",
+            "blurb": "Blurb",
+            "rule": {"type": "kind", "kind": "advancement"},
+            "layout": {
+                "type": "tree",
+                "section": "AdvancementInfo",
+                "groupOrder": ["minecraft:story/root", "minecraft:nether/root"],
+            },
+        }
+    )
+    assert isinstance(tree_manifest.layout, TreeLayout)
+    assert tree_manifest.layout.type == "tree"
+    assert tree_manifest.layout.section == "AdvancementInfo"
+    assert tree_manifest.layout.group_order == (
+        "minecraft:story/root",
+        "minecraft:nether/root",
+    )
+
+
+def test_tree_layout_refuses_columns(tmp_path: Path) -> None:
+    manifest = {
+        "id": "tree_with_columns",
+        "title": "Tree With Columns",
+        "blurb": "Blurb",
+        "rule": {"type": "kind", "kind": "advancement"},
+        "layout": {
+            "type": "tree",
+            "section": "AdvancementInfo",
+        },
+        "columns": [{"fact": "food.nutrition", "label": "Hunger"}],
+    }
+    (tmp_path / "bad.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(CollectionError, match="tree layout does not support 'columns'"):
+        load_manifests(tmp_path)
+
+
+def test_tree_layout_refuses_sort_by(tmp_path: Path) -> None:
+    manifest = {
+        "id": "tree_with_sort",
+        "title": "Tree With Sort",
+        "blurb": "Blurb",
+        "rule": {"type": "kind", "kind": "advancement"},
+        "layout": {
+            "type": "tree",
+            "section": "AdvancementInfo",
+        },
+        "sortBy": "name",
+    }
+    (tmp_path / "bad.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(CollectionError, match="tree layout does not support 'sortBy'"):
+        load_manifests(tmp_path)
+
