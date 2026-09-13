@@ -1,6 +1,6 @@
 import type { GenerationInfo, GenerationScope, VeinInfo } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
-import { entityLink } from "../link.js";
+import { proseEntityLink } from "../link.js";
 
 const DIMENSION_NAMES: Record<string, string> = {
   overworld: "Overworld",
@@ -78,7 +78,7 @@ function renderBiomes(scope: GenerationScope, ctx: RenderContext): HTMLElement {
         target.append(document.createTextNode(", "));
       }
       first = false;
-      target.append(entityLink(biome, ctx));
+      target.append(proseEntityLink(biome, ctx));
     }
   };
 

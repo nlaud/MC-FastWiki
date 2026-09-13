@@ -33,6 +33,7 @@ from pipeline.normalize.entity import (
     BiomeInfo,
     BreedingInfo,
     ChestLoot,
+    CollectionMember,
     CollectionMembers,
     CollectionTree,
     CompostInfo,
@@ -520,6 +521,11 @@ def test_a_real_sections_declared_properties_match_its_pydantic_model(def_name: 
     """For each of decision D2's five sections, the schema and the model declare the same fields."""
     schema_properties = set(load_schema("entity")["$defs"][def_name]["properties"])
     assert schema_properties == _serialization_aliases(REAL_SECTION_MODELS[def_name])
+
+
+def test_collection_member_declared_properties_match_its_pydantic_model() -> None:
+    schema_properties = set(load_schema("entity")["$defs"]["collectionMember"]["properties"])
+    assert schema_properties == _serialization_aliases(CollectionMember)
 
 
 def test_curated_chest_sources_completeness() -> None:

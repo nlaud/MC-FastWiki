@@ -107,9 +107,16 @@ code path that can write a field and forget its provenance.
 import re
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, cast
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from pipeline.extract.harvest import HarvestTier, HarvestTool
 from pipeline.normalize import NormalizeError
@@ -953,12 +960,21 @@ class CollectionMember(BaseModel, frozen=True, populate_by_name=True):
     """One row in a collection member table.
 
     ``ref`` links to the member entity. ``values`` maps column keys to
-    pre-formatted display strings. The pipeline decides how many digits it
-    trusts, once, and the renderer prints what it is given.
+    pre-formatted display strings. ``refs`` maps column keys to the entity refs
+    backing them, when the fact is an entity reference. The pipeline decides
+    how many digits it trusts, once, and the renderer prints what it is given.
     """
 
     ref: EntityRef
     values: Mapping[str, str] = {}
+    refs: Mapping[str, tuple[EntityRef, ...]] = {}
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = cast(dict[str, Any], handler(self))
+        if not data.get("refs"):
+            data.pop("refs", None)
+        return data
 
 
 class CollectionMembers(BaseModel, frozen=True, populate_by_name=True):

@@ -1,6 +1,6 @@
 import type { BiomeInfo, BiomeSpawnEntry, EntityRef, NoisePlacement } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
-import { entityLink, formatQuantityRange } from "../link.js";
+import { entityLink, formatQuantityRange, proseEntityLink } from "../link.js";
 
 /* The bare noun, for use inside a sentence. "The Nether" is the right label for a
    standalone field value, and the wrong one mid-sentence: interpolating it produced
@@ -445,7 +445,7 @@ export function renderBiomeInfo(section: BiomeInfo, ctx: RenderContext): HTMLEle
           if (p.sibling) {
             const sibWrapper = document.createElement("span");
             sibWrapper.className = "biome-noise-sibling";
-            sibWrapper.append(" (sibling: ", entityLink(p.sibling, ctx), ")");
+            sibWrapper.append(" (sibling: ", proseEntityLink(p.sibling, ctx), ")");
             chip.append(sibWrapper);
           }
 

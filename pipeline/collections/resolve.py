@@ -235,20 +235,25 @@ def _build_collection_entity(
         for mid in member_ids:
             member_entity = entities_by_id[mid]
             values: dict[str, str] = {}
+            refs: dict[str, tuple[EntityRef, ...]] = {}
             for col in manifest.columns:
-                value = extract_fact(
+                fact_value = extract_fact(
                     member_entity,
                     col.fact,
+                    entities_by_id=entities_by_id,
                     producer_index=producer_index,
                     sources=sources,
                 )
-                if value:
-                    values[col.fact] = value
+                if fact_value.text:
+                    values[col.fact] = fact_value.text
+                if fact_value.refs:
+                    refs[col.fact] = fact_value.refs
 
             members_list.append(
                 CollectionMember(
                     ref=EntityRef(id=mid, name=member_entity.name),
                     values=values,
+                    refs=refs,
                 )
             )
 

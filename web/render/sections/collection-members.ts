@@ -1,6 +1,6 @@
 import type { CollectionMembers } from "../../types/entity.js";
 import type { RenderContext } from "../context.js";
-import { entityLink } from "../link.js";
+import { entityLink, proseEntityLink } from "../link.js";
 
 /**
  * Renders a CollectionMembers section:
@@ -64,9 +64,27 @@ export function renderCollectionMembers(
       for (const col of columns) {
         const td = document.createElement("td");
         td.className = "fact-cell";
-        const val = member.values?.[col.key];
-        if (val !== undefined && val !== "") {
-          td.textContent = val;
+        const colRefs = member.refs?.[col.key];
+        if (colRefs && colRefs.length > 0) {
+          td.classList.add("has-refs");
+          // `proseEntityLink`, not `entityLink`, and on every link rather than
+          // only the ones a comma follows. The standalone link's horizontal
+          // padding reads as a word space before punctuation, which rendered
+          // the Coast trim's cell as `Shipwreck , Beached Shipwreck`. Applying
+          // it to single-ref cells too keeps one column's links on one left
+          // edge; padding only the rows that happen to hold one ref would
+          // indent them 4px past the rest of the column.
+          colRefs.forEach((ref, index) => {
+            if (index > 0) {
+              td.append(", ");
+            }
+            td.append(proseEntityLink(ref, ctx));
+          });
+        } else {
+          const val = member.values?.[col.key];
+          if (val !== undefined && val !== "") {
+            td.textContent = val;
+          }
         }
         tr.append(td);
       }

@@ -166,4 +166,89 @@ describe("renderCollectionMembers", () => {
     const secondRowCells = rows?.[1]?.querySelectorAll("td");
     expect(secondRowCells?.[1]?.textContent).toBe("dropped by Elder Guardian");
   });
+
+  it("renders a column carrying refs on some rows and plain text on others", () => {
+    const section: CollectionMembers = {
+      type: "CollectionMembers",
+      columns: [{ key: "obtain.foundIn", label: "Found in" }],
+      members: [
+        {
+          ref: {
+            id: "minecraft:bolt_armor_trim_smithing_template",
+            name: "Bolt Armor Trim",
+          },
+          values: {
+            "obtain.foundIn": "Trial Chambers",
+          },
+          refs: {
+            "obtain.foundIn": [{ id: "minecraft:trial_chambers", name: "Trial Chambers" }],
+          },
+        },
+        {
+          ref: {
+            id: "minecraft:coast_armor_trim_smithing_template",
+            name: "Coast Armor Trim",
+          },
+          values: {
+            "obtain.foundIn": "Shipwreck, Beached Shipwreck",
+          },
+          refs: {
+            "obtain.foundIn": [
+              { id: "minecraft:shipwreck", name: "Shipwreck" },
+              { id: "minecraft:shipwreck_beached", name: "Beached Shipwreck" },
+            ],
+          },
+        },
+        {
+          ref: {
+            id: "minecraft:tide_armor_trim_smithing_template",
+            name: "Tide Armor Trim",
+          },
+          values: {
+            "obtain.foundIn": "dropped by Elder Guardian",
+          },
+        },
+      ],
+    };
+
+    const el = renderCollectionMembers(section, ctx);
+    expect(el).not.toBeNull();
+    const rows = el?.querySelectorAll("tbody tr");
+    expect(rows?.length).toBe(3);
+
+    // Row 0: Bolt -> single link in fact cell, has-refs class
+    const boltCells = rows?.[0]?.querySelectorAll("td");
+    const boltFactCell = boltCells?.[1];
+    expect(boltFactCell?.className).toContain("has-refs");
+    const boltLinks = boltFactCell?.querySelectorAll("a.entity-link");
+    expect(boltLinks?.length).toBe(1);
+    expect(boltLinks?.[0]?.getAttribute("data-id")).toBe("minecraft:trial_chambers");
+    expect(boltFactCell?.textContent).toBe("Trial Chambers");
+
+    // Row 1: Coast -> multi-variant links separated by ", ", has-refs class
+    const coastCells = rows?.[1]?.querySelectorAll("td");
+    const coastFactCell = coastCells?.[1];
+    expect(coastFactCell?.className).toContain("has-refs");
+    const coastLinks = coastFactCell?.querySelectorAll("a.entity-link");
+    expect(coastLinks?.length).toBe(2);
+    expect(coastLinks?.[0]?.getAttribute("data-id")).toBe("minecraft:shipwreck");
+    expect(coastLinks?.[1]?.getAttribute("data-id")).toBe("minecraft:shipwreck_beached");
+    expect(coastFactCell?.textContent).toBe("Shipwreck, Beached Shipwreck");
+
+    // Every link in a fact cell is a prose link, not a standalone chip. The
+    // chip's horizontal padding reads as a word space before the ", ", which
+    // rendered this very cell as "Shipwreck , Beached Shipwreck". Single-ref
+    // rows carry the class too, so one column keeps one left edge.
+    expect(boltLinks?.[0]?.className).toContain("entity-link-prose");
+    expect(coastLinks?.[0]?.className).toContain("entity-link-prose");
+    expect(coastLinks?.[1]?.className).toContain("entity-link-prose");
+
+    // Row 2: Tide -> plain text, no entity links, no has-refs class
+    const tideCells = rows?.[2]?.querySelectorAll("td");
+    const tideFactCell = tideCells?.[1];
+    expect(tideFactCell?.className).not.toContain("has-refs");
+    const tideLinks = tideFactCell?.querySelectorAll("a.entity-link");
+    expect(tideLinks?.length).toBe(0);
+    expect(tideFactCell?.textContent).toBe("dropped by Elder Guardian");
+  });
 });
