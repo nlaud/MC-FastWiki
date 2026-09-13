@@ -452,3 +452,68 @@ def test_resolve_obtain_rule() -> None:
     assert section.members[1].ref.id == "minecraft:book"
 
 
+def test_resolve_populates_refs_on_collection_member() -> None:
+    from pipeline.normalize.entity import ProfessionInfo
+
+    manifest = CollectionManifest(
+        id="trades",
+        title="Villager Trades",
+        blurb="All professions",
+        rule=KindRule(kind="profession"),
+        columns=(
+            ColumnDef(fact="profession.workstation", label="Workstation"),
+            ColumnDef(fact="profession.tradeCount", label="Trades"),
+        ),
+        sort_by="profession.workstation",
+        sort_direction="ascending",
+    )
+    armorer = _minimal_entity(
+        "minecraft:armorer",
+        "Armorer",
+        kind=EntityKind.PROFESSION,
+        sections=(
+            ProfessionInfo(
+                workstation=EntityRef(id="minecraft:blast_furnace", name="Blast Furnace"),
+                trade_count=18,
+            ),
+        ),
+    )
+    butcher = _minimal_entity(
+        "minecraft:butcher",
+        "Butcher",
+        kind=EntityKind.PROFESSION,
+        sections=(
+            ProfessionInfo(
+                workstation=EntityRef(id="minecraft:smoker", name="Smoker"),
+                trade_count=11,
+            ),
+        ),
+    )
+    entities = [butcher, armorer]
+
+    result = resolve_collections([manifest], entities, {}, {})
+    assert len(result) == 1
+    col = result[0]
+    section = col.sections[0]
+    assert isinstance(section, CollectionMembers)
+    assert len(section.members) == 2
+
+    # Sorting by profession.workstation ascending: Blast Furnace before Smoker
+    m0 = section.members[0]
+    assert m0.ref.id == "minecraft:armorer"
+    assert m0.values["profession.workstation"] == "Blast Furnace"
+    assert m0.values["profession.tradeCount"] == "18"
+    assert m0.refs["profession.workstation"] == (
+        EntityRef(id="minecraft:blast_furnace", name="Blast Furnace"),
+    )
+
+    m1 = section.members[1]
+    assert m1.ref.id == "minecraft:butcher"
+    assert m1.values["profession.workstation"] == "Smoker"
+    assert m1.values["profession.tradeCount"] == "11"
+    assert m1.refs["profession.workstation"] == (
+        EntityRef(id="minecraft:smoker", name="Smoker"),
+    )
+
+
+

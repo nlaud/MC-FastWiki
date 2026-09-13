@@ -1453,6 +1453,16 @@
             "type": "string"
           },
           "default": {}
+        },
+        "refs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/entityRef"
+            }
+          },
+          "default": {}
         }
       }
     },

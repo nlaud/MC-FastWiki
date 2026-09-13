@@ -295,13 +295,32 @@ New collections the added data makes nearly free:
       `minecraft:gold_ingot`. Guarded by `tests/test_collections_drift.py`. Note: `minecraft:potion`
       carries two bartering producers (2.132% and 1.706%) that merge into one row at 3.838% with quantity 1
       because potion variants are not distinguished in the obtain graph.
-- [ ] **A fact cell cannot be a link, and Lint B cannot see that it should be.** `CollectionMember.values`
+- [x] **A fact cell cannot be a link, and Lint B cannot see that it should be.** `CollectionMember.values`
       is `dict[str, str]`, so a fact that reads an `EntityRef` has to flatten it to a name before the
       payload is written. The Villager Trades workstation column prints `Blast Furnace` as dead text
       while the Armorer page prints the same name as a link, and Lint B misses it because the ref is
       already gone by the time the renderer runs. Fixing it means letting a member row carry refs
       alongside its strings, which changes the pipeline-to-web schema contract and every collection
       renderer, so it is its own task rather than a rider on the one that surfaced it.
+      Shipped: `CollectionMember.refs` carries `EntityRef` tuples keyed by column name (omitted when empty
+      to preserve byte-identical payloads across unaffected collections), with `FactValue` producing both
+      display text and refs in a single extraction step. Guarded by a two-way `SectionFact.ref` rule.
+      `villager_trades` workstations (13) and `armor_trims` found-in locations (17 across structures,
+      expanding multi-variant families like Shipwreck while Tide drops cleanly to plain text) now render
+      as real entity links. Lint B caught the missing links when tested and now enforces them across all
+      collection member rows.
+      Two things the first cut of this got wrong, recorded so the reversals survive. A fact cell drew its
+      links with `entityLink` rather than `proseEntityLink`, and the standalone link's horizontal padding
+      reads as a word space before punctuation, so the Coast row rendered `Shipwreck , Beached Shipwreck`.
+      Every link in a fact cell now uses the prose form, single-ref rows included, so one column keeps one
+      left edge. `web/render/link.ts` had already named this rule and two other renderers were ignoring it
+      the same way: the `GenerationInfo` biome list (`Crimson Forest , Nether Wastes`, the very example
+      that docstring cites) and the `BiomeInfo` noise sibling (`(sibling: Eroded Badlands )`). Both are
+      fixed here.
+      `obtain.foundIn` also built a ref named by the family label when it had no entity map to resolve
+      against, which would print `Shipwreck, Shipwreck` for a two-variant family and claim a display name
+      no entity carries. A caller with no entity map now gets no refs and falls through to the family
+      text, because `ChestSource.structure` names a family and only the entity knows the variant's name.
 
 ## Phase 8 — Minecraft theming
 

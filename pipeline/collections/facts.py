@@ -20,16 +20,28 @@ A member missing the fact renders an empty cell, not a zero.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from pipeline.normalize.entity import Entity, Section
+from pipeline.collections import CollectionError
+from pipeline.normalize.entity import Entity, EntityRef, Section
 from pipeline.obtain.chests import ChestSource
 from pipeline.obtain.producer import ObtainMethod, ProducerIndex
 
-__all__ = ["FactSource", "ObtainFact", "SectionFact", "extract_fact"]
+__all__ = ["FactSource", "FactValue", "ObtainFact", "SectionFact", "extract_fact"]
+
+
+class FactValue(BaseModel, frozen=True):
+    """A formatted fact value, optionally carrying link references."""
+
+    text: str = ""
+    refs: tuple[EntityRef, ...] = ()
+
+    @classmethod
+    def from_refs(cls, refs: Sequence[EntityRef]) -> FactValue:
+        return cls(text=", ".join(r.name for r in refs), refs=tuple(refs))
 
 
 class SectionFact(BaseModel, frozen=True):
@@ -38,6 +50,7 @@ class SectionFact(BaseModel, frozen=True):
     type: Literal["section"] = "section"
     section_type: str
     attr_name: str = ""
+    ref: bool = False
     count: Literal["containers", "distinct_items"] | None = None
     unit: Literal["percent", "ticks_as_time", "ticks_as_operations"] | None = None
 
@@ -75,7 +88,7 @@ _FACT_REGISTRY: dict[str, FactSource] = {
         section_type="ChestLoot", count="distinct_items"
     ),
     "profession.workstation": SectionFact(
-        section_type="ProfessionInfo", attr_name="workstation.name"
+        section_type="ProfessionInfo", attr_name="workstation", ref=True
     ),
     "profession.tradeCount": SectionFact(
         section_type="ProfessionInfo", attr_name="trade_count"
@@ -108,19 +121,19 @@ def _get_section(entity: Entity, section_type: str) -> Section | None:
     return None
 
 
-def _extract_section_fact(entity: Entity, spec: SectionFact) -> str:
+def _extract_section_fact(entity: Entity, spec: SectionFact) -> FactValue:
     section = _get_section(entity, spec.section_type)
     if section is None:
-        return ""
+        return FactValue()
 
     if spec.count == "containers":
         containers = getattr(section, "containers", ())
-        return str(len(containers)) if containers else ""
+        return FactValue(text=str(len(containers))) if containers else FactValue()
 
     if spec.count == "distinct_items":
         containers = getattr(section, "containers", ())
         if not containers:
-            return ""
+            return FactValue()
         distinct = {
             item.item.id
             for c in containers
@@ -128,7 +141,7 @@ def _extract_section_fact(entity: Entity, spec: SectionFact) -> str:
             for item in c.items
             if hasattr(item, "item")
         }
-        return str(len(distinct))
+        return FactValue(text=str(len(distinct)))
 
     value: object = section
     for part in spec.attr_name.split("."):
@@ -137,36 +150,51 @@ def _extract_section_fact(entity: Entity, spec: SectionFact) -> str:
         value = getattr(value, part, None)
 
     if value is None:
-        return ""
+        return FactValue()
+
+    if isinstance(value, EntityRef):
+        if not spec.ref:
+            raise CollectionError(
+                f"Fact '{spec.section_type}.{spec.attr_name}' resolved to an EntityRef "
+                f"({value.id}) but the SectionFact did not declare ref=True."
+            )
+        return FactValue.from_refs([value])
+
+    if spec.ref:
+        raise CollectionError(
+            f"Fact '{spec.section_type}.{spec.attr_name}' declared ref=True "
+            f"but resolved to {type(value).__name__} ({value!r})."
+        )
 
     if spec.unit == "percent":
-        return f"{value}%"
+        return FactValue(text=f"{value}%")
     if spec.unit == "ticks_as_time":
         if isinstance(value, (int, float)):
             if value % 20 == 0:
-                return f"{int(value // 20)}s"
-            return f"{_format_number(value / 20)}s"
-        return f"{value}s"
+                return FactValue(text=f"{int(value // 20)}s")
+            return FactValue(text=f"{_format_number(value / 20)}s")
+        return FactValue(text=f"{value}s")
     if spec.unit == "ticks_as_operations":
         if isinstance(value, (int, float)):
             if value % 200 == 0:
-                return str(int(value // 200))
-            return _format_number(value / 200)
-        return str(value)
+                return FactValue(text=str(int(value // 200)))
+            return FactValue(text=_format_number(value / 200))
+        return FactValue(text=str(value))
 
     if isinstance(value, (int, float)):
-        return _format_number(value)
+        return FactValue(text=_format_number(value))
 
-    return str(value)
+    return FactValue(text=str(value))
 
 
 def _extract_obtain_found_in(
     member_id: str,
+    entities_by_id: Mapping[str, Entity] | None,
     producer_index: ProducerIndex | None,
     sources: Mapping[str, ChestSource] | None,
-) -> str:
+) -> FactValue:
     if producer_index is None:
-        return ""
+        return FactValue()
 
     producers = [
         p
@@ -174,63 +202,89 @@ def _extract_obtain_found_in(
         if p.method is not ObtainMethod.CRAFTING
     ]
     if not producers:
-        return ""
+        return FactValue()
 
     if sources is None:
         from pipeline.emit.obtain import load_merged_sources
 
         sources = load_merged_sources()
 
-    structures: set[str] = set()
+    # Group chest sources by structure family name so multi-variant structures (e.g. Shipwreck)
+    # expand deterministically while sorting structure families alphabetically.
+    family_sources: dict[str, list[ChestSource]] = {}
     for p in producers:
         source = sources.get(p.source_id)
         if source is not None and source.structure:
-            structures.add(source.structure)
+            family_sources.setdefault(source.structure, []).append(source)
 
-    if structures:
-        return ", ".join(sorted(structures))
+    refs: list[EntityRef] = []
+    seen_ids: set[str] = set()
+
+    # A ref is built only from an entity this build actually holds, because its
+    # name has to be that structure's own. `structure` is a family label --
+    # "Shipwreck" covers `shipwreck` and `shipwreck_beached`, "Village" covers
+    # five -- so naming a variant by its family would print "Shipwreck,
+    # Shipwreck" and claim a display name no entity carries. A caller with no
+    # entity map gets no refs and falls through to the family text below.
+    for family in sorted(family_sources):
+        for source in family_sources[family]:
+            for s_id in source.structure_ref:
+                if s_id in seen_ids:
+                    continue
+                seen_ids.add(s_id)
+                if entities_by_id is not None and s_id in entities_by_id:
+                    ent = entities_by_id[s_id]
+                    refs.append(EntityRef(id=ent.id, name=ent.name))
+
+    if refs:
+        return FactValue.from_refs(refs)
+
+    if family_sources:
+        return FactValue(text=", ".join(sorted(family_sources)))
 
     first_note = producers[0].note
     if first_note:
-        return first_note
+        return FactValue(text=first_note)
 
-    return ""
+    return FactValue()
 
 
 def _extract_obtain_fact(
     entity: Entity,
     spec: ObtainFact,
-    producer_index: ProducerIndex | None,
-    sources: Mapping[str, ChestSource] | None,
-) -> str:
+    *,
+    entities_by_id: Mapping[str, Entity] | None = None,
+    producer_index: ProducerIndex | None = None,
+    sources: Mapping[str, ChestSource] | None = None,
+) -> FactValue:
     if spec.field == "foundIn":
-        return _extract_obtain_found_in(entity.id, producer_index, sources)
+        return _extract_obtain_found_in(entity.id, entities_by_id, producer_index, sources)
 
     if producer_index is None:
-        return ""
+        return FactValue()
 
     producers = producer_index.producers_of(entity.id)
     if spec.method is not None:
         producers = tuple(p for p in producers if p.method.value == spec.method)
 
     if not producers:
-        return ""
+        return FactValue()
 
     # A member whose producer carries no odds renders empty cells
     producers_with_odds = [p for p in producers if p.chance is not None]
     if not producers_with_odds:
-        return ""
+        return FactValue()
 
     if spec.field == "chance":
         total_chance = sum(p.chance for p in producers_with_odds if p.chance is not None)
         pct = total_chance * 100
-        return f"{pct:.3f}%"
+        return FactValue(text=f"{pct:.3f}%")
 
     if spec.field == "perAttempt":
         total_per_attempt = sum(
             p.per_attempt for p in producers_with_odds if p.per_attempt is not None
         )
-        return f"{total_per_attempt:.3f}"
+        return FactValue(text=f"{total_per_attempt:.3f}")
 
     if spec.field == "stackRange":
         low = min(p.output.count for p in producers_with_odds)
@@ -239,28 +293,35 @@ def _extract_obtain_fact(
             for p in producers_with_odds
         )
         if low == high:
-            return str(low)
-        return f"{low}-{high}"
+            return FactValue(text=str(low))
+        return FactValue(text=f"{low}-{high}")
 
-    return ""
+    return FactValue()
 
 
 def extract_fact(
     entity: Entity,
     fact_key: str,
     *,
+    entities_by_id: Mapping[str, Entity] | None = None,
     producer_index: ProducerIndex | None = None,
     sources: Mapping[str, ChestSource] | None = None,
-) -> str:
-    """Return the formatted display string for *fact_key* on *entity*.
+) -> FactValue:
+    """Return the formatted display string and optional refs for *fact_key* on *entity*.
 
-    Returns an empty string when the entity does not carry the fact,
+    Returns an empty FactValue when the entity does not carry the fact,
     which a renderer displays as a blank cell rather than a zero.
     """
     entry = _FACT_REGISTRY.get(fact_key)
     if entry is None:
-        return ""
+        return FactValue()
 
     if isinstance(entry, SectionFact):
         return _extract_section_fact(entity, entry)
-    return _extract_obtain_fact(entity, entry, producer_index, sources)
+    return _extract_obtain_fact(
+        entity,
+        entry,
+        entities_by_id=entities_by_id,
+        producer_index=producer_index,
+        sources=sources,
+    )

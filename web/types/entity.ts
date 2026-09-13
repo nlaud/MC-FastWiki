@@ -801,6 +801,9 @@ export interface CollectionMember {
   values?: {
     [k: string]: string;
   };
+  refs?: {
+    [k: string]: EntityRef[];
+  };
 }
 /**
  * One group of a tree-shaped collection, in depth-first order.

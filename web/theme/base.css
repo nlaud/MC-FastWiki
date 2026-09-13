@@ -2874,6 +2874,10 @@ canvas,
   white-space: nowrap;
 }
 
+.collection-members-table td.fact-cell.has-refs {
+  white-space: normal;
+}
+
 /* CollectionTree */
 .collection-tree-section {
   display: flex;
