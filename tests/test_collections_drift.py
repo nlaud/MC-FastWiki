@@ -255,3 +255,152 @@ def test_fuel_drift_guard() -> None:
     assert burn_seconds == sorted(burn_seconds, reverse=True)
 
 
+def test_chest_loot_drift_guard() -> None:
+    """The built chest_loot page holds exactly 31 structures sorted ascending by name."""
+    collection_entities = _load_shard_entities("collection-0")
+    chest_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:chest_loot"),
+        None,
+    )
+    assert chest_entity is not None, "collection:chest_loot not found in collection-0 shard"
+
+    members_section = next(
+        (
+            s
+            for s in chest_entity.get("sections", [])
+            if isinstance(s, dict) and s.get("type") == "CollectionMembers"
+        ),
+        None,
+    )
+    assert members_section is not None, "CollectionMembers section not found on chest_loot"
+
+    members = members_section.get("members", [])
+    assert len(members) == 31, f"Expected 31 chest_loot members, got {len(members)}"
+
+    # Check anchors and formatting against reference data
+    members_by_id = {m["ref"]["id"]: m for m in members}
+    ac = members_by_id["minecraft:ancient_city"]["values"]
+    assert ac["chest.containers"] == "2"
+    assert ac["chest.items"] == "32"
+
+    bm = members_by_id["minecraft:mineshaft_mesa"]["values"]
+    assert bm["chest.containers"] == "1"
+    assert bm["chest.items"] == "22"
+
+    tc = members_by_id["minecraft:trial_chambers"]["values"]
+    assert tc["chest.containers"] == "20"
+    assert tc["chest.items"] == "67"
+
+    dv = members_by_id["minecraft:village_desert"]["values"]
+    assert dv["chest.containers"] == "12"
+    assert dv["chest.items"] == "65"
+
+    # Check sort order: name ascending
+    names = [m["ref"]["name"].casefold() for m in members]
+    assert names == sorted(names)
+
+
+def test_villager_trades_drift_guard() -> None:
+    """The built villager_trades page holds exactly 13 professions sorted ascending by name."""
+    collection_entities = _load_shard_entities("collection-0")
+    trades_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:villager_trades"),
+        None,
+    )
+    assert trades_entity is not None, "collection:villager_trades not found in collection-0 shard"
+
+    members_section = next(
+        (
+            s
+            for s in trades_entity.get("sections", [])
+            if isinstance(s, dict) and s.get("type") == "CollectionMembers"
+        ),
+        None,
+    )
+    assert members_section is not None, "CollectionMembers section not found on villager_trades"
+
+    members = members_section.get("members", [])
+    assert len(members) == 13, f"Expected 13 villager_trades members, got {len(members)}"
+
+    # Check anchors and formatting against reference data
+    members_by_id = {m["ref"]["id"]: m for m in members}
+    armorer = members_by_id["minecraft:armorer"]["values"]
+    assert armorer["profession.workstation"] == "Blast Furnace"
+    assert armorer["profession.tradeCount"] == "18"
+
+    farmer = members_by_id["minecraft:farmer"]["values"]
+    assert farmer["profession.workstation"] == "Composter"
+    assert farmer["profession.tradeCount"] == "14"
+
+    shepherd = members_by_id["minecraft:shepherd"]["values"]
+    assert shepherd["profession.workstation"] == "Loom"
+    assert shepherd["profession.tradeCount"] == "26"
+
+    weaponsmith = members_by_id["minecraft:weaponsmith"]["values"]
+    assert weaponsmith["profession.workstation"] == "Grindstone"
+    assert weaponsmith["profession.tradeCount"] == "9"
+
+    # Check sort order: name ascending
+    names = [m["ref"]["name"].casefold() for m in members]
+    assert names == sorted(names)
+
+
+def test_bartering_drift_guard() -> None:
+    """The built bartering page holds exactly 18 items sorted descending by chance."""
+    collection_entities = _load_shard_entities("collection-0")
+    barter_entity = next(
+        (e for e in collection_entities if e.get("id") == "collection:bartering"),
+        None,
+    )
+    assert barter_entity is not None, "collection:bartering not found in collection-0 shard"
+
+    members_section = next(
+        (
+            s
+            for s in barter_entity.get("sections", [])
+            if isinstance(s, dict) and s.get("type") == "CollectionMembers"
+        ),
+        None,
+    )
+    assert members_section is not None, "CollectionMembers section not found on bartering"
+
+    members = members_section.get("members", [])
+    assert len(members) == 18, f"Expected 18 bartering members, got {len(members)}"
+
+    # Check anchors and formatting against reference data
+    members_by_id = {m["ref"]["id"]: m for m in members}
+    bs = members_by_id["minecraft:blackstone"]["values"]
+    assert bs["obtain.chance"] == "8.529%"
+    assert bs["obtain.stackRange"] == "8-16"
+    assert bs["obtain.perAttempt"] == "1.023"
+
+    fc = members_by_id["minecraft:fire_charge"]["values"]
+    assert fc["obtain.chance"] == "8.529%"
+    assert fc["obtain.stackRange"] == "1"
+    assert fc["obtain.perAttempt"] == "0.085"
+
+    nq = members_by_id["minecraft:quartz"]["values"]
+    assert nq["obtain.chance"] == "4.264%"
+    assert nq["obtain.stackRange"] == "5-12"
+    assert nq["obtain.perAttempt"] == "0.362"
+
+    potion = members_by_id["minecraft:potion"]["values"]
+    assert potion["obtain.chance"] == "3.838%"
+    assert potion["obtain.stackRange"] == "1"
+    assert potion["obtain.perAttempt"] == "0.038"
+
+    inug = members_by_id["minecraft:iron_nugget"]["values"]
+    assert inug["obtain.chance"] == "2.132%"
+    assert inug["obtain.stackRange"] == "10-36"
+    assert inug["obtain.perAttempt"] == "0.490"
+
+    book = members_by_id["minecraft:book"]["values"]
+    assert book["obtain.chance"] == "1.066%"
+    assert book["obtain.stackRange"] == "1"
+    assert book["obtain.perAttempt"] == "0.011"
+
+    # Check sort order: chance is descending
+    chances = [float(m["values"]["obtain.chance"].rstrip("%")) for m in members]
+    assert chances == sorted(chances, reverse=True)
+
+

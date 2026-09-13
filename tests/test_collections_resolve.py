@@ -9,6 +9,7 @@ from pipeline.collections.manifest import (
     ComponentRule,
     KindRule,
     ListRule,
+    ObtainRule,
     TagRule,
     TreeLayout,
 )
@@ -388,4 +389,66 @@ def test_resolve_tree_manifest() -> None:
     assert [(m.ref.id, m.depth) for m in sec1.members] == [
         ("minecraft:nether/root", 0),
     ]
+
+
+def test_resolve_obtain_rule() -> None:
+    from pipeline.obtain.producer import ObtainMethod, Producer, ProducerIndex, ProducerOutput
+
+    manifest = CollectionManifest(
+        id="bartering",
+        title="Piglin Bartering",
+        blurb="Bartering items",
+        rule=ObtainRule(method="bartering"),
+        columns=(
+            ColumnDef(fact="obtain.chance", label="Chance"),
+            ColumnDef(fact="obtain.stackRange", label="Quantity"),
+            ColumnDef(fact="obtain.perAttempt", label="Per barter"),
+        ),
+        sort_by="obtain.chance",
+        sort_direction="descending",
+    )
+    entities = [
+        _minimal_entity("minecraft:blackstone", "Blackstone"),
+        _minimal_entity("minecraft:book", "Book"),
+        _minimal_entity("minecraft:dirt", "Dirt"),
+    ]
+    prod_bs = Producer(
+        method=ObtainMethod.BARTERING,
+        output=ProducerOutput(item="minecraft:blackstone", count=8),
+        inputs=(),
+        source_id="gameplay/piglin_bartering.json",
+        chance=0.085,
+        count_max=16,
+        per_attempt=1.02,
+    )
+    prod_book = Producer(
+        method=ObtainMethod.BARTERING,
+        output=ProducerOutput(item="minecraft:book", count=1),
+        inputs=(),
+        source_id="gameplay/piglin_bartering.json",
+        chance=0.011,
+        count_max=1,
+        per_attempt=0.011,
+    )
+    prod_dirt = Producer(
+        method=ObtainMethod.CRAFTING,
+        output=ProducerOutput(item="minecraft:dirt", count=1),
+        inputs=(),
+        source_id="crafting/dirt.json",
+    )
+    index = ProducerIndex.from_producers([prod_bs, prod_book, prod_dirt])
+
+    result = resolve_collections(
+        [manifest], entities, {}, {}, producer_index=index
+    )
+    assert len(result) == 1
+    col = result[0]
+    assert col.id == "collection:bartering"
+    section = col.sections[0]
+    assert isinstance(section, CollectionMembers)
+    assert len(section.members) == 2
+    # Sorted descending by chance: Blackstone then Book
+    assert section.members[0].ref.id == "minecraft:blackstone"
+    assert section.members[1].ref.id == "minecraft:book"
+
 

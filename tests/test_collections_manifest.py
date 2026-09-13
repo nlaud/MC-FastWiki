@@ -12,6 +12,7 @@ from pipeline.collections.manifest import (
     KindRule,
     ListLayout,
     ListRule,
+    ObtainRule,
     SectionRule,
     TagRule,
     TreeLayout,
@@ -19,15 +20,17 @@ from pipeline.collections.manifest import (
 )
 
 
-def test_load_default_manifests_loads_all_twelve() -> None:
+def test_load_default_manifests_loads_all_fifteen() -> None:
     manifests = load_manifests()
-    assert len(manifests) == 12
+    assert len(manifests) == 15
     ids = [m.id for m in manifests]
     assert ids == [
         "advancements",
         "armor_trims",
         "arthropods",
         "banner_patterns",
+        "bartering",
+        "chest_loot",
         "compostable",
         "enchantments",
         "fuel",
@@ -35,6 +38,7 @@ def test_load_default_manifests_loads_all_twelve() -> None:
         "structures",
         "undead",
         "unique_food",
+        "villager_trades",
         "workstations",
     ]
 
@@ -95,6 +99,17 @@ def test_manifest_rule_discriminated_union() -> None:
     )
     assert isinstance(section_rule.rule, SectionRule)
     assert section_rule.rule.section == "CompostInfo"
+
+    obtain_rule = CollectionManifest.model_validate(
+        {
+            "id": "test_obtain",
+            "title": "Test Obtain",
+            "blurb": "Test blurb",
+            "rule": {"type": "obtain", "method": "bartering"},
+        }
+    )
+    assert isinstance(obtain_rule.rule, ObtainRule)
+    assert obtain_rule.rule.method == "bartering"
 
 
 def test_load_manifests_missing_directory_raises(tmp_path: Path) -> None:

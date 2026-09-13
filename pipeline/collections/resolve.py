@@ -20,6 +20,7 @@ from pipeline.collections.manifest import (
     ComponentRule,
     KindRule,
     ListRule,
+    ObtainRule,
     SectionRule,
     TagRule,
     TreeLayout,
@@ -100,11 +101,28 @@ def _resolve_section_rule(
     )
 
 
+def _resolve_obtain_rule(
+    rule: ObtainRule,
+    producer_index: ProducerIndex | None,
+    entities_by_id: Mapping[str, Entity],
+) -> list[str]:
+    """Return every entity ID that has at least one Producer of *rule.method*."""
+    if producer_index is None:
+        return []
+    return sorted(
+        item_id
+        for item_id, producers in producer_index.by_output.items()
+        if any(p.method.value == rule.method for p in producers)
+        and item_id in entities_by_id
+    )
+
+
 def _resolve_members(
     manifest: CollectionManifest,
     item_components: Mapping[str, Mapping[str, object]],
     tag_indexes: Mapping[str, TagIndex],
     entities_by_id: Mapping[str, Entity],
+    producer_index: ProducerIndex | None = None,
 ) -> list[str]:
     """Return the member IDs a manifest's rule selects, raising on zero."""
     rule = manifest.rule
@@ -126,6 +144,8 @@ def _resolve_members(
         member_ids = _resolve_list_rule(rule)
     elif isinstance(rule, SectionRule):
         member_ids = _resolve_section_rule(rule, entities_by_id)
+    elif isinstance(rule, ObtainRule):
+        member_ids = _resolve_obtain_rule(rule, producer_index, entities_by_id)
     else:
         raise CollectionError(
             f"Manifest {manifest.id!r}: unknown rule type {type(rule).__name__!r}."
@@ -349,7 +369,11 @@ def resolve_collections(
 
     for manifest in manifests:
         member_ids = _resolve_members(
-            manifest, item_components, tag_indexes, entities_by_id
+            manifest,
+            item_components,
+            tag_indexes,
+            entities_by_id,
+            producer_index=producer_index,
         )
         collection_entity = _build_collection_entity(
             manifest,

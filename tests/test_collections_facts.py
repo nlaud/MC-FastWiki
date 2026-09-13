@@ -3,12 +3,16 @@
 from pipeline.collections.facts import extract_fact
 from pipeline.normalize.entity import (
     ApplicableItems,
+    ChestLoot,
+    ChestLootContainer,
+    ChestLootItem,
     EnchantInfo,
     Entity,
     EntityKind,
     EntityRef,
     FoodInfo,
     IntegerRange,
+    ProfessionInfo,
     SourceTier,
 )
 
@@ -208,4 +212,113 @@ def test_extract_obtain_found_in_multiple_structures() -> None:
 def test_extract_obtain_found_in_empty_when_no_producers() -> None:
     item = _minimal_entity(id="minecraft:test_item", name="Test Item")
     assert extract_fact(item, "obtain.foundIn") == ""
+
+
+def test_extract_chest_containers_and_distinct_items() -> None:
+    city = _minimal_entity(
+        id="minecraft:ancient_city",
+        name="Ancient City",
+        kind=EntityKind.STRUCTURE,
+        sections=(
+            ChestLoot(
+                containers=(
+                    ChestLootContainer(
+                        label="Chest",
+                        items=(
+                            ChestLootItem(
+                                item=EntityRef(id="minecraft:echo_shard", name="Echo Shard"),
+                                chance=0.298,
+                                stack_range=IntegerRange(minimum=1, maximum=3),
+                            ),
+                            ChestLootItem(
+                                item=EntityRef(
+                                    id="minecraft:disc_fragment_5", name="Disc Fragment"
+                                ),
+                                chance=0.298,
+                                stack_range=IntegerRange(minimum=1, maximum=3),
+                            ),
+                        ),
+                    ),
+                    ChestLootContainer(
+                        label="Ice Box",
+                        items=(
+                            ChestLootItem(
+                                item=EntityRef(id="minecraft:echo_shard", name="Echo Shard"),
+                                chance=0.1,
+                                stack_range=IntegerRange(minimum=1, maximum=1),
+                            ),
+                            ChestLootItem(
+                                item=EntityRef(id="minecraft:packed_ice", name="Packed Ice"),
+                                chance=0.5,
+                                stack_range=IntegerRange(minimum=1, maximum=4),
+                            ),
+                        ),
+                    ),
+                )
+            ),
+        ),
+    )
+    # 2 containers, 3 distinct items (echo_shard, disc_fragment_5, packed_ice)
+    assert extract_fact(city, "chest.containers") == "2"
+    assert extract_fact(city, "chest.items") == "3"
+
+
+def test_extract_profession_workstation_and_trade_count() -> None:
+    armorer = _minimal_entity(
+        id="minecraft:armorer",
+        name="Armorer",
+        kind=EntityKind.PROFESSION,
+        sections=(
+            ProfessionInfo(
+                workstation=EntityRef(id="minecraft:blast_furnace", name="Blast Furnace"),
+                trade_count=18,
+            ),
+        ),
+    )
+    assert extract_fact(armorer, "profession.workstation") == "Blast Furnace"
+    assert extract_fact(armorer, "profession.tradeCount") == "18"
+
+
+def test_extract_bartering_odds_single_and_merged() -> None:
+    from pipeline.obtain.producer import ObtainMethod, Producer, ProducerIndex, ProducerOutput
+
+    blackstone = _minimal_entity(id="minecraft:blackstone", name="Blackstone")
+    potion = _minimal_entity(id="minecraft:potion", name="Potion")
+
+    prod_bs = Producer(
+        method=ObtainMethod.BARTERING,
+        output=ProducerOutput(item="minecraft:blackstone", count=8),
+        inputs=(),
+        source_id="gameplay/piglin_bartering.json",
+        chance=40 / 469,
+        count_max=16,
+        per_attempt=480 / 469,
+    )
+    prod_pot1 = Producer(
+        method=ObtainMethod.BARTERING,
+        output=ProducerOutput(item="minecraft:potion", count=1),
+        inputs=(),
+        source_id="gameplay/piglin_bartering.json",
+        chance=10 / 469,
+        count_max=1,
+        per_attempt=10 / 469,
+    )
+    prod_pot2 = Producer(
+        method=ObtainMethod.BARTERING,
+        output=ProducerOutput(item="minecraft:potion", count=1),
+        inputs=(),
+        source_id="gameplay/piglin_bartering.json",
+        chance=8 / 469,
+        count_max=1,
+        per_attempt=8 / 469,
+    )
+    index = ProducerIndex.from_producers([prod_bs, prod_pot1, prod_pot2])
+
+    assert extract_fact(blackstone, "obtain.chance", producer_index=index) == "8.529%"
+    assert extract_fact(blackstone, "obtain.stackRange", producer_index=index) == "8-16"
+    assert extract_fact(blackstone, "obtain.perAttempt", producer_index=index) == "1.023"
+
+    assert extract_fact(potion, "obtain.chance", producer_index=index) == "3.838%"
+    assert extract_fact(potion, "obtain.stackRange", producer_index=index) == "1"
+    assert extract_fact(potion, "obtain.perAttempt", producer_index=index) == "0.038"
 

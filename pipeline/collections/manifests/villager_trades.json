@@ -1,0 +1,24 @@
+{
+  "id": "villager_trades",
+  "title": "Villager Trades",
+  "blurb": "Villager professions, their job site workstations, and the trades each profession offers.",
+  "aliases": ["villager trades", "trades", "trading", "professions"],
+  "iconFrom": "minecraft:emerald",
+  "rule": {
+    "type": "kind",
+    "kind": "profession"
+  },
+  "columns": [
+    {
+      "fact": "profession.workstation",
+      "label": "Workstation"
+    },
+    {
+      "fact": "profession.tradeCount",
+      "label": "Trades"
+    }
+  ],
+  "sortBy": "name",
+  "sortDirection": "ascending",
+  "note": "All 13 villager professions, their job site workstations, and trade counts from ProfessionInfo. The nitwit carries no workstation or trades and is omitted. Icon borrowed from Emerald."
+}
