@@ -1,0 +1,28 @@
+{
+  "id": "bartering",
+  "title": "Piglin Bartering",
+  "blurb": "Every item obtainable by bartering gold ingots with piglins, with its probability, quantity, and average yield.",
+  "aliases": ["barter", "piglin bartering", "bartering table", "piglin trades"],
+  "iconFrom": "minecraft:gold_ingot",
+  "rule": {
+    "type": "obtain",
+    "method": "bartering"
+  },
+  "columns": [
+    {
+      "fact": "obtain.chance",
+      "label": "Chance"
+    },
+    {
+      "fact": "obtain.stackRange",
+      "label": "Quantity"
+    },
+    {
+      "fact": "obtain.perAttempt",
+      "label": "Per barter"
+    }
+  ],
+  "sortBy": "obtain.chance",
+  "sortDirection": "descending",
+  "note": "Piglin bartering loot table (loot_table/gameplay/piglin_bartering.json). 18 items from 19 producers. minecraft:potion carries two bartering producers (2.132% and 1.706% for normal and splash potions of fire resistance) which merge into one row at 3.838% with quantity 1 because potion variants are not distinguished in the obtain graph. Icon borrowed from Gold Ingot."
+}

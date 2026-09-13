@@ -271,8 +271,9 @@ dependency.
 
 New collections the added data makes nearly free:
 
-- [ ] `fuel` — its own search keyword, with burn times. Blocked on the same missing source as the
-      bullet above; it is not free after all
+- [x] `fuel` — its own search keyword, with burn times. Shipped in commit `d6f8d18` via the curated tier
+      file `data/curated/fuel.json`, overtaking the earlier note that called it blocked on a missing
+      upstream source.
 - [x] `enchantments` — the full list (43), with each one's maximum level. Flat rather than grouped
       by what they apply to: an enchantment applies to a set of items, so the grouping is
       many-to-many and wants its own section type rather than a member list
@@ -280,9 +281,27 @@ New collections the added data makes nearly free:
       which has a page of its own per Decision 27, because the collection lists structure *pages*
       rather than `worldgen/structure` registry entries. Each member links to its own page, which
       already carries the biomes
-- [ ] `chest_loot` — every lootable chest, as a hub into the structures that contain them
-- [ ] `villager_trades` — professions as an index into the trade tables
-- [ ] `bartering` — the full bartering table for piglin bartering
+- [x] `chest_loot` — every lootable chest (31 structures), as a structure-level hub into the structures
+      that contain them, with container counts and distinct item counts via derived counting facts.
+      Resolved via `section` rule on `ChestLoot`. Borrowed icon from `minecraft:chest`. Guarded by
+      `tests/test_collections_drift.py`. Note: `spawn_bonus_chest` has no structureRef and belongs to no
+      structure page, so it has no row here per Decision 27.
+- [x] `villager_trades` — all 13 villager professions as an index into trade tables, with workstation name
+      (nested `EntityRef.name`) and trade count. Resolved via `kind` rule on `profession`. Borrowed icon
+      from `minecraft:emerald`. Guarded by `tests/test_collections_drift.py`.
+- [x] `bartering` — the full piglin bartering table (18 items from 19 producers off
+      `loot_table/gameplay/piglin_bartering.json`), with chance, stack range, and per-barter rate.
+      Resolved via new `obtain` rule with `method: "bartering"`. Borrowed icon from
+      `minecraft:gold_ingot`. Guarded by `tests/test_collections_drift.py`. Note: `minecraft:potion`
+      carries two bartering producers (2.132% and 1.706%) that merge into one row at 3.838% with quantity 1
+      because potion variants are not distinguished in the obtain graph.
+- [ ] **A fact cell cannot be a link, and Lint B cannot see that it should be.** `CollectionMember.values`
+      is `dict[str, str]`, so a fact that reads an `EntityRef` has to flatten it to a name before the
+      payload is written. The Villager Trades workstation column prints `Blast Furnace` as dead text
+      while the Armorer page prints the same name as a link, and Lint B misses it because the ref is
+      already gone by the time the renderer runs. Fixing it means letting a member row carry refs
+      alongside its strings, which changes the pipeline-to-web schema contract and every collection
+      renderer, so it is its own task rather than a rider on the one that surfaced it.
 
 ## Phase 8 — Minecraft theming
 

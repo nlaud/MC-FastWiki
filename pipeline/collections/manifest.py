@@ -28,6 +28,7 @@ __all__ = [
     "ListLayout",
     "ListRule",
     "MemberRule",
+    "ObtainRule",
     "SectionRule",
     "TagRule",
     "TreeLayout",
@@ -82,8 +83,15 @@ class SectionRule(BaseModel, frozen=True, populate_by_name=True):
     section: str = Field(min_length=1)
 
 
+class ObtainRule(BaseModel, frozen=True, populate_by_name=True):
+    """Select every entity that has at least one Producer of the named ObtainMethod."""
+
+    type: Literal["obtain"] = "obtain"
+    method: str = Field(min_length=1)
+
+
 MemberRule = Annotated[
-    ComponentRule | TagRule | KindRule | ListRule | SectionRule,
+    ComponentRule | TagRule | KindRule | ListRule | SectionRule | ObtainRule,
     Field(discriminator="type"),
 ]
 

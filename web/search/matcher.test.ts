@@ -312,12 +312,33 @@ describe("matcher", () => {
         ["job sites", "collection:workstations"],
         ["minecart variants", "collection:minecarts"],
         ["rail vehicles", "collection:minecarts"],
+        ["chest loot", "collection:chest_loot"],
+        ["structure loot", "collection:chest_loot"],
+        ["villager trades", "collection:villager_trades"],
+        ["trades", "collection:villager_trades"],
+        ["trading", "collection:villager_trades"],
+        ["bartering", "collection:bartering"],
+        ["piglin bartering", "collection:bartering"],
       ];
       for (const [query, expectedId] of cases) {
         const results = search(realCorpus, query);
         const match = results.find((r) => r.id === expectedId);
         expect(match, `expected ${expectedId} to match query "${query}"`).toBeDefined();
       }
+    });
+
+    it("does not let villager_trades aliases shadow profession entities or workstations", () => {
+      // Searching "farmer" must return Farmer as the top result (not villager_trades)
+      const farmerResults = search(realCorpus, "farmer");
+      expect(farmerResults[0]?.id).toBe("minecraft:farmer");
+
+      // Searching "workstations" must return Villager Workstations
+      const wsResults = search(realCorpus, "workstations");
+      expect(wsResults[0]?.id).toBe("collection:workstations");
+
+      // Searching "trades" or "villager trades" must return Villager Trades
+      const tradeResults = search(realCorpus, "trades");
+      expect(tradeResults[0]?.id).toBe("collection:villager_trades");
     });
   });
 });

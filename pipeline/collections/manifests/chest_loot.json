@@ -1,0 +1,24 @@
+{
+  "id": "chest_loot",
+  "title": "Chest Loot",
+  "blurb": "Every naturally generating structure that contains loot chests, barrels, dispensers, pots, or vaults.",
+  "aliases": ["chests", "loot", "structure loot", "loot chests"],
+  "iconFrom": "minecraft:chest",
+  "rule": {
+    "type": "section",
+    "section": "ChestLoot"
+  },
+  "columns": [
+    {
+      "fact": "chest.containers",
+      "label": "Containers"
+    },
+    {
+      "fact": "chest.items",
+      "label": "Distinct items"
+    }
+  ],
+  "sortBy": "name",
+  "sortDirection": "ascending",
+  "note": "Structure-level hub of lootable containers across all 31 structures carrying a ChestLoot section. The 'Distinct items' column counts distinct item IDs appearing across containers, not total item stacks. Note: loot_table/chests/spawn_bonus_chest.json has no structureRef and belongs to no structure, so it has no row here per Decision 27. Icon borrowed from Chest."
+}

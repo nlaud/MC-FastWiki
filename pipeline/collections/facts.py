@@ -37,7 +37,8 @@ class SectionFact(BaseModel, frozen=True):
 
     type: Literal["section"] = "section"
     section_type: str
-    attr_name: str
+    attr_name: str = ""
+    count: Literal["containers", "distinct_items"] | None = None
     unit: Literal["percent", "ticks_as_time", "ticks_as_operations"] | None = None
 
 
@@ -46,6 +47,7 @@ class ObtainFact(BaseModel, frozen=True):
 
     type: Literal["obtain"] = "obtain"
     field: str
+    method: str | None = None
 
 
 FactSource = Annotated[SectionFact | ObtainFact, Field(discriminator="type")]
@@ -66,6 +68,21 @@ _FACT_REGISTRY: dict[str, FactSource] = {
     "fuel.operations": SectionFact(
         section_type="FuelInfo", attr_name="burn_time", unit="ticks_as_operations"
     ),
+    "chest.containers": SectionFact(
+        section_type="ChestLoot", count="containers"
+    ),
+    "chest.items": SectionFact(
+        section_type="ChestLoot", count="distinct_items"
+    ),
+    "profession.workstation": SectionFact(
+        section_type="ProfessionInfo", attr_name="workstation.name"
+    ),
+    "profession.tradeCount": SectionFact(
+        section_type="ProfessionInfo", attr_name="trade_count"
+    ),
+    "obtain.chance": ObtainFact(field="chance", method="bartering"),
+    "obtain.stackRange": ObtainFact(field="stackRange", method="bartering"),
+    "obtain.perAttempt": ObtainFact(field="perAttempt", method="bartering"),
 }
 
 
@@ -96,7 +113,29 @@ def _extract_section_fact(entity: Entity, spec: SectionFact) -> str:
     if section is None:
         return ""
 
-    value = getattr(section, spec.attr_name, None)
+    if spec.count == "containers":
+        containers = getattr(section, "containers", ())
+        return str(len(containers)) if containers else ""
+
+    if spec.count == "distinct_items":
+        containers = getattr(section, "containers", ())
+        if not containers:
+            return ""
+        distinct = {
+            item.item.id
+            for c in containers
+            if hasattr(c, "items")
+            for item in c.items
+            if hasattr(item, "item")
+        }
+        return str(len(distinct))
+
+    value: object = section
+    for part in spec.attr_name.split("."):
+        if value is None:
+            break
+        value = getattr(value, part, None)
+
     if value is None:
         return ""
 
@@ -166,6 +205,43 @@ def _extract_obtain_fact(
 ) -> str:
     if spec.field == "foundIn":
         return _extract_obtain_found_in(entity.id, producer_index, sources)
+
+    if producer_index is None:
+        return ""
+
+    producers = producer_index.producers_of(entity.id)
+    if spec.method is not None:
+        producers = tuple(p for p in producers if p.method.value == spec.method)
+
+    if not producers:
+        return ""
+
+    # A member whose producer carries no odds renders empty cells
+    producers_with_odds = [p for p in producers if p.chance is not None]
+    if not producers_with_odds:
+        return ""
+
+    if spec.field == "chance":
+        total_chance = sum(p.chance for p in producers_with_odds if p.chance is not None)
+        pct = total_chance * 100
+        return f"{pct:.3f}%"
+
+    if spec.field == "perAttempt":
+        total_per_attempt = sum(
+            p.per_attempt for p in producers_with_odds if p.per_attempt is not None
+        )
+        return f"{total_per_attempt:.3f}"
+
+    if spec.field == "stackRange":
+        low = min(p.output.count for p in producers_with_odds)
+        high = max(
+            p.count_max if p.count_max is not None else p.output.count
+            for p in producers_with_odds
+        )
+        if low == high:
+            return str(low)
+        return f"{low}-{high}"
+
     return ""
 
 
