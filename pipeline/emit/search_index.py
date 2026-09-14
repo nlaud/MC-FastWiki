@@ -55,6 +55,7 @@ class IndexEntry(BaseModel, frozen=True, populate_by_name=True):
     aliases: tuple[str, ...] = Field(alias="a")
     shard: str = Field(alias="s")
     icon: str | None = Field(default=None, alias="i")
+    item_rarity: str | None = Field(default=None, alias="r")
 
 
 class SearchIndex(BaseModel, frozen=True, populate_by_name=True):
@@ -94,6 +95,7 @@ def build_search_index(shards: Sequence[Shard]) -> SearchIndex:
             aliases=entity.aliases,
             shard=shard.name,
             icon=entity.icon,
+            item_rarity=entity.item_rarity,
         )
         for shard in shards
         for entity in shard.entities

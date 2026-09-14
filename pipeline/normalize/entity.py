@@ -1209,7 +1209,9 @@ Section = Annotated[
 # provenance entry -- a provenance map does not describe its own presence, and
 # a whole section's provenance is recorded under `sections.<Type>`, not under
 # the literal key `"sections"`.
-_PROVENANCE_FIELDS = frozenset({"id", "kind", "name", "aliases", "icon", "blurb", "wikiUrl"})
+_PROVENANCE_FIELDS = frozenset(
+    {"id", "kind", "name", "aliases", "icon", "itemRarity", "blurb", "wikiUrl"}
+)
 
 # The twenty-two `type` values a `sections.<Type>` provenance key may name,
 # matching `tests/test_schema_contract.py`'s `SECTION_TYPES` and this module's
@@ -1259,6 +1261,7 @@ class Entity(BaseModel, frozen=True, populate_by_name=True):
     name: str
     aliases: tuple[str, ...]
     icon: str | None = None
+    item_rarity: str | None = Field(default=None, alias="itemRarity")
     blurb: str | None = None
     wiki_url: str | None = Field(default=None, alias="wikiUrl")
     source_tiers: Mapping[str, SourceTier] = Field(alias="sourceTiers")
@@ -1398,6 +1401,7 @@ class EntityDraft:
         self._kind = kind
         self._name = name
         self._icon: str | None = None
+        self._item_rarity: str | None = None
         self._blurb: str | None = None
         self._wiki_url: str | None = None
         self._aliases: dict[str, SourceTier] = {}
@@ -1442,6 +1446,8 @@ class EntityDraft:
             self._name = value if value is not None else self._name
         elif field == "icon":
             self._icon = value
+        elif field == "itemRarity":
+            self._item_rarity = value
         elif field == "blurb":
             self._blurb = value
         elif field == "wikiUrl":
@@ -1529,6 +1535,7 @@ class EntityDraft:
             name=self._name,
             aliases=tuple(self._aliases),
             icon=self._icon,
+            item_rarity=self._item_rarity,
             blurb=self._blurb,
             wiki_url=self._wiki_url,
             source_tiers=dict(self._provenance),

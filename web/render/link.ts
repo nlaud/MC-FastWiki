@@ -45,9 +45,12 @@ function appendQuantity(host: HTMLElement, quantityStr: string | null): void {
   host.append(qtySpan);
 }
 
-function appendName(host: HTMLElement, name: string): void {
+function appendName(host: HTMLElement, name: string, rarity?: string): void {
   const nameSpan = document.createElement("span");
   nameSpan.className = "entity-name";
+  if (rarity) {
+    nameSpan.classList.add(`rarity-${rarity}`);
+  }
   nameSpan.textContent = name;
   host.append(nameSpan);
 }
@@ -99,7 +102,7 @@ export function entityLink(target: EntityRef | ItemAmount, ctx: RenderContext): 
 
   appendQuantity(link, quantityStr);
   link.append(createIconElement(entryIconKey(entry)));
-  appendName(link, ref.name || displayName);
+  appendName(link, ref.name || displayName, entry.r);
   appendNote(link, note);
 
   link.addEventListener("click", (e) => {

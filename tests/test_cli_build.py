@@ -273,12 +273,19 @@ def _build_fixtures() -> dict[str, bytes]:
     fixtures[summary_url] = json.dumps(registries).encode("utf-8")
 
     # `item_components/data.json`, the second summary payload a build reads.
-    # Its keys are unprefixed, matching the real branch, and the one item here
-    # is food so that the fixture exercises `pipeline.extract.food` rather than
-    # tripping its "an empty read is a broken fetch" guard.
+    # Its keys are unprefixed, matching the real branch, and the items here
+    # carry components so that the fixture exercises `pipeline.extract.food` and
+    # `pipeline.extract.rarity` rather than tripping their "an empty read is a
+    # broken fetch" guards.
     item_components = {
-        "creeper_spawn_egg": {"minecraft:max_stack_size": 64},
-        "apple": {"minecraft:food": {"nutrition": 4, "saturation": 2.4}},
+        "creeper_spawn_egg": {
+            "minecraft:max_stack_size": 64,
+            "minecraft:rarity": "rare",
+        },
+        "apple": {
+            "minecraft:food": {"nutrition": 4, "saturation": 2.4},
+            "minecraft:rarity": "common",
+        },
     }
     item_components_url = (
         f"https://raw.githubusercontent.com/{MCMETA_REPOSITORY}/{SUMMARY_SHA}"

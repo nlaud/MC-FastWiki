@@ -26,7 +26,13 @@ function resolveWikiLink(target: string, ctx: RenderContext) {
   return ctx.lookup(namespaced);
 }
 
-function createEntityLink(id: string, icon: string | undefined, label: string, ctx: RenderContext) {
+function createEntityLink(
+  id: string,
+  icon: string | undefined,
+  label: string,
+  ctx: RenderContext,
+  rarity?: string,
+) {
   const link = document.createElement("a");
   link.href = "#";
   // `entity-link-prose` drops the chip padding that the standalone form carries.
@@ -40,6 +46,9 @@ function createEntityLink(id: string, icon: string | undefined, label: string, c
 
   const labelSpan = document.createElement("span");
   labelSpan.className = "entity-name";
+  if (rarity) {
+    labelSpan.classList.add(`rarity-${rarity}`);
+  }
   labelSpan.textContent = label;
   link.append(labelSpan);
 
@@ -82,7 +91,7 @@ export function appendWikiText(host: HTMLElement, rawText: string, ctx: RenderCo
 
     const entry = resolveWikiLink(target, ctx);
     if (entry) {
-      host.append(createEntityLink(entry.id, entry.i, label, ctx));
+      host.append(createEntityLink(entry.id, entry.i, label, ctx, entry.r));
     } else {
       host.append(document.createTextNode(label));
     }

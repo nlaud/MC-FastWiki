@@ -39,6 +39,9 @@ export function createWindowElement(
   const icon = createIconElement(entryIconKey(windowState.entry));
   const title = document.createElement("h2");
   title.className = "window-title";
+  if (windowState.entry.r) {
+    title.classList.add(`rarity-${windowState.entry.r}`);
+  }
   title.textContent = windowState.entry.n;
 
   const badge = document.createElement("span");

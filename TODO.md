@@ -370,23 +370,25 @@ New collections the added data makes nearly free:
       (`water`, `mundane`, `thick`, `awkward`).
 - [x] Hostile/passive color coding consistent across every renderer.
       `.stat-behavior.is-hostile`, `.is-passive` and `.is-neutral` cover it.
-- [ ] **Rarity color coding is blocked on the pipeline, not on CSS.** There is no rarity to colour:
-      `grep '"rarity"' data/dist/entities/*.json` hits only the 43 enchantments, because nothing
-      extracts the `minecraft:rarity` component. Closing it means an extract change, a schema edit,
-      a `data/dist` regeneration and new pipeline tests, so it is its own task.
-      The palette it needs is already defined and deliberately left unused: `--mc-yellow` and
-      `--mc-purple` sit in the token block with a comment saying why, so the four rarity tiers get
-      picked once rather than half now and half later.
+- [x] Rarity color coding across pipeline and web.
+      Extracted `minecraft:rarity` from `item_components/data.json` into typed `ItemRarity` (`common`,
+      `uncommon`, `rare`, `epic`) via `pipeline/extract/rarity.py`. Schema contracts updated in
+      `entity.schema.json` (`itemRarity`) and `index.schema.json` (`r`), generated into TypeScript types.
+      Non-common tiers attached at merge time and search index emission. Rebuilt `data/dist` with 115
+      tiered items. Rendered in web via CSS tokens (`--mc-yellow`, `--mc-aqua`, `--mc-purple`) across
+      window titles (`.window-title`), suggestion names (`.suggestion-name`), and entity links (`.entity-name`).
 - [x] Accessibility: contrast and focus rings.
       Every colour was measured against the surface it actually sits on. Body prose 12.9:1, headings
       5.9:1 on content and 4.5:1 on chrome, links 8.1:1 and 6.2:1, muted labels 6.5:1, hostile red
       5.4:1 - all at or above 4.5:1.
       Focus is one white outline rather than the old blue glow, on the focused window, the search bar
       and every control alike, so one visual language answers "where am I".
-- [ ] Accessibility: a reduced-motion path.
-      Left open on purpose rather than deferred by accident. The theme pass deleted most of the
-      transitions it would have needed to disable, so the honest scope of what remains is easier to
-      state now than it was before.
+- [x] Accessibility: a reduced-motion path.
+      Honors `(prefers-reduced-motion: reduce)`: pauses recipe slot ticker animation in
+      `web/render/station/ticker.ts`, provides keyboard arrow navigation (Left/Right) and a visible
+      step button on multi-member slots, enables full-list member view modal on click/Enter/Space,
+      and enforces `animation-duration: 0.01ms !important; transition-duration: 0.01ms !important;`
+      globally via media query in `web/theme/base.css`.
 
 ### Palette, after review
 

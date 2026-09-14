@@ -99,4 +99,27 @@ describe("entityLink rule", () => {
     expect(el.classList.contains("entity-plain")).toBe(true);
     expect(el.textContent).toBe("Unindexed");
   });
+
+  it("applies rarity classes to entity-name when the target index entry declares rarity", () => {
+    const beaconEntry: IndexEntry = {
+      id: "minecraft:beacon",
+      n: "Beacon",
+      k: "block",
+      a: [],
+      s: "block-0",
+      r: "rare",
+    };
+    mockIndex.set("minecraft:beacon", beaconEntry);
+
+    const ctx = createMockContext();
+    const appleEl = entityLink({ id: "minecraft:apple", name: "Apple" }, ctx);
+    const appleName = appleEl.querySelector(".entity-name");
+    expect(appleName?.classList.contains("rarity-rare")).toBe(false);
+    expect(appleName?.classList.contains("rarity-uncommon")).toBe(false);
+    expect(appleName?.classList.contains("rarity-epic")).toBe(false);
+
+    const beaconEl = entityLink({ id: "minecraft:beacon", name: "Beacon" }, ctx);
+    const beaconName = beaconEl.querySelector(".entity-name");
+    expect(beaconName?.classList.contains("rarity-rare")).toBe(true);
+  });
 });
