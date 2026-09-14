@@ -9,23 +9,24 @@ const listeners = new Set<TickListener>();
 /**
  * Whether the shared cycle may advance.
  *
- * `prefers-reduced-motion` used to stop it, and that was the wrong call. The
- * cycle is not decoration: it is the only thing on screen that says a torch
- * takes coal *or* charcoal, and that a plank slot accepts any of twelve woods.
- * Freezing it does not reduce motion so much as delete the information, and
- * Windows sets that preference whenever "Show animations" is off -- which is
- * how a feature that works reports as simply not working.
+ * When `prefers-reduced-motion: reduce` is set, the automatic ticker halts to
+ * satisfy WCAG 2.2.2 (Pause, Stop, Hide). The information remains accessible
+ * through a static path: multi-member slots carry an accent marker, announce
+ * their tag, alternative count, and current member via `aria-label`, allow
+ * stepping through alternatives on demand via keyboard (Left/Right) or mouse
+ * (next button), and open the full member list on activation.
  *
- * What the preference does still get is the static path: every cycling slot
- * carries the full alternative list on its `title` and is focusable, so the
- * same facts are reachable without waiting for the animation.
- *
- * An unfocused window still holds. That gate is about not moving things in the
- * corner of the reader's eye while they are reading a different window, which
- * costs them nothing.
+ * An unfocused window also holds. That gate is about not moving things in the
+ * corner of the reader's eye while they are reading a different window.
  */
-function shouldTick(): boolean {
+export function shouldTick(): boolean {
   if (typeof window === "undefined") {
+    return false;
+  }
+  if (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
     return false;
   }
   if (typeof document !== "undefined" && typeof document.hasFocus === "function") {

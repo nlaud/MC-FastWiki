@@ -1933,6 +1933,122 @@ canvas,
   padding: 0 2px;
 }
 
+/* Cycling slot indicator notch */
+.station-slot.is-cycling::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 5px 5px 0;
+  border-color: transparent var(--mc-accent) transparent transparent;
+  pointer-events: none;
+}
+
+.slot-step-next {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  font-size: 8px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: var(--mc-panel-lo);
+  color: var(--mc-text);
+  border: 1px solid var(--mc-panel-hi);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  opacity: 0.8;
+}
+
+.slot-step-next:hover,
+.slot-step-next:focus-visible {
+  opacity: 1;
+  background: var(--mc-panel-hi);
+  color: var(--mc-yellow);
+  outline: none;
+}
+
+/* Slot Member List Modal */
+.slot-list-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.slot-list-panel {
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.slot-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 3px solid var(--mc-panel-lo);
+}
+
+.slot-list-title {
+  margin: 0;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
+  font-weight: normal;
+  color: var(--mc-accent);
+}
+
+.slot-list-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.slot-list-close-btn:hover {
+  color: #fff;
+}
+
+.slot-list-close-btn:focus-visible {
+  outline: 2px solid var(--mc-focus);
+  outline-offset: 1px;
+}
+
+.slot-list-content {
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Crafting Grid */
 .crafting-grid {
   display: grid;
@@ -3066,4 +3182,16 @@ canvas,
     )
     no-repeat;
   background-size: calc(var(--depth) * 14px) 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

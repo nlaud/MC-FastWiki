@@ -7,8 +7,13 @@ import { renderSmithingCard } from "./smithing.js";
 import { renderStonecutterCard } from "./stonecutter.js";
 import { renderUsingCard } from "./using.js";
 
-export { advanceTickerForTesting, resetTickerForTesting, subscribeTicker } from "./ticker.js";
-export { humaniseTag, renderSlot, type SlotOptions } from "./slot.js";
+export {
+  advanceTickerForTesting,
+  resetTickerForTesting,
+  shouldTick,
+  subscribeTicker,
+} from "./ticker.js";
+export { humaniseTag, openSlotMemberList, renderSlot, type SlotOptions } from "./slot.js";
 export { renderCraftingCard } from "./crafting.js";
 export { renderFurnaceCard } from "./furnace.js";
 export { renderStonecutterCard } from "./stonecutter.js";
