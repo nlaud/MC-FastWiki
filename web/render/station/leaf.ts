@@ -1,6 +1,6 @@
 import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
-import { potionIconKey, potionName } from "./potion-icon.js";
+import { potionIconKey, potionName } from "../potion-icon.js";
 import { humaniseId } from "./slot.js";
 
 /**

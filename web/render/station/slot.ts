@@ -1,7 +1,7 @@
 import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
 import type { TreeInput } from "../obtain-tree.js";
-import { potionIconKey, potionName } from "./potion-icon.js";
+import { potionIconKey, potionName } from "../potion-icon.js";
 import { subscribeTicker } from "./ticker.js";
 
 /**
@@ -88,7 +88,7 @@ export function renderSlot(
     const iconKey = entry?.i ?? potionIconKey(item);
 
     if (iconKey) {
-      const icon = createIconElement(iconKey, { size: 16 });
+      const icon = createIconElement(iconKey, { size: 32, allowUpscale: true });
       contentContainer.append(icon);
     } else {
       // Fallback for items with no sprite in the atlas

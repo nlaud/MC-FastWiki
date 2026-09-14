@@ -1,9 +1,47 @@
-/* Base stylesheet. The Minecraft theme arrives in Phase 8. */
+/* ==========================================================================
+   Design Tokens (Minecraft Java Edition GUI)
+   ========================================================================== */
+
+:root {
+  --mc-panel: #313131;
+  --mc-panel-hi: #5f5f5f;
+  --mc-panel-lo: #1a1a1a;
+  --mc-surface: #1c1c1c;
+  --mc-slot: #8b8b8b;
+  --mc-slot-lo: #373737;
+  --mc-slot-hi: #ffffff;
+  --mc-focus: rgba(255, 255, 255, 0.5);
+  --mc-focus-soft: rgba(255, 255, 255, 0.2);
+  --mc-select-bg: rgba(255, 255, 255, 0.08);
+  --mc-accent: #00aaaa;
+  --mc-blue: #8bb3ff;
+  --mc-green: #55ff55;
+  --mc-red: #ff5555;
+  /* Defined but not yet drawn. Item rarity (Phase 8 part 2) needs the full
+     white / yellow / aqua / light-purple set, and splitting the palette across
+     two commits is how one of them ends up a different purple. Neither is an
+     accent: rarity states a tier, so it keeps Minecraft's own codes even now
+     that the chrome accent has moved off yellow. */
+  --mc-yellow: #ffff55;
+  --mc-purple: #ff55ff;
+  --mc-page: #131313;
+  --mc-text: #ffffff;
+  --mc-muted: #a0a0a0;
+}
+
+@font-face {
+  font-family: "Monocraft";
+  src: url("./fonts/monocraft.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+  border-radius: 0;
 }
 
 html,
@@ -12,7 +50,7 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #141414;
+  background: var(--mc-page);
   color: #e0e0e0;
   font-family:
     system-ui,
@@ -49,31 +87,33 @@ body {
 .wiki-window {
   display: flex;
   flex-direction: column;
-  background: #1f1f1f;
-  border: 1px solid #333;
-  border-radius: 6px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   overflow: hidden;
   outline: none;
   min-width: 0;
   min-height: 0;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
 .wiki-window:focus,
 .wiki-window.is-focused {
-  border-color: #5c85d6;
-  box-shadow: 0 0 0 2px rgba(92, 133, 214, 0.4);
+  outline: none;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 3px var(--mc-focus-soft);
 }
 
 .window-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: #282828;
-  border-bottom: 1px solid #333;
+  padding: 7px 10px;
+  background: var(--mc-panel);
+  border-bottom: 3px solid var(--mc-panel-lo);
   user-select: none;
 }
 
@@ -87,9 +127,12 @@ body {
 
 .window-title {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #f0f0f0;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
+  font-weight: normal;
+  color: var(--mc-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -105,27 +148,25 @@ body {
   padding: 0;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
-  color: #999;
-  font-size: 1.2rem;
+  border-radius: 0;
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease,
-    border-color 0.1s ease;
 }
 
 .window-close-btn:hover {
-  background: #3a3a3a;
+  background: var(--mc-panel-hi);
   color: #fff;
-  border-color: #555;
+  border-color: var(--mc-panel-lo);
 }
 
 .window-close-btn:focus-visible {
-  outline: none;
-  border-color: #5c85d6;
-  box-shadow: 0 0 0 2px rgba(92, 133, 214, 0.4);
+  outline: 2px solid var(--mc-focus);
+  outline-offset: 1px;
 }
 
 .window-body {
@@ -143,8 +184,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: var(--mc-surface);
   scrollbar-width: thin;
-  scrollbar-color: #333333 transparent;
+  scrollbar-color: var(--mc-panel-lo) transparent;
 }
 
 .window-body::-webkit-scrollbar {
@@ -158,12 +200,12 @@ body {
 }
 
 .window-body::-webkit-scrollbar-thumb {
-  background: #333333;
-  border-radius: 3px;
+  background: var(--mc-panel-lo);
+  border-radius: 0;
 }
 
 .window-body::-webkit-scrollbar-thumb:hover {
-  background: #5c85d6;
+  background: var(--mc-panel-hi);
 }
 
 /* ==========================================================================
@@ -178,20 +220,25 @@ body {
 
 .entity-kind-badge {
   display: inline-block;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: 2px 6px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #333;
-  color: #8ab4f8;
-  border-radius: 4px;
+  background: #000;
+  color: var(--mc-accent);
+  border: 2px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  border-radius: 0;
   flex-shrink: 0;
 }
 
 .entity-kind-badge.profession {
-  background: #1e3820;
-  color: #81c995;
+  background: #000;
+  color: var(--mc-green);
 }
 
 .entity-blurb {
@@ -206,11 +253,11 @@ body {
   padding-top: 12px;
   border-top: 1px solid #2a2a2a;
   font-size: 0.8rem;
-  color: #888;
+  color: var(--mc-muted);
 }
 
 .entity-attribution a {
-  color: #8ab4f8;
+  color: var(--mc-blue);
   text-decoration: none;
 }
 
@@ -219,18 +266,18 @@ body {
 }
 
 .entity-attribution a:focus-visible {
-  outline: 2px solid #5c85d6;
+  outline: 2px solid var(--mc-focus);
   outline-offset: 2px;
 }
 
 .entity-loading {
-  color: #888;
+  color: var(--mc-muted);
   font-size: 0.9rem;
   font-style: italic;
 }
 
 .entity-error {
-  color: #f28b82;
+  color: var(--mc-red);
   font-size: 0.9rem;
 }
 
@@ -268,11 +315,12 @@ body {
      the bar is a permanent 8px of chrome nobody drags. `scrollbar-width` covers
      Firefox and the `::-webkit-scrollbar` rule below covers Chrome and Safari. */
   scrollbar-width: none;
-  background: #1c1c1c;
-  border: 1px solid #3a3a3a;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  padding: 4px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
+  padding: 3px;
   gap: 2px;
 }
 
@@ -284,15 +332,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 6px 9px;
+  border-radius: 0;
   cursor: pointer;
   user-select: none;
-  transition: background 0.1s ease;
+  color: #dcdcdc;
 }
 
 .suggestion-item.is-selected {
-  background: #2a3b5c;
+  background: var(--mc-select-bg);
   color: #fff;
 }
 
@@ -304,21 +352,24 @@ body {
 }
 
 .suggestion-name {
-  font-size: 0.95rem;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .suggestion-kind {
-  font-size: 0.75rem;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
   text-transform: uppercase;
-  color: #888;
+  color: var(--mc-muted);
   padding-left: 8px;
 }
 
 .suggestion-item.is-selected .suggestion-kind {
-  color: #adc8ff;
+  color: var(--mc-accent);
 }
 
 .search-input-wrapper {
@@ -327,17 +378,22 @@ body {
 
 .search-input {
   width: 100%;
-  padding: 12px 16px;
-  font-size: 1rem;
-  background: #1c1c1c;
+  padding: 9px 12px;
+  background: #000;
   color: #fff;
-  border: 1px solid #444;
-  border-radius: 8px;
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   outline: none;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
+}
+
+.search-input::placeholder {
+  color: #6a6a6a;
 }
 
 .search-input:focus,
@@ -348,22 +404,25 @@ body {
    of whether the bar is meant to own the keyboard, and that does not change
    during a click. */
 .search-input.is-bar-focused {
-  border-color: #5c85d6;
-  box-shadow:
-    0 0 0 2px rgba(92, 133, 214, 0.4),
-    0 6px 20px rgba(0, 0, 0, 0.6);
+  outline: 1px solid var(--mc-focus);
+  outline-offset: 1px;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
 }
 
 .search-max-hint {
   text-align: center;
-  padding: 10px 16px;
-  font-size: 0.85rem;
-  background: rgba(28, 28, 28, 0.95);
-  border: 1px solid #444;
-  border-radius: 8px;
-  color: #aaa;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  padding: 8px 12px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 12px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
+  color: var(--mc-muted);
 }
 
 /* ==========================================================================
@@ -383,19 +442,19 @@ body {
   justify-content: center;
   z-index: 2000;
   padding: 16px;
-  backdrop-filter: blur(2px);
 }
 
 .help-panel {
-  background: #1c1c1c;
-  border: 1px solid #444;
-  border-radius: 10px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   width: 100%;
   max-width: 560px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
   overflow: hidden;
 }
 
@@ -403,21 +462,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid #333;
+  padding: 10px 14px;
+  border-bottom: 3px solid var(--mc-panel-lo);
 }
 
 .help-title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
+  font-weight: normal;
+  color: var(--mc-accent);
 }
 
 .help-close-btn {
   background: transparent;
   border: none;
-  color: #aaa;
-  font-size: 1.4rem;
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   padding: 4px;
@@ -427,26 +493,33 @@ body {
   color: #fff;
 }
 
+.help-close-btn:focus-visible {
+  outline: 2px solid var(--mc-focus);
+  outline-offset: 1px;
+}
+
 .help-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 14px;
   overflow-y: auto;
 }
 
 .help-table th,
 .help-table td {
-  padding: 10px 14px;
+  padding: 8px 12px;
   text-align: left;
-  border-bottom: 1px solid #282828;
+  border-bottom: 1px solid var(--mc-panel-lo);
 }
 
 .help-table th {
-  color: #888;
-  font-weight: 600;
-  font-size: 0.8rem;
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
   text-transform: uppercase;
-  background: #222;
+  background: var(--mc-panel-lo);
 }
 
 .help-key {
@@ -455,12 +528,14 @@ body {
 
 .help-key kbd {
   display: inline-block;
-  padding: 3px 6px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.85rem;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 12px;
+  background: #000;
+  border: 1px solid var(--mc-panel-hi);
+  border-radius: 0;
   color: #eee;
 }
 
@@ -471,8 +546,8 @@ body {
 
 .help-when {
   width: 30%;
-  color: #888;
-  font-size: 0.85rem;
+  color: var(--mc-muted);
+  font-size: 12px;
 }
 
 /* ==========================================================================
@@ -517,11 +592,13 @@ canvas,
 
 .section-title {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 12px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
+  color: var(--mc-accent);
 }
 
 /* Entity links */
@@ -529,9 +606,9 @@ canvas,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #8ab4f8;
+  color: var(--mc-blue);
   text-decoration: none;
-  border-radius: 3px;
+  border-radius: 0;
   padding: 1px 4px;
   margin: -1px -2px;
   cursor: pointer;
@@ -554,12 +631,12 @@ canvas,
 }
 
 .entity-link:hover {
-  background: rgba(138, 180, 248, 0.12);
+  background: rgba(85, 255, 255, 0.15);
   text-decoration: underline;
 }
 
 .entity-link:focus-visible {
-  outline: 2px solid #5c85d6;
+  outline: 2px solid var(--mc-focus);
   outline-offset: 1px;
 }
 
@@ -579,7 +656,7 @@ canvas,
 }
 
 .item-note {
-  color: #888;
+  color: var(--mc-muted);
   font-size: 0.8em;
   font-style: italic;
 }
@@ -602,32 +679,36 @@ canvas,
 .stat-badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 4px;
-  background: #282828;
-  border: 1px solid #383838;
+  padding: 2px 6px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  border-radius: 0;
+  background: #000;
+  border: 2px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
   color: #e0e0e0;
   line-height: 1.2;
 }
 
 .stat-behavior.is-hostile {
-  background: rgba(242, 139, 130, 0.15);
-  border-color: rgba(242, 139, 130, 0.35);
-  color: #f28b82;
+  background: rgba(255, 85, 85, 0.15);
+  border-color: var(--mc-red);
+  color: var(--mc-red);
 }
 
 .stat-behavior.is-passive {
-  background: rgba(129, 201, 149, 0.15);
-  border-color: rgba(129, 201, 149, 0.35);
-  color: #81c995;
+  background: rgba(85, 255, 85, 0.15);
+  border-color: var(--mc-green);
+  color: var(--mc-green);
 }
 
 .stat-behavior.is-neutral {
-  background: rgba(253, 214, 99, 0.15);
-  border-color: rgba(253, 214, 99, 0.35);
-  color: #fdd663;
+  background: rgba(255, 255, 85, 0.15);
+  border-color: var(--mc-accent);
+  color: var(--mc-accent);
 }
 
 .stat-mob-type {
@@ -639,9 +720,11 @@ canvas,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: #181818;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   padding: 8px 12px;
 }
 
@@ -667,10 +750,12 @@ canvas,
 }
 
 .stat-icons-more {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 12px;
   line-height: 1;
-  color: #ff8a80;
+  color: var(--mc-red);
 }
 
 .stat-label-text {
@@ -680,11 +765,11 @@ canvas,
 }
 
 .stat-metric-health .stat-label-text {
-  color: #ff8a80;
+  color: var(--mc-red);
 }
 
 .stat-metric-armor .stat-label-text {
-  color: #8ab4f8;
+  color: var(--mc-blue);
 }
 
 .stat-metric-damage .stat-label-text {
@@ -698,11 +783,13 @@ canvas,
 /* Tables (DropTable, TradeTable) */
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #1a1a1a;
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
+  background: var(--mc-surface);
   scrollbar-width: thin;
-  scrollbar-color: #333333 transparent;
+  scrollbar-color: var(--mc-panel-lo) transparent;
 }
 
 .table-wrapper::-webkit-scrollbar {
@@ -716,12 +803,12 @@ canvas,
 }
 
 .table-wrapper::-webkit-scrollbar-thumb {
-  background: #333333;
-  border-radius: 3px;
+  background: var(--mc-panel-lo);
+  border-radius: 0;
 }
 
 .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #5c85d6;
+  background: var(--mc-panel-hi);
 }
 
 .data-table {
@@ -738,10 +825,13 @@ canvas,
 }
 
 .data-table th {
-  background: #222;
-  color: #888;
-  font-size: 0.75rem;
-  font-weight: 600;
+  background: var(--mc-panel-lo);
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -944,26 +1034,27 @@ canvas,
   align-self: flex-start;
   margin-top: 6px;
   padding: 4px 10px;
-  background: #252525;
-  border: 1px solid #383838;
-  border-radius: 4px;
-  color: #8ab4f8;
+  background: var(--mc-panel);
+  border: 1px solid #000;
+  border-radius: 0;
+  box-shadow:
+    inset -1px -1px 0 0 var(--mc-panel-lo),
+    inset 1px 1px 0 0 var(--mc-panel-hi);
+  color: var(--mc-blue);
   font-size: 0.8rem;
   cursor: pointer;
   transition:
     background 0.1s ease,
-    color 0.1s ease,
-    border-color 0.1s ease;
+    color 0.1s ease;
 }
 
 .show-more-btn:hover {
-  background: #333;
-  color: #adc8ff;
-  border-color: #555;
+  background: #3f3f3f;
+  color: #b3ccff;
 }
 
 .show-more-btn:focus-visible {
-  outline: 2px solid #5c85d6;
+  outline: 2px solid var(--mc-focus);
   outline-offset: 1px;
 }
 
@@ -988,7 +1079,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .food-metric {
@@ -1071,7 +1162,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .compost-metric,
@@ -1114,7 +1205,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .harvest-row {
@@ -1153,7 +1244,7 @@ canvas,
   padding: 2px 6px;
   font-size: 0.75rem;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .harvest-badge.badge-yes {
@@ -1202,7 +1293,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .generation-row {
@@ -1231,7 +1322,7 @@ canvas,
 
 .generation-biomes-details summary {
   cursor: pointer;
-  color: #8ab4f8;
+  color: var(--mc-blue);
   user-select: none;
 }
 
@@ -1267,19 +1358,22 @@ canvas,
   text-align: left;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .generation-veins-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
   padding: 6px 10px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
   letter-spacing: 0.05em;
-  background: #202020;
+  background: var(--mc-panel-lo);
 }
 
 .generation-veins-table td {
@@ -1315,7 +1409,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .enchant-row {
@@ -1375,7 +1469,7 @@ canvas,
   padding: 2px 6px;
   font-size: 0.75rem;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .enchant-badge.badge-treasure {
@@ -1651,11 +1745,12 @@ canvas,
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #181818;
-  border: 1px solid #2e2e2e;
-  border-radius: 6px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   padding: 10px 14px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .station-chips {
@@ -1670,14 +1765,18 @@ canvas,
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border-radius: 3px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  border-radius: 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #242424;
-  color: #ccc;
-  border: 1px solid #383838;
+  background: #000;
+  color: var(--mc-accent);
+  border: 2px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
 }
 
 .station-chip-furnace {
@@ -1711,9 +1810,9 @@ canvas,
 }
 
 .station-chip-smithing {
-  color: #81c995;
-  background: rgba(129, 201, 149, 0.15);
-  border-color: rgba(129, 201, 149, 0.35);
+  color: var(--mc-green);
+  background: rgba(85, 255, 85, 0.15);
+  border-color: rgba(85, 255, 85, 0.35);
 }
 
 .station-chip-brewing {
@@ -1723,9 +1822,9 @@ canvas,
 }
 
 .station-chip-filling {
-  color: #8ab4f8;
-  background: rgba(138, 180, 248, 0.15);
-  border-color: rgba(138, 180, 248, 0.35);
+  color: var(--mc-blue);
+  background: rgba(85, 255, 255, 0.15);
+  border-color: rgba(85, 255, 255, 0.35);
 }
 
 .station-chip-using {
@@ -1758,13 +1857,10 @@ canvas,
 .station-slot {
   width: 36px;
   height: 36px;
-  background: #141414;
-  border: 2px solid #3a3a3a;
-  border-top-color: #101010;
-  border-left-color: #101010;
-  border-right-color: #4a4a4a;
-  border-bottom-color: #4a4a4a;
-  border-radius: 2px;
+  background: var(--mc-slot);
+  border: 2px solid;
+  border-color: var(--mc-slot-lo) var(--mc-slot-hi) var(--mc-slot-hi) var(--mc-slot-lo);
+  border-radius: 0;
   position: relative;
   display: flex;
   align-items: center;
@@ -1773,16 +1869,15 @@ canvas,
 }
 
 .station-slot.slot-result {
-  width: 40px;
-  height: 40px;
-  border-color: #555;
-  border-top-color: #151515;
-  border-left-color: #151515;
+  width: 44px;
+  height: 44px;
+  border: 2px solid;
+  border-color: var(--mc-slot-lo) var(--mc-slot-hi) var(--mc-slot-hi) var(--mc-slot-lo);
 }
 
 .station-slot.is-empty {
-  opacity: 0.4;
-  border-style: dashed;
+  opacity: 1;
+  border-style: solid;
 }
 
 .station-slot[role="button"] {
@@ -1791,7 +1886,7 @@ canvas,
 
 .station-slot[role="button"]:hover,
 .station-slot[role="button"]:focus-visible {
-  outline: 2px solid #5c85d6;
+  outline: 2px solid var(--mc-focus);
   outline-offset: 1px;
 }
 
@@ -1809,11 +1904,12 @@ canvas,
   position: absolute;
   right: 2px;
   bottom: 0px;
-  font-family: monospace;
-  font-size: 0.75rem;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
   font-weight: bold;
   color: #ffffff;
-  text-shadow: 1px 1px 0 #222;
   user-select: none;
   pointer-events: none;
 }
@@ -1833,21 +1929,26 @@ canvas,
   font-size: 0.55rem;
   line-height: 1.1;
   text-align: center;
-  color: #b0b0b0;
+  color: #222;
   padding: 0 2px;
 }
 
 /* Crafting Grid */
 .crafting-grid {
   display: grid;
-  grid-template-columns: repeat(3, 34px);
-  grid-template-rows: repeat(3, 34px);
+  grid-template-columns: repeat(3, 36px);
+  grid-template-rows: repeat(3, 36px);
   gap: 2px;
+  background: var(--mc-panel);
+  padding: 4px;
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
 }
 
 .crafting-grid .station-slot {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
 }
 
 /* Furnace Card */
@@ -1887,8 +1988,11 @@ canvas,
 .station-card.station-leaf {
   padding: 8px 12px;
   cursor: pointer;
-  background: #181818;
-  border: 1px solid #333;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   transition:
     background 0.1s ease,
     border-color 0.1s ease;
@@ -1896,9 +2000,8 @@ canvas,
 
 .station-card.station-leaf:hover,
 .station-card.station-leaf:focus-visible {
-  background: #242424;
-  border-color: #555;
-  outline: 2px solid #5c85d6;
+  background: var(--mc-panel-hi);
+  outline: 2px solid var(--mc-focus);
   outline-offset: 1px;
 }
 
@@ -1911,7 +2014,7 @@ canvas,
 .leaf-name {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #8ab4f8;
+  color: var(--mc-blue);
 }
 
 /* Station Pagination Dots */
@@ -1920,7 +2023,7 @@ canvas,
 }
 
 .station-card.is-steppable:hover {
-  border-color: #5c85d6;
+  outline: 2px solid var(--mc-focus);
 }
 
 .station-pagination {
@@ -1933,7 +2036,7 @@ canvas,
 .station-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #444;
   border: none;
   padding: 0;
@@ -1944,7 +2047,7 @@ canvas,
 }
 
 .station-dot.is-active {
-  background: #8ab4f8;
+  background: var(--mc-accent);
   transform: scale(1.2);
 }
 
@@ -1964,9 +2067,9 @@ canvas,
   padding: 3px 8px;
   font-size: 0.75rem;
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: 0;
   background: #242424;
-  color: #8ab4f8;
+  color: var(--mc-blue);
   border: 1px solid #3a3a3a;
   cursor: pointer;
   transition:
@@ -1978,12 +2081,12 @@ canvas,
 .sources-more-button:hover {
   background: #333;
   border-color: #555;
-  color: #adc8ff;
+  color: var(--mc-accent);
 }
 
 .tree-expand-stub-btn:focus-visible,
 .sources-more-button:focus-visible {
-  outline: 2px solid #5c85d6;
+  outline: 2px solid var(--mc-focus);
   outline-offset: 1px;
 }
 
@@ -2011,18 +2114,23 @@ canvas,
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #161616;
-  border: 1px solid #282828;
-  border-radius: 6px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-hi) var(--mc-panel-lo) var(--mc-panel-lo) var(--mc-panel-hi);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
   padding: 12px 14px;
 }
 
 .sources-pane-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #ffffff;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 14px;
+  font-weight: normal;
+  color: var(--mc-text);
   margin: 0;
-  border-bottom: 1px solid #2e2e2e;
+  border-bottom: 3px solid var(--mc-panel-lo);
   padding-bottom: 6px;
 }
 
@@ -2033,9 +2141,12 @@ canvas,
 }
 
 .sources-group-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #adc8ff;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2124,7 +2235,7 @@ canvas,
   color: #aaa;
   background: #222;
   border: 1px solid #333;
-  border-radius: 3px;
+  border-radius: 0;
   padding: 1px 5px;
 }
 
@@ -2151,8 +2262,12 @@ canvas,
 }
 
 .sources-odds-chance {
-  color: #adc8ff;
-  font-weight: 600;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  color: var(--mc-accent);
+  font-weight: normal;
 }
 
 .sources-odds-count {
@@ -2198,31 +2313,34 @@ canvas,
 .effect-category-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  border-radius: 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1.2;
 }
 
 .effect-category-badge.category-positive {
-  background: rgba(129, 201, 149, 0.15);
-  border: 1px solid #81c995;
-  color: #81c995;
+  background: rgba(85, 255, 85, 0.15);
+  border: 1px solid var(--mc-green);
+  color: var(--mc-green);
 }
 
 .effect-category-badge.category-negative {
-  background: rgba(242, 139, 130, 0.15);
-  border: 1px solid #f28b82;
-  color: #f28b82;
+  background: rgba(255, 85, 85, 0.15);
+  border: 1px solid var(--mc-red);
+  color: var(--mc-red);
 }
 
 .effect-category-badge.category-neutral {
-  background: rgba(138, 180, 248, 0.15);
-  border: 1px solid #8ab4f8;
-  color: #8ab4f8;
+  background: rgba(85, 255, 255, 0.15);
+  border: 1px solid var(--mc-blue);
+  color: var(--mc-blue);
 }
 
 .effect-behaviour {
@@ -2239,13 +2357,15 @@ canvas,
   gap: 6px;
   font-size: 0.8rem;
   padding: 6px 10px;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 4px;
+  background: var(--mc-panel);
+  border: 3px solid;
+  border-color: var(--mc-panel-lo) var(--mc-panel-hi) var(--mc-panel-hi) var(--mc-panel-lo);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
 }
 
 .effect-removed-by-label {
-  color: #888;
+  color: var(--mc-muted);
   font-weight: 500;
 }
 
@@ -2264,12 +2384,16 @@ canvas,
 }
 
 .effect-sources-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  background: var(--mc-panel-lo);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
   padding: 6px 8px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
+  font-weight: normal;
   letter-spacing: 0.05em;
 }
 
@@ -2337,9 +2461,14 @@ canvas,
 
 .chest-container-label {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #aaa;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .chest-loot-table {
@@ -2350,12 +2479,16 @@ canvas,
 }
 
 .chest-loot-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  background: var(--mc-panel-lo);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
   padding: 6px 8px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 
@@ -2390,7 +2523,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .structure-row {
@@ -2420,7 +2553,7 @@ canvas,
 
 .structure-biomes-details summary {
   cursor: pointer;
-  color: #8ab4f8;
+  color: var(--mc-blue);
   user-select: none;
 }
 
@@ -2448,9 +2581,14 @@ canvas,
 
 .structure-spawns-title {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #aaa;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .structure-spawns-table {
@@ -2461,12 +2599,16 @@ canvas,
 }
 
 .structure-spawns-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  background: var(--mc-panel-lo);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
   padding: 6px 8px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 
@@ -2510,7 +2652,7 @@ canvas,
   padding: 8px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .biome-row {
@@ -2544,9 +2686,14 @@ canvas,
 
 .biome-category-title {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #aaa;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* One category renders one table, and a biome stacks up to seven of them directly
@@ -2579,12 +2726,16 @@ canvas,
 }
 
 .biome-spawns-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  background: var(--mc-panel-lo);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
   padding: 6px 8px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 
@@ -2652,7 +2803,7 @@ canvas,
   padding: 9px 12px;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.8rem;
   /* Capped rather than full-bleed. A track free to take the whole window turned
      a five-step scale into a bar the width of the screen, which reads as a
@@ -2686,12 +2837,12 @@ canvas,
   flex: 1 1 0;
   min-width: 4px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 0;
   background: #2c2c2c;
 }
 
 .noise-axis-seg.is-on {
-  background: #5c85d6;
+  background: var(--mc-green);
 }
 
 .noise-axis-value {
@@ -2731,7 +2882,7 @@ canvas,
    question, and this is the depth behind it. */
 .biome-noise-detail {
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
+  border-radius: 0;
   background: #181818;
 }
 
@@ -2741,7 +2892,7 @@ canvas,
   color: #888;
   cursor: pointer;
   user-select: none;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 .biome-noise-detail > summary:hover {
@@ -2749,8 +2900,8 @@ canvas,
 }
 
 .biome-noise-detail > summary:focus-visible {
-  outline: 2px solid #5c85d6;
-  outline-offset: -2px;
+  outline: 2px solid var(--mc-focus);
+  outline-offset: 1px;
 }
 
 /* The disclosure body scrolls rather than growing without limit. The terrain
@@ -2780,9 +2931,12 @@ canvas,
 }
 
 .biome-noise-group-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #aaa;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2803,7 +2957,7 @@ canvas,
   font-family: monospace;
   background: #181818;
   border: 1px solid #2a2a2a;
-  border-radius: 4px;
+  border-radius: 0;
   color: #ccc;
   line-height: 1.3;
 }
@@ -2819,9 +2973,12 @@ canvas,
 
 .biome-noise-subtitle {
   margin: 4px 0 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #aaa;
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--mc-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2834,12 +2991,16 @@ canvas,
 }
 
 .biome-noise-table th {
-  color: #888;
-  font-weight: 600;
+  color: var(--mc-muted);
+  background: var(--mc-panel-lo);
+  font-family: "Monocraft", ui-monospace, SFMono-Regular, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
   padding: 6px 8px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--mc-panel-lo);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 11px;
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
