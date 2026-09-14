@@ -1,4 +1,5 @@
 import type { IndexEntry } from "../types/index.js";
+import { potionIconKey } from "./potion-icon.js";
 
 /**
  * The icon key an index entry draws with, after the kind-level fallbacks.
@@ -53,14 +54,26 @@ export const ENCHANTMENT_FALLBACK_ICON = "InvSprite:Enchanted Book";
  *
  * Call this rather than reading `entry.i` directly anywhere an entry is drawn,
  * so the suggestion list, the window header, and an inline entity link all
- * agree on what an enchantment looks like.
+ * agree on what an enchantment or potion looks like.
  */
-export function entryIconKey(entry: Pick<IndexEntry, "i" | "k">): string | undefined {
+export function entryIconKey(entry: Pick<IndexEntry, "i" | "k" | "id">): string | undefined {
   if (entry.i) {
     return entry.i;
   }
   if (entry.k === "enchantment") {
     return ENCHANTMENT_FALLBACK_ICON;
   }
+  // Wind Charge (an entity) borrows the inventory sprite of the thrown item.
+  if (entry.id === "minecraft:breeze_wind_charge") {
+    return "InvSprite:Wind Charge";
+  }
+  const potionIcon = potionIconKey(entry.id);
+  if (potionIcon) {
+    return potionIcon;
+  }
+  // Minecart with Monster Spawner (`minecraft:spawner_minecart`) and Bucket of
+  // Sulfur Cube (`minecraft:sulfur_cube_bucket`) stay iconless. The wiki
+  // publishes no sprite for either, and composing one from a Minecart plus a
+  // Spawner would invent art the game does not have, which Decision 3 forbids.
   return undefined;
 }

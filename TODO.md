@@ -324,23 +324,86 @@ New collections the added data makes nearly free:
 
 ## Phase 8 — Minecraft theming
 
-- [ ] Pixel typeface — use an open font that reads as Minecraft rather than shipping Mojang's own
-- [ ] GUI panel styling: beveled 3D borders, stone/dirt surfaces, inventory-slot framing
-- [ ] Sprite atlas rendering with `image-rendering: pixelated`; no smoothing, ever
-- [ ] Icons beside every entity name, in suggestion rows, and inside recipe grids
-- [ ] **All 46 potion entities carry no icon.** The wiki publishes four potion sprites in total
+- [x] Pixel typeface - Monocraft v4.2.1 (SIL OFL 1.1), vendored rather than linked because Phase 10
+      needs the app to work offline and a Google Fonts stylesheet is a runtime call on the hot path.
+      Subset to Latin with `pyftsubset --flavor=woff2`, which lands at 3.0 KB, under Vite's 4 KB
+      inline limit, so the build emits it as a data URI and the shipped site makes no font request
+      at all.
+      `web/theme/fonts/README.md` records the source, the release tag and the exact subset
+      command, next to the file it describes rather than in `/scripts`, which holds build scripts.
+      It is applied to chrome only - titles, badges, headings, table headers, `kbd`, the search bar,
+      numeric stat values - while blurbs and table body text keep the system sans stack, because the
+      product promise is an answer in under two seconds and monospace body prose costs reading speed.
+      Crispness is not automatic: a pixel face antialiases at a fractional size whatever the
+      smoothing property says, so every pixel-font rule carries `-webkit-font-smoothing: none` plus
+      `font-smooth: never` and a fixed px size rather than a `rem` expression.
+- [x] GUI panel styling - beveled 3D borders and inventory-slot framing.
+      A 3px border, light on top and left, dark on bottom and right, inside a 1px black outline,
+      with `border-radius: 0` everywhere; an inset surface flips the two, and a slot is an inset
+      with 2px borders and the game's own `#8b8b8b` / `#373737` / `#ffffff`.
+      Recipe slot icons doubled to 32px through `createIconElement`'s `allowUpscale` path, which
+      scales by whole numbers only, so the slots read as slots rather than as empty boxes.
+      **Stone and dirt surfaces were deliberately dropped, not forgotten.** They would sit behind
+      body text and cost reading speed, which is the one thing this tool cannot spend.
+      Chrome gets the Minecraft treatment; reading surfaces stay flat `#1c1c1c`.
+- [x] Sprite atlas rendering with `image-rendering: pixelated`; no smoothing, ever.
+      Audited after the panel rules landed, since a background-image on a new element is how this
+      regresses. Two rules cover `img`, `canvas`, `.sprite` and `.entity-icon`, `web/render/icon.ts`
+      integer-scales every atlas frame, and the new 32px slots stay on whole-number scaling.
+      "No smoothing, ever" now covers text as well as sprites - see the typeface entry.
+- [x] Icons beside every entity name, in suggestion rows, and inside recipe grids.
+      Of 2,191 index entries, two still draw nothing, and both are correct:
+      `minecraft:spawner_minecart` and `minecraft:sulfur_cube_bucket`.
+      The wiki publishes no sprite for either, and composing one from a Minecart plus a Spawner would
+      invent art the game does not have, which Decision 3 forbids. The reason is recorded in
+      `web/render/entry-icon.ts` so the next audit does not re-litigate it.
+      `minecraft:breeze_wind_charge` borrows `InvSprite:Wind Charge`: the entity is the same object
+      as the item, thrown rather than flying, so that is an identity rather than a guess.
+- [x] **All 46 potion entities carry no icon.** The wiki publishes four potion sprites in total
       (`InvSprite:Potion`, `ItemSprite:potion`, `ItemSprite:splash-potion`, `ItemSprite:lingering-potion`),
       because the game tints one texture rather than shipping a sprite per variant, so there is no
       `Potion of Swiftness` file to resolve and Decision 3 forbids constructing one.
-      Every potion page and every potion row of an Effect page therefore renders iconless.
-      This predates the Effect work but became visible there: those rows used to borrow the generic
-      `minecraft:potion` icon because they wrongly linked to it, and now that they link to the right
-      variant they show none.
-      The fix is a renderer fallback from `minecraft:potion/<path>` to the generic potion sprite,
-      not a new sprite, because the texture really is the same one.
-- [ ] Hostile/passive and rarity color coding consistent across every renderer
-- [ ] Accessibility pass: contrast, focus rings, and a reduced-motion path — the pixel aesthetic
-      must not make the tool unreadable under match pressure
+      Every potion page and every potion row of an Effect page therefore rendered iconless.
+      The fix routes `entryIconKey()` through `potionIconKey()`, giving each effect-bearing potion
+      its distinct coloured effect sprite (`EffectSprite:<effect>`) that says which potion it is,
+      while falling back to the generic bottle sprite for the four effectless variants
+      (`water`, `mundane`, `thick`, `awkward`).
+- [x] Hostile/passive color coding consistent across every renderer.
+      `.stat-behavior.is-hostile`, `.is-passive` and `.is-neutral` cover it.
+- [ ] **Rarity color coding is blocked on the pipeline, not on CSS.** There is no rarity to colour:
+      `grep '"rarity"' data/dist/entities/*.json` hits only the 43 enchantments, because nothing
+      extracts the `minecraft:rarity` component. Closing it means an extract change, a schema edit,
+      a `data/dist` regeneration and new pipeline tests, so it is its own task.
+      The palette it needs is already defined and deliberately left unused: `--mc-yellow` and
+      `--mc-purple` sit in the token block with a comment saying why, so the four rarity tiers get
+      picked once rather than half now and half later.
+- [x] Accessibility: contrast and focus rings.
+      Every colour was measured against the surface it actually sits on. Body prose 12.9:1, headings
+      5.9:1 on content and 4.5:1 on chrome, links 8.1:1 and 6.2:1, muted labels 6.5:1, hostile red
+      5.4:1 - all at or above 4.5:1.
+      Focus is one white outline rather than the old blue glow, on the focused window, the search bar
+      and every control alike, so one visual language answers "where am I".
+- [ ] Accessibility: a reduced-motion path.
+      Left open on purpose rather than deferred by accident. The theme pass deleted most of the
+      transitions it would have needed to disable, so the honest scope of what remains is easier to
+      state now than it was before.
+
+### Palette, after review
+
+The plan proposed Minecraft's own `§` codes throughout. Review changed three of them, and the
+reasoning is recorded here because the code now disagrees with the plan.
+
+- **Links are `#8bb3ff`, not aqua `#55ffff` and not blue `#5555ff`.** `#5555ff` was tried first and
+  measured 3.35:1 on the content surface and 2.56:1 on chrome panels, under the 4.5:1 gate.
+  `#8bb3ff` reaches 8.1:1 and 6.2:1.
+- **The accent is `#00aaaa`, not yellow `#ffff55`.** It carries every heading, badge, chip and odds
+  figure, so there is one accent rather than a heading colour and a badge colour.
+- **Selection is quiet.** A selected suggestion row is an 8% white fill with no outline, and a
+  focused window is a 20% white ring, replacing a 28% fill with a solid white outline and a solid
+  4px white ring. Both are keyboard cursors, not alerts, and the old treatment was the loudest thing
+  on the page.
+- **No text shadows.** The 29 `text-shadow: 1px 1px 0 #3f3f3f` rules that imitated the game's GUI
+  drop shadow are gone, along with the token that fed them.
 
 ## Phase 9 — Auto-update
 
