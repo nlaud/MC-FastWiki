@@ -1,14 +1,22 @@
 """`BuildSnapshot`'s two constructors: from a fresh `MergeResult`, and from a committed `data/dist`.
 
-The real baseline numbers asserted below (2120 entities, 15 shards, the per-kind breakdown, the
-section-type counts, the 4002-producer obtain graph, the 1901-key sprite atlas) were measured
-against the committed `data/dist` on 2026-09-02, the same measurement `pipeline.validate`'s own
-module docstring and this task's brief both cite. A future build of a newer Minecraft version will
-change these numbers, and that is expected -- these assertions exist to catch `BuildSnapshot.
-from_dist` reading the tree wrong, not to pin `data/dist` itself in place.
+The `from_merge_result` tests below build their own small fixtures, so they assert exact numbers
+and always will: three entities in, three entities out.
+
+`test_from_dist_reads_the_real_committed_baseline` is the one that reads this repository's real
+`data/dist`, and it asserts no counts at all. It used to. An earlier version of this docstring
+cited "2120 entities, 15 shards, the 4002-producer obtain graph, the 1901-key sprite atlas" as
+measured on 2026-09-02, and went on to say the assertions existed to catch `from_dist` reading the
+tree wrong, "not to pin `data/dist` itself in place". Both halves aged badly: not one of those four
+figures was still true, and the test pinned the tree anyway with roughly thirty-eight constants.
+The weekly wiki refresh settled it by moving a count with no commit behind it. That test now checks
+what this paragraph always claimed it checked. See its own docstring for the full reasoning.
 """
 
+import json
+from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from pipeline.enrich.advancement import Reconciliation
 from pipeline.normalize.entity import (
@@ -104,97 +112,124 @@ def test_from_merge_result_defaults_to_an_empty_producer_index() -> None:
 
 
 def test_from_dist_reads_the_real_committed_baseline() -> None:
-    """The false-positive test for the *snapshot* half: this repository's own `data/dist` must
-    read back with the exact numbers the module docstring and this task's brief both cite.
+    """The false-positive test for the *snapshot* half: `from_dist` must read this repository's
+    own `data/dist` back correctly.
+
+    Every assertion below is a cross-check or an invariant. None of them pins a count.
+
+    That is a deliberate reversal, and the reason is worth keeping. This test used to assert
+    roughly thirty-eight exact figures -- the total, an eleven-entry per-kind dict, three optional
+    coverage figures, twenty section-type counts, the producer count and the atlas count -- each
+    trailed by a comment explaining which commit had last moved it. That worked while the only
+    thing that moved these numbers was a change in this repository. The weekly wiki refresh broke
+    the arrangement: it rebuilds from the wiki's own tables on a schedule, so a count can now move
+    with no commit behind it at all. The first refresh to run added three Wandering Trader trades
+    and reddened `main`, and a release bump would move most of the thirty-eight at once.
+
+    The module docstring of this file already named the right intent -- these assertions exist to
+    catch `from_dist` reading the tree wrong, "not to pin `data/dist` itself in place" -- so the
+    fix is to assert that, and nothing else. Guarding against data that shrinks when it should not
+    is a real job, but it belongs to `pipeline.validate.regression`, which does it with percentage
+    rules against the committed baseline rather than with constants a person has to retype.
+
+    The retired figures and the changelog comments that explained each move are in this file's git
+    history. They are not maintained here any more, because a number nobody can update without
+    rerunning a build is a number that goes stale silently -- this file's own module docstring
+    still cites 2120 entities and a 4002-producer graph, and neither has been true for many
+    commits.
     """
     snapshot = BuildSnapshot.from_dist(DIST)
+    assert snapshot is not None
+
+    # The strongest check available: `index.json` is written by
+    # `pipeline.emit.search_index` while the shards are written by
+    # `pipeline.emit.shard`, and the two spell the same field differently
+    # (`k` against `kind`). So agreement between them is a genuine
+    # cross-check of two independently produced files rather than this test
+    # restating `from_dist`'s own arithmetic back to itself.
+    index_payload: Any = json.loads((DIST / "index.json").read_text(encoding="utf-8"))
+    index_entries = index_payload["entities"]
+    assert snapshot.total == len(index_entries)
+    assert snapshot.by_kind == dict(Counter(entry["k"] for entry in index_entries))
+
+    # Internal consistency: every entity carries a kind, so the per-kind
+    # breakdown has to add back up to the total.
+    assert snapshot.total == sum(snapshot.by_kind.values())
+
+    # A required field is required. This is the one coverage figure that is a
+    # contract rather than a measurement, so it is still asserted exactly --
+    # against the total this build actually has, not against a constant.
+    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, snapshot.total)
+
+    # An optional field is optional, so the only thing true of every build is
+    # that each one is carried by at least one entity and by no more than all
+    # of them. A field that reached zero would mean the emitter stopped
+    # writing it, which is the fault worth catching here.
+    assert set(snapshot.optional_field_coverage) == set(OPTIONAL_ENTITY_FIELDS)
+    for field, count in snapshot.optional_field_coverage.items():
+        assert 0 < count <= snapshot.total, f"optional field {field!r} has coverage {count}"
+
+    # Section counts, recounted from the shards by a flat `Counter` over a
+    # generator rather than by `from_dist`'s nested increments. A shard the
+    # glob misses, a double count, or a read of the wrong key all show up as
+    # a disagreement.
+    scanned: Counter[str] = Counter(
+        section["type"]
+        for shard_path in sorted((DIST / "entities").glob("*.json"))
+        for entity in json.loads(shard_path.read_text(encoding="utf-8"))["entities"]
+        for section in entity.get("sections", ())
+        if isinstance(section, dict) and isinstance(section.get("type"), str)
+    )
+    assert snapshot.section_type_counts == dict(scanned)
+
+    # The other two payloads, each checked against the file it is read from.
+    obtain_payload: Any = json.loads((DIST / "obtain.json").read_text(encoding="utf-8"))
+    assert snapshot.obtain_producer_count == sum(
+        len(group) for group in obtain_payload["producers"].values()
+    )
+
+    atlas_payload: Any = json.loads((DIST / "sprites.json").read_text(encoding="utf-8"))
+    assert snapshot.atlas_icon_count == len(atlas_payload["sprites"])
+
+    # A floor, not a pin. Every assertion above compares one committed file
+    # against another, so all of them would hold if `data/dist` were replaced
+    # by a handful of entities. This is the one line that says the baseline is
+    # a real build. It is deliberately far below any plausible real total, so
+    # that content changes never reach it.
+    assert snapshot.total > 1000
+    assert snapshot.obtain_producer_count > 1000
+    assert snapshot.atlas_icon_count > 1000
+
+
+
+def test_from_dist_counts_a_required_field_that_a_shard_omits(tmp_path: Path) -> None:
+    """Coverage of a required field must fall when an entity does not carry it.
+
+    The real-baseline test above cannot prove this. Every entity in the committed `data/dist`
+    carries every required field, so `from_dist` counting the field properly and `from_dist` not
+    checking at all produce the identical answer there -- a mutation that deletes the `if field in
+    entity` guard passes that test untouched. It only shows up against a shard that actually omits
+    one, which is what this fixture is.
+    """
+    entities_dir = tmp_path / "entities"
+    entities_dir.mkdir()
+    (entities_dir / "item-0.json").write_text(
+        '{"schemaVersion":1,"entities":['
+        '{"id":"minecraft:apple","kind":"item","name":"Apple","aliases":[],'
+        '"sourceTiers":{},"sections":[]},'
+        '{"id":"minecraft:stick","kind":"item","name":"Stick","aliases":[],'
+        '"sourceTiers":{}}'
+        "]}",
+        encoding="utf-8",
+    )
+
+    snapshot = BuildSnapshot.from_dist(tmp_path)
 
     assert snapshot is not None
-    assert snapshot.total == 2191
-    assert snapshot.by_kind == {
-        "block": 1195,
-        "item": 540,
-        "advancement": 126,
-        "mob": 91,
-        "biome": 66,
-        "collection": 15,
-        "enchantment": 43,
-        "effect": 39,
-        "structure": 35,
-        "entity": 28,
-        "profession": 13,
-    }
-    assert snapshot.required_field_coverage == dict.fromkeys(REQUIRED_ENTITY_FIELDS, 2191)
-    # 2035 before minecraft:nether/brew_potion (Local Brewery) received a curated icon override.
-    # 2097 wikiUrl, 1971 blurb, 2036 icon before 13 villager professions were added.
-    # 2144 wikiUrl, 2015 blurb, 2049 icon after 34 structures were added, when a structure carried
-    # no icon and the three villages that share the `Village` page carried no blurb.
-    # 2144 wikiUrl, 2018 blurb, 2083 icon after `Village` was fetched, so Savanna, Snowy and
-    # Taiga Village carry its prose (+3), and all 34 structures borrow a curated Tier C icon (+34).
-    # 2145/2019/2084 now: the dungeon is a 35th place, enumerated from the configured feature the
-    # game files it under, and it carries all three.
-    # 2145/2024/2084 after Phase 7: all 5 collections carry a manifest blurb (+5).
-    # 2145/2024/2089 once each collection also borrowed an icon (+5).
-    # 2145/2028/2093 after four more Phase 7 collections: +4 blurbs, +4 borrowed icons.
-    # 2145/2029/2094 after advancements collection: +1 blurb, +1 borrowed icon.
-    # 2145/2031/2096 after compostable and fuel collections: +2 blurbs, +2 borrowed icons.
-    # 2145/2034/2099 after final Phase 7 collections (chest_loot, villager_trades,
-    # bartering): +3 blurbs, +3 borrowed icons.
-    assert snapshot.optional_field_coverage == {"wikiUrl": 2145, "blurb": 2034, "icon": 2099}
-    assert snapshot.section_type_counts == {
-        "AdvancementInfo": 126,
-        # 157 before `_wiki_rows` learned to fall back from `Enchanted <item>`
-        # to `<item>`. 169 before Potato trade disambiguation resolved onto
-        # minecraft:potato. 170 before 13 villager professions and Wandering
-        # Trader mob trades attached.
-        "TradeTable": 184,
-        "StatBlock": 93,
-        "DropTable": 65,
-        # 53 when sourced from Tier B wiki spawn table. 52 now: sourced from
-        # Tier A biome spawners inverted onto mob entities.
-        "SpawnInfo": 52,
-        "BreedingInfo": 26,
-        # 44 items with a `minecraft:food` component, plus the milk bucket,
-        # which clears every effect while restoring no hunger. `ominous_bottle`
-        # is the third consumable-only item and is deliberately absent: its
-        # whole consume behaviour is a sound, which a page cannot draw.
-        "FoodInfo": 45,
-        "HarvestInfo": 861,
-        "EffectSources": 39,
-        # 52 blocks with generation facts, plus the dungeon, which states where
-        # it generates through this section rather than `StructureInfo`: a
-        # feature has no structure set, no separation and no generation step.
-        "GenerationInfo": 53,
-        "EnchantInfo": 43,
-        "ProfessionInfo": 13,
-        "StructureInfo": 34,
-        # 30 of the 34 structures hold a container, plus the dungeon's chest.
-        "ChestLoot": 31,
-        "LinkList": 62,
-        "CollectionMembers": 14,
-        "CollectionTree": 5,
-        # All 66 enumerated biomes carry climate, spawns, and generating blocks.
-        "BiomeInfo": 66,
-        "CompostInfo": 116,
-        "FuelInfo": 280,
-    }
-    # 3998 before Arrow of * mob drops (Bogged, Parched, Stray) resolved to minecraft:tipped_arrow.
-    # 4001 before 10 unread loot table families added 267 producers.
-    # 4268 before 6 unhandled recipe types added 43 producers.
-    # 4311 before curated one-off producers added 14 producers.
-    # 4325 before 12 creeper-dropped music discs were expanded.
-    # 4337 before the first weekly wiki refresh (run 34990992207) picked up three
-    # Wandering Trader trades the wiki had added for 26.x content: Poplar Log
-    # (8 for 1 emerald, Special), Poplar Sapling (1 for 5 emeralds, Ordinary),
-    # and Shelf Mushroom (3 for 1 emerald, Ordinary). This is the first time
-    # this number moved without a code change, which is the refresh working:
-    # the trades come from the wiki's own tables, and the build reads them on
-    # every run. `TradeTable` stays at 184 because all three land on the
-    # Wandering Trader's existing table rather than creating a new one.
-    assert snapshot.obtain_producer_count == 4340
-    # 1914 before Local Brewery (InvSprite:Potion) and Ominous Banner (BlockSprite:ominous-banner)
-    # joined the atlas. 1916 before 13 profession icons joined the atlas.
-    assert snapshot.atlas_icon_count == 1929
+    assert snapshot.total == 2
+    # Only the apple carries `sections`; every other required field is on both.
+    assert snapshot.required_field_coverage["sections"] == 1
+    assert snapshot.required_field_coverage["id"] == 2
 
 
 def test_from_dist_is_none_for_an_absent_directory(tmp_path: Path) -> None:
