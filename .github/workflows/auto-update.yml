@@ -1,0 +1,204 @@
+name: Auto-update data
+
+on:
+  schedule:
+    # Daily at 06:00 UTC for Minecraft release check
+    - cron: "0 6 * * *"
+    # Weekly on Mondays at 08:00 UTC for wiki-only refresh
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Update mode"
+        required: true
+        default: "release"
+        type: choice
+        options:
+          - release
+          - wiki
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  update:
+    name: Auto-update pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 8 * * 1" ]; then
+            echo "mode=wiki" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Check latest Minecraft release
+        id: check
+        if: steps.mode.outputs.mode == 'release'
+        run: |
+          uv run python -m pipeline check --json > check_result.json
+          cat check_result.json
+          REBUILD_OWED=$(python -c "import json; print(json.load(open('check_result.json'))['rebuild_owed'])")
+          echo "rebuild_owed=$REBUILD_OWED" >> "$GITHUB_OUTPUT"
+          BUILT_VER=$(python -c "import json; print(json.load(open('check_result.json'))['built_version'])")
+          CURRENT_VER=$(python -c "import json; print(json.load(open('check_result.json'))['current_release'])")
+          echo "built_version=$BUILT_VER" >> "$GITHUB_OUTPUT"
+          echo "current_release=$CURRENT_VER" >> "$GITHUB_OUTPUT"
+
+      - name: Decide if rebuild is needed
+        id: decision
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          REBUILD_OWED="${{ steps.check.outputs.rebuild_owed }}"
+          if [ "$MODE" = "wiki" ] || [ "$REBUILD_OWED" = "True" ] || [ "$REBUILD_OWED" = "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Data is up to date. No rebuild needed."
+          fi
+
+      - name: Save baseline index
+        if: steps.decision.outputs.should_run == 'true'
+        run: |
+          cp data/dist/index.json /tmp/index.before.json
+
+      - name: Run build pipeline
+        id: build
+        if: steps.decision.outputs.should_run == 'true'
+        run: |
+          uv run python -m pipeline build
+
+      - name: Handle build validation failure
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - << 'EOF'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          report_path = Path("data/reports/validation.json")
+          failed_items = []
+          if report_path.is_file():
+              try:
+                  data = json.loads(report_path.read_text(encoding="utf-8"))
+                  conf_failures = data.get("conformance", {}).get("failures", [])
+                  for f in conf_failures:
+                      failed_items.append(f"- Conformance failure: `{f}`")
+                  ref_failures = data.get("references", {}).get("failures", [])
+                  for f in ref_failures:
+                      failed_items.append(f"- Reference failure: `{f}`")
+                  reg_checks = data.get("regression", {}).get("checks", [])
+                  for c in reg_checks:
+                      if not c.get("passed", False):
+                          failed_items.append(
+                              f"- Regression check failed: `{c.get('name')}` "
+                              f"(baseline: {c.get('baseline')}, new: {c.get('new')}, rule: {c.get('rule')})"
+                          )
+              except Exception as e:
+                  failed_items.append(f"Failed to read validation report: {e}")
+
+          body_lines = [
+              "## Build Validation Rejection",
+              "",
+              "The automated build failed the validation gate. Under project rules, regressions are never auto-merged or downgraded.",
+              "",
+              "### Failed Checks",
+          ]
+          if failed_items:
+              body_lines.extend(failed_items)
+          else:
+              body_lines.append("No specific validation checks recorded; inspect the Actions run logs.")
+
+          body = "\n".join(body_lines)
+          title = "Auto-update build failed validation gate"
+
+          # A gate that stays broken fails on every scheduled run. Opening one
+          # issue per run would bury the first report under duplicates, so an
+          # already-open issue gets a comment instead.
+          existing = subprocess.run(
+              ["gh", "issue", "list", "--state", "open", "--search", f'"{title}" in:title',
+               "--json", "number", "--jq", ".[0].number"],
+              capture_output=True, text=True, check=False,
+          )
+          number = existing.stdout.strip()
+          if number:
+              subprocess.run(["gh", "issue", "comment", number, "--body", body], check=False)
+          else:
+              subprocess.run(["gh", "issue", "create", "--title", title, "--body", body], check=False)
+          EOF
+
+      - name: Generate diff summary
+        if: steps.decision.outputs.should_run == 'true'
+        run: |
+          uv run python -m pipeline diff \
+            --before /tmp/index.before.json \
+            --after data/dist/index.json \
+            --validation data/reports/validation.json \
+            --full-report data/reports/diff_full.md > pr_body.md
+          cat pr_body.md
+
+      - name: Upload diff artifact
+        if: steps.decision.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff-summary
+          path: |
+            data/reports/diff_full.md
+            pr_body.md
+            data/reports/validation.json
+
+      - name: Create pull request
+        if: steps.decision.outputs.should_run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          RUN_ID="${{ github.run_id }}"
+          BRANCH="auto-update/${MODE}-${RUN_ID}"
+
+          # Only data/dist is tracked. /data/reports/ is gitignored on purpose
+          # (build diagnostics, not site payload), so it can be neither status-
+          # checked nor added here. The reports still reach a reviewer: the
+          # "Upload diff artifact" step above attaches them to the run.
+          if [ -z "$(git status --porcelain data/dist)" ]; then
+            echo "No data changes detected after rebuild."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add data/dist
+          git commit -m "chore(data): auto-update ${MODE} data [skip ci]"
+          git push origin "$BRANCH"
+
+          TITLE="chore(data): auto-update ${MODE} data"
+          gh pr create \
+            --head "$BRANCH" \
+            --base main \
+            --title "$TITLE" \
+            --body-file pr_body.md

@@ -2,6 +2,33 @@ import fs from "node:fs";
 import path from "node:path";
 import { type Plugin, defineConfig } from "vite";
 
+/** Recursively collect all files in web/dist excluding sw.js and source maps. */
+export function collectPrecacheFiles(dir: string, baseDir: string = dir): string[] {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectPrecacheFiles(fullPath, baseDir));
+    } else if (entry.isFile()) {
+      const relPath = path.relative(baseDir, fullPath).split(path.sep).join("/");
+      if (relPath !== "sw.js" && !relPath.endsWith(".map")) {
+        files.push(relPath);
+      }
+    }
+  }
+  return files.sort();
+}
+
+/** Construct cache bucket name from data/dist/manifest.json. */
+export function getCacheName(manifestPath: string): string {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
+    minecraftVersion: string;
+    builtAt: string;
+  };
+  return `mc-fastwiki-${manifest.minecraftVersion}-${manifest.builtAt}`;
+}
+
 // `root` is `web/`, so nothing under `data/dist` is reachable by the browser on
 // its own -- in dev or in the build. This plugin publishes that directory at
 // `/data/`, the path `web/README.md` already documents as the shipped layout,
@@ -75,6 +102,46 @@ function serveDataDist(): Plugin {
       const outDataDir = path.resolve(import.meta.dirname, "web/dist/data");
       fs.mkdirSync(outDataDir, { recursive: true });
       fs.cpSync(dataDistDir, outDataDir, { recursive: true });
+
+      // Every failure below throws rather than warning. A service worker that
+      // ships with its placeholders still in it is the worst outcome
+      // available: `cache.addAll(["__PRECACHE_URLS__"])` rejects, install
+      // fails, and the site silently loses offline support while every local
+      // check stays green. A red build is the cheap version of that fault.
+      const webDistDir = path.resolve(import.meta.dirname, "web/dist");
+      const swDistPath = path.join(webDistDir, "sw.js");
+      if (!fs.existsSync(swDistPath)) {
+        throw new Error(
+          `Service worker was not emitted to ${swDistPath}. The precache list cannot be written, ` +
+            `so the build would ship without offline support.`,
+        );
+      }
+
+      const manifestPath = path.join(outDataDir, "manifest.json");
+      const cacheName = getCacheName(manifestPath);
+      const precacheUrls = collectPrecacheFiles(webDistDir);
+
+      const original = fs.readFileSync(swDistPath, "utf-8");
+      const withUrls = original.replace(
+        /\[[`'"]__PRECACHE_URLS__[`'"]\]/,
+        JSON.stringify(precacheUrls),
+      );
+      if (withUrls === original) {
+        throw new Error(
+          `Could not find the __PRECACHE_URLS__ placeholder in ${swDistPath}. ` +
+            `web/sw.ts and this substitution have drifted apart.`,
+        );
+      }
+
+      const swContent = withUrls.replace(/[`'"]__CACHE_NAME__[`'"]/, JSON.stringify(cacheName));
+      if (swContent === withUrls) {
+        throw new Error(
+          `Could not find the __CACHE_NAME__ placeholder in ${swDistPath}. ` +
+            `web/sw.ts and this substitution have drifted apart.`,
+        );
+      }
+
+      fs.writeFileSync(swDistPath, swContent, "utf-8");
     },
   };
 }
@@ -96,6 +163,20 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     target: "es2022",
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "web/index.html"),
+        sw: path.resolve(import.meta.dirname, "web/sw.ts"),
+      },
+      output: {
+        entryFileNames: (chunkInfo) => {
+          if (chunkInfo.name === "sw") {
+            return "sw.js";
+          }
+          return "assets/[name]-[hash].js";
+        },
+      },
+    },
   },
   server: {
     open: false,

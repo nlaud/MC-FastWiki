@@ -9,3 +9,11 @@ if (root === null) {
   throw new Error("Mount point #app is missing from index.html");
 }
 mount(root);
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((error: unknown) => {
+      console.error("Service worker registration failed:", error);
+    });
+  });
+}

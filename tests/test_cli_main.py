@@ -48,7 +48,7 @@ def test_no_subcommand_exits_two() -> None:
 
 def test_unknown_subcommand_exits_two() -> None:
     with pytest.raises(SystemExit) as excinfo:
-        main(["check"])
+        main(["nope"])
     assert excinfo.value.code == 2
 
 

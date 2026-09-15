@@ -33,14 +33,14 @@ applies to a build failure at the command line exactly as it applies to a
   (0)` the same way. `main` does not catch `SystemExit` at all, so both of
   argparse's own exit codes reach the process exactly as argparse chose them.
 
-## One subcommand: `build`
+## Subcommands: `build`, `check`, and `diff`
 
-`python -m pipeline build` is the only command this package defines. There is
-no `check` subcommand -- an earlier phase of this project sketched one
-(`python -m pipeline check` answering "does a newer release exist"), but that
-command was never built, and this task adds `build` alone. A `check`
-subcommand is a natural follow-up once something other than a human reads its
-answer, not a gap this module leaves open by accident.
+* `python -m pipeline build`: Fetch, extract, enrich, normalize, and emit one
+  Minecraft release.
+* `python -m pipeline check`: Compare the built version against Mojang's version
+  manifest to decide if a rebuild is owed.
+* `python -m pipeline diff`: Compare two search index files (`index.json`) and
+  produce a Markdown diff summary with changes and validation gate tables.
 """
 
 import argparse
@@ -153,11 +153,66 @@ def _build_parser() -> argparse.ArgumentParser:
         "in full in data/reports/validation.json. Never downgrades a schema conformance "
         "failure -- a malformed document always fails the build.",
     )
+
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Check if a newer Minecraft release exists than the built manifest.",
+        description=(
+            "Compare the built version in data/dist/manifest.json against Mojang's "
+            "version manifest to decide if a rebuild is owed."
+        ),
+    )
+    check_parser.add_argument(
+        "--dist",
+        type=Path,
+        metavar="PATH",
+        default=DEFAULT_DIST_PATH,
+        help=f"Where the site payload and manifest.json live. Defaults to {DEFAULT_DIST_PATH}.",
+    )
+    check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON on stdout.",
+    )
+
+    diff_parser = subparsers.add_parser(
+        "diff",
+        help="Compare two search index files and generate a Markdown summary.",
+        description="Diff two index.json files and output entity changes and gate check tables.",
+    )
+    diff_parser.add_argument(
+        "--before",
+        type=Path,
+        metavar="PATH",
+        required=True,
+        help="Path to baseline index.json.",
+    )
+    diff_parser.add_argument(
+        "--after",
+        type=Path,
+        metavar="PATH",
+        required=True,
+        help="Path to newly generated index.json.",
+    )
+    diff_parser.add_argument(
+        "--validation",
+        type=Path,
+        metavar="PATH",
+        default=None,
+        help="Optional path to validation.json for including gate check tables.",
+    )
+    diff_parser.add_argument(
+        "--full-report",
+        type=Path,
+        metavar="PATH",
+        default=None,
+        help="Optional path to write untruncated Markdown diff artifact.",
+    )
     return parser
 
 
 def main(argv: Sequence[str]) -> int:
-    """Parse `argv`, run the build it names, and return the process exit code.
+    """Parse `argv`, run the command it names, and return the process exit code.
 
     `argv` is `sys.argv[1:]`, not `sys.argv` itself -- `pipeline/__main__.py`
     passes it that way, and a test passes its own list the same way, so
@@ -168,19 +223,28 @@ def main(argv: Sequence[str]) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    options = BuildOptions(
-        minecraft_version=args.minecraft_version,
-        dist=args.dist,
-        cache=args.cache,
-        reports=args.reports,
-        shard_size=args.shard_size,
-        offline=args.offline,
-        quiet=args.quiet,
-        allow_regression=args.allow_regression,
-    )
-
     try:
-        run_build(options)
+        if args.command == "build":
+            options = BuildOptions(
+                minecraft_version=args.minecraft_version,
+                dist=args.dist,
+                cache=args.cache,
+                reports=args.reports,
+                shard_size=args.shard_size,
+                offline=args.offline,
+                quiet=args.quiet,
+                allow_regression=args.allow_regression,
+            )
+            run_build(options)
+        elif args.command == "check":
+            run_check(dist=args.dist, json_output=args.json)
+        elif args.command == "diff":
+            run_diff(
+                before=args.before,
+                after=args.after,
+                validation=args.validation,
+                full_report=args.full_report,
+            )
     except (
         FetchError,
         ExtractError,
@@ -205,6 +269,8 @@ def main(argv: Sequence[str]) -> int:
 # yet -- the same ordering `pipeline.emit.__init__` keeps for `pipeline.emit.
 # write` and explains in full.
 from pipeline.cli.build import BuildOptions, run_build  # noqa: E402
+from pipeline.cli.check import run_check  # noqa: E402
+from pipeline.cli.diff import run_diff  # noqa: E402
 from pipeline.emit import EmitError  # noqa: E402
 from pipeline.enrich import EnrichError  # noqa: E402
 from pipeline.extract import ExtractError  # noqa: E402
