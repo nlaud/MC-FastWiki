@@ -383,7 +383,7 @@ New collections the added data makes nearly free:
       5.4:1 - all at or above 4.5:1.
       Focus is one white outline rather than the old blue glow, on the focused window, the search bar
       and every control alike, so one visual language answers "where am I".
-- [ ] Accessibility: a reduced-motion path.
+- [x] Accessibility: a reduced-motion path — deliberately dropped.
       Built once, reviewed, and reverted on purpose. The reversal is recorded here rather than
       dropped, so the next attempt does not rebuild the thing that was rejected.
       The shipped attempt honoured `(prefers-reduced-motion: reduce)` four ways: it froze the
@@ -430,23 +430,34 @@ reasoning is recorded here because the code now disagrees with the plan.
 - [ ] Scheduled CI (daily) runs the check; on a new version it runs the full pipeline (no JDK
       needed in the runner — Python and Node only)
 - [ ] CI opens a PR with the regenerated data and a human-readable diff summary
-      (entities added, removed, changed)
-- [ ] Validation gate blocks the PR on suspicious diffs rather than auto-merging
-- [ ] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release
-- [ ] Deploy to GitHub Pages on merge to `main` (see Decision 4).
-      One workflow runs the web build and publishes `web/dist` through
+      (entities added, removed, changed).
+      Note: `pipeline/validate/snapshot.py` holds counts only (carrying IDs was rejected to avoid
+      conflating snapshots with diffs). The diff summary must read `data/dist/index.json`, which
+      carries every entity's `id`, `n`, and `k`.
+- [ ] Validation gate blocks the PR on suspicious diffs rather than auto-merging.
+      Note: The validation gate already exists in `pipeline/validate/` (running conformance, regression,
+      and reference checks inside `run_build` baselined against committed `data/dist`). Remaining work
+      is workflow wiring.
+- [ ] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release.
+      Note: A weekly refresh can never use a warm cache because the cache key carries a revision and
+      `pipeline/cli/build.py` passes the Minecraft version as that revision, reusing cached payloads.
+      Fresh CI runners start without a cache anyway, ruling out `actions/cache` on `data/.cache`.
+- [x] Deploy to GitHub Pages on merge to `main` (see Decision 4).
+      `.github/workflows/deploy.yml` runs `pnpm build` and publishes `web/dist` through
       `actions/upload-pages-artifact` and `actions/deploy-pages`.
-      The site ships straight out of the Actions run rather than from a committed `gh-pages` branch
-- [ ] Set the repository's Pages source to "GitHub Actions" once, by hand.
-      It is the one step of the deploy that no workflow file can do for itself
-- [ ] Assert the build stays under the limits a deploy can fail on: 1 GB per published site, and
-      GitHub's 100 MB ceiling on any single committed file, which `data/dist` is subject to because
-      it is committed.
-      Today's output is 4.7 MB across 23 files with the largest at 761 KB, so the assertion is a
-      tripwire rather than a constraint
-- [ ] Smoke-test the deployed URL, not just the build output.
-      A project site is served from `https://nlaud.github.io/MC-FastWiki/`, and a root-absolute
-      asset URL 404s there while passing every local check
+      The site ships straight out of the Actions run rather than from a committed `gh-pages` branch.
+- [x] Set the repository's Pages source to "GitHub Actions" once.
+      Configured via `gh api -X POST repos/nlaud/MC-FastWiki/pages -f build_type=workflow`,
+      confirming Pages publishes directly from the workflow.
+- [x] Assert the build stays under the limits a deploy can fail on: 1 GB per published site, and
+      GitHub's 100 MB ceiling on any single committed file.
+      `scripts/assert-dist-limits.js` asserts both trees: total `web/dist` size < 1 GB and single-file
+      < 100 MB, plus committed `data/dist` files < 100 MB. Measured at 4.9 MB across 26 files with
+      the largest at 743 KB (`data/obtain.json`), serving as automated build tripwires.
+- [x] Smoke-test the deployed URL, not just the build output.
+      `scripts/smoke-test.js` fetches the live deployed site at `https://nlaud.github.io/MC-FastWiki/`,
+      extracts script and stylesheet asset links, and verifies every asset and core data payload
+      returns HTTP 200 with non-empty content. Succeeded against live deployment.
 
 ## Phase 10 — Performance and offline
 
@@ -1074,6 +1085,21 @@ reasoning is recorded here because the code now disagrees with the plan.
     count, and composting chance. In the collection views, members sort descending by the numeric value
     underneath the formatted cell. Drift tests (`tests/test_collections_drift.py`) enforce the exact
     116 and 280 item baselines.
+
+33. **CI workflows and GitHub Pages static deployment.**
+    Stage 0 implements continuous integration across both project halves via `.github/workflows/ci.yml`,
+    running parallel Web (Node 22 / pnpm 11.23.0) and Pipeline (Python 3.12 / uv) verification jobs covering
+    all six repo gates (`pnpm test`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pytest`,
+    `ruff check .`, `mypy`).
+
+    Stage 1 publishes the site to GitHub Pages via `.github/workflows/deploy.yml`. GitHub Pages build
+    type is set to GitHub Actions (`workflow`) via `gh api -X POST repos/nlaud/MC-FastWiki/pages -f build_type=workflow`.
+    The deploy workflow builds static assets with `pnpm build`, runs `scripts/assert-dist-limits.js` to enforce
+    GitHub's 1 GB published site ceiling and 100 MB single-file ceiling (including committed `data/dist`), uploads
+    the `web/dist` artifact, and deploys using the native repository `GITHUB_TOKEN`. On deployment to `main`,
+    an end-to-end smoke test (`scripts/smoke-test.js`) verifies that the live site serves 200 OK across the root
+    page, parsed script/style assets, and dynamic data shards (`data/index.json`, `data/manifest.json`, etc.),
+    preventing blank unstyled page regressions caused by relative base path issues.
 
 
 ## Still open
