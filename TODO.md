@@ -12,7 +12,16 @@ reasoning survives even after the choice is made.
 
 `pipeline/obtain` builds the graph from mcmeta loot tables and recipe files, plus the wiki's trade
 and mob-drop tables.
-That covers 14 methods and 4337 producers (12 loot-table families read, closing 27 gaps).
+That covers 14 methods and 4340 producers (12 loot-table families read, closing 27 gaps).
+The figure read 4337 until the first weekly wiki refresh, and the three it gained are worth naming
+because of where they came from rather than what they are.
+Run 34990992207 picked up three Wandering Trader trades the wiki had added for 26.x content: Poplar
+Log at 8 for an emerald, Poplar Sapling at 1 for five emeralds, and Shelf Mushroom at 3 for an
+emerald.
+No code changed. The trades live in the wiki's own tables, the build reads those tables on every
+run, and this is the first time a count in this file moved on its own - which is the whole point of
+the weekly job. Expect it to keep moving, and treat a changed count here as data rather than as a
+regression.
 Every producer whose outcome is a draw rather than a certainty also carries its odds - the chance,
 the stack range, and the expected yield per chest, catch, barter, shear, brush or kill.
 A producer only carries them where the source states them: an entry under `minecraft:alternatives`
