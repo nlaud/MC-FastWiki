@@ -17,12 +17,10 @@
   --mc-blue: #8bb3ff;
   --mc-green: #55ff55;
   --mc-red: #ff5555;
-  /* Defined but not yet drawn. Item rarity (Phase 8 part 2) needs the full
-     white / yellow / aqua / light-purple set, and splitting the palette across
-     two commits is how one of them ends up a different purple. Neither is an
-     accent: rarity states a tier, so it keeps Minecraft's own codes even now
-     that the chrome accent has moved off yellow. */
+  /* Item rarity palette: common is default text (#ffffff), uncommon is yellow,
+     rare is aqua, epic is light purple. */
   --mc-yellow: #ffff55;
+  --mc-aqua: #55ffff;
   --mc-purple: #ff55ff;
   --mc-page: #131313;
   --mc-text: #ffffff;
@@ -659,6 +657,22 @@ canvas,
   color: var(--mc-muted);
   font-size: 0.8em;
   font-style: italic;
+}
+
+/* ==========================================================================
+   Item Rarity
+   ========================================================================== */
+
+.rarity-uncommon {
+  color: var(--mc-yellow);
+}
+
+.rarity-rare {
+  color: var(--mc-aqua);
+}
+
+.rarity-epic {
+  color: var(--mc-purple);
 }
 
 /* StatBlock */

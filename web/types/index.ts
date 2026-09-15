@@ -11,6 +11,13 @@
  */
 export type EntityId = string;
 /**
+ * The four display rarity tiers of Minecraft Java Edition items. Mirrors `entity.schema.json`'s `$defs.itemRarity` exactly, copied for the same self-containment reason as `entityId` above.
+ *
+ * This interface was referenced by `Index`'s JSON-Schema
+ * via the `definition` "itemRarity".
+ */
+export type ItemRarity = "common" | "uncommon" | "rare" | "epic";
+/**
  * The discriminator of the Entity model. Mirrors `entity.schema.json`'s `$defs.entityKind` exactly, copied for the same self-containment reason as `entityId` above.
  *
  * This interface was referenced by `Index`'s JSON-Schema
@@ -83,4 +90,8 @@ export interface IndexEntry {
    * Long form: `icon`. The sprite key in the atlas coordinate map. Absent, not null, when the entity has no icon -- see `entity.schema.json`'s own `icon` field for why a missing one is a reported gap rather than a fabricated placeholder.
    */
   i?: string;
+  /**
+   * Long form: `itemRarity`. The item's display rarity tier. Absent when common (the default) or when the entity is not an item with special rarity.
+   */
+  r?: "common" | "uncommon" | "rare" | "epic";
 }

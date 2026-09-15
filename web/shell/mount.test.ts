@@ -11,7 +11,14 @@ describe("mount", () => {
     schemaVersion: 1,
     entities: [
       { id: "minecraft:villager", n: "Villager", k: "mob", a: [], s: "mob-0" },
-      { id: "minecraft:golden_apple", n: "Golden Apple", k: "item", a: ["gapple"], s: "item-0" },
+      {
+        id: "minecraft:golden_apple",
+        n: "Golden Apple",
+        k: "item",
+        a: ["gapple"],
+        s: "item-0",
+        r: "rare",
+      },
       { id: "minecraft:diamond", n: "Diamond", k: "item", a: [], s: "item-0" },
       { id: "minecraft:creeper", n: "Creeper", k: "mob", a: [], s: "mob-0" },
       { id: "minecraft:iron_ingot", n: "Iron Ingot", k: "item", a: [], s: "item-0" },
@@ -414,5 +421,23 @@ describe("mount", () => {
     const windows = root.querySelectorAll(".wiki-window");
     expect(windows).toHaveLength(2);
     expect(windows[1]?.querySelector(".window-title")?.textContent).toBe("Iron Ingot");
+  });
+
+  it("applies rarity classes to window-title when the opened entity declares rarity", async () => {
+    const corpus = buildCorpus(mockIndex);
+    mount(root, corpus);
+
+    const input = root.querySelector<HTMLInputElement>("input.search-input");
+    if (!input) throw new Error("Missing input");
+    input.value = "gapple";
+    input.dispatchEvent(new Event("input"));
+
+    await Promise.resolve();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+
+    const windowEl = root.querySelector(".wiki-window");
+    const title = windowEl?.querySelector(".window-title");
+    expect(title?.textContent).toBe("Golden Apple");
+    expect(title?.classList.contains("rarity-rare")).toBe(true);
   });
 });

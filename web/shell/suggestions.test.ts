@@ -60,4 +60,24 @@ describe("renderSuggestions", () => {
 
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
+
+  it("applies rarity classes to suggestion-name when entry declares rarity", () => {
+    const container = document.createElement("div");
+    const testResults: IndexEntry[] = [
+      { id: "minecraft:apple", n: "Apple", k: "item", a: [], s: "item-0" },
+      { id: "minecraft:golden_apple", n: "Golden Apple", k: "item", a: [], s: "item-0", r: "rare" },
+      { id: "minecraft:mace", n: "Mace", k: "item", a: [], s: "item-0", r: "epic" },
+    ];
+
+    renderSuggestions(container, {
+      results: testResults,
+      selectedIndex: 0,
+      onSelect: () => undefined,
+    });
+
+    const names = container.querySelectorAll(".suggestion-name");
+    expect(names[0]?.classList.contains("rarity-rare")).toBe(false);
+    expect(names[1]?.classList.contains("rarity-rare")).toBe(true);
+    expect(names[2]?.classList.contains("rarity-epic")).toBe(true);
+  });
 });

@@ -38,6 +38,9 @@ export function renderSuggestions(container: HTMLElement, props: SuggestionsProp
     const icon = createIconElement(entryIconKey(entry));
     const name = document.createElement("span");
     name.className = "suggestion-name";
+    if (entry.r) {
+      name.classList.add(`rarity-${entry.r}`);
+    }
     name.textContent = entry.n;
     left.append(icon, name);
 

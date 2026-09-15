@@ -6,6 +6,7 @@ import { appendWikiText } from "./wikilinks.js";
 const ENTRIES: IndexEntry[] = [
   { id: "minecraft:witch", n: "Witch", k: "mob", a: [], i: "EntitySprite:witch" },
   { id: "minecraft:shipwreck", n: "Shipwreck", k: "block", a: [], i: "InvSprite:Shipwreck" },
+  { id: "minecraft:beacon", n: "Beacon", k: "block", a: [], i: "InvSprite:Beacon", r: "rare" },
 ] as unknown as IndexEntry[];
 
 function makeContext(): RenderContext & { openRef: ReturnType<typeof vi.fn> } {
@@ -85,5 +86,17 @@ describe("appendWikiText", () => {
 
     expect(first.host.querySelectorAll("a.entity-link")).toHaveLength(1);
     expect(second.host.querySelectorAll("a.entity-link")).toHaveLength(1);
+  });
+
+  it("applies rarity classes to entity-name in wikilink when target declares rarity", () => {
+    const { host } = render("Requires a [[Shipwreck]] and a [[Beacon]].");
+    const links = host.querySelectorAll<HTMLAnchorElement>("a.entity-link");
+    expect(links).toHaveLength(2);
+
+    const shipwreckName = links[0]?.querySelector(".entity-name");
+    expect(shipwreckName?.classList.contains("rarity-rare")).toBe(false);
+
+    const beaconName = links[1]?.querySelector(".entity-name");
+    expect(beaconName?.classList.contains("rarity-rare")).toBe(true);
   });
 });

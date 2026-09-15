@@ -229,6 +229,7 @@ from pipeline.extract.food import ConsumeEffectKind, FoodFacts
 from pipeline.extract.generation import BlockGeneration, Dimension
 from pipeline.extract.harvest import BlockHarvest, HarvestTier, HarvestTool
 from pipeline.extract.profession import ProfessionIndex, extract_professions
+from pipeline.extract.rarity import ItemRarity
 from pipeline.extract.structure import (
     RandomSpreadPlacement as ExtractedRandomSpreadPlacement,
 )
@@ -1569,6 +1570,7 @@ def merge_entities(
     entity_classification: EntityClassification,
     breeding_index: enrich_breeding.BreedingIndex | None = None,
     food_index: Mapping[str, FoodFacts] | None = None,
+    rarity_index: Mapping[str, ItemRarity] | None = None,
     harvest_index: Mapping[str, BlockHarvest] | None = None,
     block_drops: Mapping[str, Sequence[HarvestDrop]] | None = None,
     effect_index: enrich_effect.EffectIndex | None = None,
@@ -2562,6 +2564,14 @@ def merge_entities(
             # mcmeta and no wiki page was read to build the section -- so it
             # incurs no D1 attribution requirement of its own.
             item_draft.add_section_first(food_section, SourceTier.A)
+
+    if rarity_index is not None:
+        for item_id, rarity in rarity_index.items():
+            item_draft = drafts.get(item_id)
+            if item_draft is None:
+                continue
+            if rarity is not ItemRarity.COMMON:
+                item_draft.set("itemRarity", rarity.value, SourceTier.A)
 
     if harvest_index is not None:
         for block_id, harvest_facts in harvest_index.items():

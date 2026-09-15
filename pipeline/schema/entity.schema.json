@@ -32,6 +32,10 @@
       "type": "string",
       "minLength": 1
     },
+    "itemRarity": {
+      "description": "The item's display rarity tier from `minecraft:rarity`. Absent when common (the default) or when the entity is not a tiered item.",
+      "$ref": "#/$defs/itemRarity"
+    },
     "blurb": {
       "description": "The intro text of the wiki page, as plain text.",
       "type": "string"
@@ -99,6 +103,11 @@
       "type": "string",
       "pattern": "^[a-z0-9_-]+:[a-z0-9_./-]+$",
       "examples": ["minecraft:creeper", "collection:compostable"]
+    },
+    "itemRarity": {
+      "description": "The four display rarity tiers of Minecraft Java Edition items.",
+      "type": "string",
+      "enum": ["common", "uncommon", "rare", "epic"]
     },
     "entityKind": {
       "description": "The discriminator of the Entity model. It selects the renderer.",

@@ -175,6 +175,7 @@ from pipeline.extract.generation import (
 )
 from pipeline.extract.harvest import extract_block_harvest
 from pipeline.extract.profession import extract_professions
+from pipeline.extract.rarity import extract_rarity
 from pipeline.extract.structure import extract_structures
 from pipeline.extract.tags import TagIndex
 from pipeline.fetch import FetchError, Transport, decode_json, get_bytes
@@ -610,6 +611,7 @@ def run_build(
         item_components_payload, source=summary_tag.raw_url(item_components_path)
     )
     food_index = extract_food(item_components)
+    rarity_index = extract_rarity(item_components)
     files = fetch_data_files(
         data_tag,
         groups=(
@@ -641,6 +643,7 @@ def run_build(
         f"tier A: {len(registries)} registries, {len(advancement_ids)} advancement ids, "
         f"{len(classification.by_path)} entity_type paths classified, "
         f"{len(food_index)} items that can be eaten, "
+        f"{len(rarity_index)} items with display rarity, "
         f"{len(harvest_index)} blocks with harvest requirements, "
         f"{len(gen_result.blocks)} blocks with generation facts, "
         f"{len(enchant_index)} enchantments, "
@@ -886,6 +889,7 @@ def run_build(
         entity_classification=classification,
         breeding_index=breeding_index,
         food_index=food_index,
+        rarity_index=rarity_index,
         harvest_index=harvest_index,
         block_drops=block_drops_from_producers(loot_result.producers),
         effect_index=effect_index,

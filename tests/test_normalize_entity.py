@@ -116,6 +116,7 @@ def test_serializing_by_alias_produces_the_schema_camel_case_keys() -> None:
         "name",
         "aliases",
         "icon",
+        "itemRarity",
         "blurb",
         "wikiUrl",
         "sourceTiers",
@@ -124,6 +125,7 @@ def test_serializing_by_alias_produces_the_schema_camel_case_keys() -> None:
     # No snake_case leaked through: `wiki_url` and `source_tiers` must be absent.
     assert "wiki_url" not in dumped
     assert "source_tiers" not in dumped
+    assert "item_rarity" not in dumped
 
 
 def test_a_nested_camel_case_alias_also_round_trips() -> None:

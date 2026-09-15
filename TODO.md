@@ -370,13 +370,13 @@ New collections the added data makes nearly free:
       (`water`, `mundane`, `thick`, `awkward`).
 - [x] Hostile/passive color coding consistent across every renderer.
       `.stat-behavior.is-hostile`, `.is-passive` and `.is-neutral` cover it.
-- [ ] **Rarity color coding is blocked on the pipeline, not on CSS.** There is no rarity to colour:
-      `grep '"rarity"' data/dist/entities/*.json` hits only the 43 enchantments, because nothing
-      extracts the `minecraft:rarity` component. Closing it means an extract change, a schema edit,
-      a `data/dist` regeneration and new pipeline tests, so it is its own task.
-      The palette it needs is already defined and deliberately left unused: `--mc-yellow` and
-      `--mc-purple` sit in the token block with a comment saying why, so the four rarity tiers get
-      picked once rather than half now and half later.
+- [x] Rarity color coding across pipeline and web.
+      Extracted `minecraft:rarity` from `item_components/data.json` into typed `ItemRarity` (`common`,
+      `uncommon`, `rare`, `epic`) via `pipeline/extract/rarity.py`. Schema contracts updated in
+      `entity.schema.json` (`itemRarity`) and `index.schema.json` (`r`), generated into TypeScript types.
+      Non-common tiers attached at merge time and search index emission. Rebuilt `data/dist` with 115
+      tiered items. Rendered in web via CSS tokens (`--mc-yellow`, `--mc-aqua`, `--mc-purple`) across
+      window titles (`.window-title`), suggestion names (`.suggestion-name`), and entity links (`.entity-name`).
 - [x] Accessibility: contrast and focus rings.
       Every colour was measured against the surface it actually sits on. Body prose 12.9:1, headings
       5.9:1 on content and 4.5:1 on chrome, links 8.1:1 and 6.2:1, muted labels 6.5:1, hostile red
@@ -384,9 +384,28 @@ New collections the added data makes nearly free:
       Focus is one white outline rather than the old blue glow, on the focused window, the search bar
       and every control alike, so one visual language answers "where am I".
 - [ ] Accessibility: a reduced-motion path.
-      Left open on purpose rather than deferred by accident. The theme pass deleted most of the
-      transitions it would have needed to disable, so the honest scope of what remains is easier to
-      state now than it was before.
+      Built once, reviewed, and reverted on purpose. The reversal is recorded here rather than
+      dropped, so the next attempt does not rebuild the thing that was rejected.
+      The shipped attempt honoured `(prefers-reduced-motion: reduce)` four ways: it froze the
+      multi-member slot ticker in `web/render/station/ticker.ts`, added Left/Right stepping and a
+      visible `›` button on every cycling slot, moved click/Enter/Space onto a full-member-list
+      modal, and zeroed transition and animation durations globally via a media query in
+      `web/theme/base.css`.
+      It was reverted because freezing the cycle is the wrong trade for this product. The cycle is
+      not decoration: it is the only thing on screen that says a torch takes coal *or* charcoal and
+      that a plank slot accepts any of twelve woods. Windows sets the preference whenever "Show
+      animations" is off, which is a display preference rather than a vestibular one, so the freeze
+      reached readers who had asked for no such thing and deleted the information rather than the
+      motion. `ticker.ts` already argued this in its docstring, the plan overrode it, and seeing it
+      run settled it the other way.
+      Two further faults the review found, worth keeping whoever tries next:
+      the `›` step button and the list modal were built ungated, so they changed the default path
+      for every reader rather than only the reduced-motion one; and routing click onto the modal
+      displaced navigation on the two-second path, which no part of the plan asked for.
+      What is still worth having, and is the whole of what a retry should attempt first, is the
+      pure-CSS half: a `@media (prefers-reduced-motion: reduce)` block zeroing
+      `transition-duration` and `animation-duration`. It touches no slot behaviour, costs nothing,
+      and was removed only because it shipped inside the same commit as the part that was rejected.
 
 ### Palette, after review
 

@@ -106,6 +106,13 @@ export type EnchantSlot = "any" | "armor" | "feet" | "hand" | "head" | "legs" | 
  * via the `definition` "structurePlacement".
  */
 export type StructurePlacement = RandomSpreadPlacement | ConcentricRingsPlacement;
+/**
+ * The four display rarity tiers of Minecraft Java Edition items.
+ *
+ * This interface was referenced by `Entity`'s JSON-Schema
+ * via the `definition` "itemRarity".
+ */
+export type ItemRarity = "common" | "uncommon" | "rare" | "epic";
 
 /**
  * One searchable thing. Every entity of the site uses this shape, and the `kind` field selects the renderer. The pipeline writes these objects into the sharded entity JSON.
@@ -125,6 +132,10 @@ export interface Entity {
    * The sprite key in the atlas coordinate map. A missing icon is a broken join between the wiki and the registry, so the build reports it.
    */
   icon?: string;
+  /**
+   * The item's display rarity tier from `minecraft:rarity`. Absent when common (the default) or when the entity is not a tiered item.
+   */
+  itemRarity?: "common" | "uncommon" | "rare" | "epic";
   /**
    * The intro text of the wiki page, as plain text.
    */
