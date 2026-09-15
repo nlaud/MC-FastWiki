@@ -441,15 +441,44 @@ reasoning is recorded here because the code now disagrees with the plan.
       Implemented `python -m pipeline diff` in `pipeline/cli/diff.py`. Reads `index.json`, calculates
       net differences per entity kind, formats added and removed entity lists with names and IDs,
       truncates at 50 items for PR bodies, and exports full untruncated diffs to run artifacts.
-      Actions PR creation setting enabled via `gh api` repository configuration.
+      Actions PR creation setting enabled via `gh api` repository configuration: the repository
+      default stays `read` and only this workflow asks for more, in its own `permissions:` block.
+      Proven by run 34990992207, which opened PR #45 with a real body: the counts-by-kind table, the
+      added and removed sections, and the gate's own 54-row check table as the "changed" report.
+      Note what a reviewer of that PR does not get. A pull request opened with `GITHUB_TOKEN` does
+      not trigger other workflows, so CI never runs on it. That is a GitHub rule rather than a
+      choice made here, and the alternative, a stored Personal Access Token, was rejected during
+      plan review because it needs rotation.
 - [x] Validation gate blocks the PR on suspicious diffs rather than auto-merging.
       `.github/workflows/auto-update.yml` runs `pipeline build` without `--allow-regression`.
       On gate failure, the workflow catches failure, reads `data/reports/validation.json`, opens an
       issue naming the failed regression, conformance, and reference checks, and halts without
       opening a PR.
+      One claim the first cut of this made was wrong, and the correction is recorded here so the
+      reversal survives. It titled *every* build failure a validation-gate rejection, whatever had
+      actually gone wrong. The first real run died fetching an upstream tag, never reached the gate,
+      and opened an issue blaming the gate anyway, which sends a reader to the wrong subsystem.
+      The report now claims a gate rejection only when `validation.json` recorded failed checks, and
+      otherwise names the real cause and quotes the last 30 lines of the build log. See Decision 36.
 - [x] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release.
       Scheduled weekly on Mondays at 08:00 UTC (and via `workflow_dispatch` mode `wiki`). Runs cold
       without `actions/cache` restore of `data/.cache`, forcing fresh fetches from the wiki.
+      It builds the version `data/dist/manifest.json` pins, passed as `--minecraft-version`.
+      The first cut passed no version at all, and that was wrong in a way worth recording: with no
+      flag, `pipeline/cli/build.py:583` resolves `options.minecraft_version or
+      manifest.latest.release`, so the "wiki-only" job silently became a version upgrade. A
+      `mode=wiki` dispatch proved it, logging `version: 26.3` against a manifest pinned to 26.2.
+      That also made the job useless in the one window where it matters most: a release Mojang has
+      shipped but mcmeta has not tagged yet, which is exactly when a wiki-only refresh is wanted.
+      Passing the flag also turns the fetch cache on, keyed by that version, and that costs nothing
+      here for the reason the bullet above already gives - `data/.cache` is gitignored and no step
+      restores it, so a runner starts cold either way.
+      Proven end to end by run 34990992207, which built 26.2 in 3m51s and opened PR #45. The refresh
+      earned its place on its first real run: it caught the wiki reclassifying the Ocelot from
+      `Passive` to `Neutral (Wild)` plus `Passive (Trusting)`, and rewording the Polar Bear and
+      Wandering Trader entries. Twenty files changed at an unchanged `mcmetaRef` of `26.2-data`,
+      which is the shape a wiki-only refresh is supposed to have, and the gate passed every check
+      with 2191 entities before and after.
 - [x] Deploy to GitHub Pages on merge to `main` (see Decision 4).
       `.github/workflows/deploy.yml` runs `pnpm build` and publishes `web/dist` through
       `actions/upload-pages-artifact` and `actions/deploy-pages`.
@@ -1161,6 +1190,57 @@ reasoning is recorded here because the code now disagrees with the plan.
     prevent CI runner noise from flaking while strictly catching algorithmic regressions. In Vitest, medians
     measured 0.53 ms keystroke and 3.15 ms render. In a real browser trace via `chrome-devtools-axi`, end-to-end
     medians clocked at 0.80 ms per keystroke and 59.1 ms to open and render a full entity window.
+
+36. **A scheduled build failure is classified before it is reported, and upstream lag is not an
+    incident.**
+    The first real run of the auto-update workflow found Minecraft 26.3, correctly decided a rebuild
+    was owed, and then failed: `misode/mcmeta` had not yet tagged 26.3, so both `26.3-summary` and
+    `26.3-data` answered 404.
+
+    `docs/mcmeta-fallback.md` already covers that case and already states the answer. mcmeta has
+    published within hours of every release so far, the pipeline pins one version, and `/data/dist`
+    holds the last build, so the deployed site keeps serving while the tag is missing. A missing tag
+    stops a rebuild. It does not break the site. Waiting is the documented response, and a daily
+    schedule performs that wait by itself.
+
+    Two faults turned that wait into an incident, and both are fixed.
+
+    The failure handler titled every build failure a validation-gate rejection. The gate never ran,
+    so the issue it opened pointed at the wrong subsystem entirely and its body quoted a rule about
+    regressions that had nothing to do with the fault. It now claims a gate rejection only when
+    `validation.json` recorded failed checks, and otherwise names the real cause and quotes the last
+    30 lines of the build log.
+
+    An expected upstream lag opened an issue at all. mcmeta lags every Mojang release by hours, so a
+    daily check lands in that window on every release, and an issue per run for a self-healing
+    condition is noise that buries the reports worth reading. The workflow now detects the
+    missing-tag 404 specifically, says so in the log, leaves the run green, and opens nothing. Any
+    other build failure still opens an issue and still fails the run.
+
+    The build step carries `continue-on-error` so the classifier can run after it, so the three
+    post-build steps require `steps.build.outcome == 'success'` rather than relying on the job
+    stopping by itself.
+
+    Proven by re-dispatch against the same untagged 26.3: run 34987104118 failed and opened a
+    misattributed issue, and run 34988150368 went green, opened nothing, and logged the real reason.
+
+37. **The weekly refresh builds the pinned version, not Mojang's newest.**
+    `pipeline build` resolves `options.minecraft_version or manifest.latest.release`
+    (`pipeline/cli/build.py:583`), so a build invoked with no `--minecraft-version` follows Mojang.
+    The workflow passed no flag, which made the job named "wiki-only refresh" a silent version
+    upgrade. A `mode=wiki` dispatch proved it: run 34988251993 logged `version: 26.3` against a
+    manifest pinned to 26.2, then failed because mcmeta had not tagged 26.3.
+
+    That is the wrong behaviour twice over. The refresh exists to land wiki corrections *without* a
+    Minecraft release, and following the release defeats its purpose. It also disabled the job in
+    the one window where it is most wanted, a release Mojang has shipped and mcmeta has not tagged,
+    because the build it chose could not run at all.
+
+    The wiki path now reads `minecraftVersion` out of `data/dist/manifest.json` and passes it. The
+    release path is unchanged and still follows Mojang, which is what that path is for.
+
+    The fix also unblocked the only piece of Phase 9 that had never run. See the Phase 9 wiki bullet
+    for what run 34990992207 caught on its first real pass.
 
 
 ## Still open
