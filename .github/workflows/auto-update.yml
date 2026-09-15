@@ -83,19 +83,45 @@ jobs:
         run: |
           cp data/dist/index.json /tmp/index.before.json
 
+      # `continue-on-error` so the next step decides what the failure means.
+      # Not every build failure is an incident: mcmeta tags each release hours
+      # after Mojang ships it, so a check that fires inside that window finds a
+      # release it cannot build yet. docs/mcmeta-fallback.md states the policy
+      # for that case -- wait a day, the deployed site keeps serving the last
+      # build -- and a daily schedule already performs that wait by itself.
       - name: Run build pipeline
         id: build
         if: steps.decision.outputs.should_run == 'true'
+        continue-on-error: true
         run: |
-          uv run python -m pipeline build
+          set -o pipefail
+          uv run python -m pipeline build 2>&1 | tee /tmp/build.log
 
-      - name: Handle build validation failure
-        if: failure() && steps.build.outcome == 'failure'
+      - name: Classify build failure
+        id: classify
+        if: steps.decision.outputs.should_run == 'true' && steps.build.outcome == 'failure'
+        run: |
+          # An mcmeta tag that does not exist yet answers 404 on the single-ref
+          # endpoint. docs/mcmeta-fallback.md names this as the signal to expect.
+          if grep -qE 'git/ref/tags/[^ ]*(summary|data) failed: HTTP Error 404' /tmp/build.log; then
+            echo "upstream_not_ready=true" >> "$GITHUB_OUTPUT"
+            echo "mcmeta has not published tags for this release yet."
+            echo "This is expected within hours of a Minecraft release and is not a fault."
+            echo "The deployed site keeps serving the last build. The next scheduled run retries."
+          else
+            echo "upstream_not_ready=false" >> "$GITHUB_OUTPUT"
+            echo "Build failed for a reason that is not upstream lag. Opening an issue."
+          fi
+
+      - name: Report build failure
+        if: steps.classify.outcome == 'success' && steps.classify.outputs.upstream_not_ready == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           python - << 'EOF'
           import json
+          import os
           import subprocess
           from pathlib import Path
 
@@ -120,20 +146,43 @@ jobs:
               except Exception as e:
                   failed_items.append(f"Failed to read validation report: {e}")
 
-          body_lines = [
-              "## Build Validation Rejection",
-              "",
-              "The automated build failed the validation gate. Under project rules, regressions are never auto-merged or downgraded.",
-              "",
-              "### Failed Checks",
-          ]
+          # Only claim a gate rejection when the gate actually rejected
+          # something. An earlier cut titled every build failure that way, so a
+          # run that died fetching an upstream file opened an issue blaming the
+          # validation gate and sent the reader to the wrong place entirely.
+          tail = ""
+          log_path = Path("/tmp/build.log")
+          if log_path.is_file():
+              tail = "".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)[-30:])
+
           if failed_items:
+              title = "Auto-update build failed the validation gate"
+              body_lines = [
+                  "## Validation gate rejection",
+                  "",
+                  "The automated build ran and the validation gate rejected its output.",
+                  "The gate is never downgraded: `--allow-regression` is not passed here.",
+                  "",
+                  "### Failed checks",
+              ]
               body_lines.extend(failed_items)
           else:
-              body_lines.append("No specific validation checks recorded; inspect the Actions run logs.")
+              title = "Auto-update build failed before the validation gate"
+              body_lines = [
+                  "## Build failure",
+                  "",
+                  "The automated build failed before it reached the validation gate, so no check table exists.",
+                  "This is not upstream lag: a missing mcmeta tag is detected separately and does not open an issue.",
+                  "",
+                  "### Last lines of the build log",
+                  "",
+                  "```",
+                  tail.rstrip() or "No build log was captured. Inspect the Actions run logs.",
+                  "```",
+              ]
 
+          body_lines += ["", f"Run: {os.environ.get('RUN_URL', 'see the Actions tab')}"]
           body = "\n".join(body_lines)
-          title = "Auto-update build failed validation gate"
 
           # A gate that stays broken fails on every scheduled run. Opening one
           # issue per run would bury the first report under duplicates, so an
@@ -151,7 +200,7 @@ jobs:
           EOF
 
       - name: Generate diff summary
-        if: steps.decision.outputs.should_run == 'true'
+        if: steps.decision.outputs.should_run == 'true' && steps.build.outcome == 'success'
         run: |
           uv run python -m pipeline diff \
             --before /tmp/index.before.json \
@@ -161,7 +210,7 @@ jobs:
           cat pr_body.md
 
       - name: Upload diff artifact
-        if: steps.decision.outputs.should_run == 'true'
+        if: steps.decision.outputs.should_run == 'true' && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: diff-summary
@@ -171,7 +220,7 @@ jobs:
             data/reports/validation.json
 
       - name: Create pull request
-        if: steps.decision.outputs.should_run == 'true'
+        if: steps.decision.outputs.should_run == 'true' && steps.build.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -202,3 +251,13 @@ jobs:
             --base main \
             --title "$TITLE" \
             --body-file pr_body.md
+
+      # The build step carries `continue-on-error`, so the job no longer fails
+      # on its own. Fail it here, and only for a real fault: a release that
+      # mcmeta has not tagged yet leaves the run green, because waiting is the
+      # documented response to that and the next schedule performs the wait.
+      - name: Fail the run on a real build failure
+        if: steps.build.outcome == 'failure' && steps.classify.outputs.upstream_not_ready != 'true'
+        run: |
+          echo "The build failed for a reason that is not upstream lag."
+          exit 1
