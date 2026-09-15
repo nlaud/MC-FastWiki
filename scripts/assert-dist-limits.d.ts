@@ -1,3 +1,5 @@
+export const DEFAULT_WEB_DIST: string;
+export const DEFAULT_DATA_DIST: string;
 export const MAX_SITE_TOTAL_BYTES: number;
 export const MAX_SINGLE_FILE_BYTES: number;
 

@@ -11,8 +11,8 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const DEFAULT_WEB_DIST = join(REPO_ROOT, "web", "dist");
-const DEFAULT_DATA_DIST = join(REPO_ROOT, "data", "dist");
+export const DEFAULT_WEB_DIST = join(REPO_ROOT, "web", "dist");
+export const DEFAULT_DATA_DIST = join(REPO_ROOT, "data", "dist");
 
 export const MAX_SITE_TOTAL_BYTES = 1024 * 1024 * 1024; // 1 GB
 export const MAX_SINGLE_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
