@@ -183,7 +183,15 @@ def test_from_dist_reads_the_real_committed_baseline() -> None:
     # 4268 before 6 unhandled recipe types added 43 producers.
     # 4311 before curated one-off producers added 14 producers.
     # 4325 before 12 creeper-dropped music discs were expanded.
-    assert snapshot.obtain_producer_count == 4337
+    # 4337 before the first weekly wiki refresh (run 34990992207) picked up three
+    # Wandering Trader trades the wiki had added for 26.x content: Poplar Log
+    # (8 for 1 emerald, Special), Poplar Sapling (1 for 5 emeralds, Ordinary),
+    # and Shelf Mushroom (3 for 1 emerald, Ordinary). This is the first time
+    # this number moved without a code change, which is the refresh working:
+    # the trades come from the wiki's own tables, and the build reads them on
+    # every run. `TradeTable` stays at 184 because all three land on the
+    # Wandering Trader's existing table rather than creating a new one.
+    assert snapshot.obtain_producer_count == 4340
     # 1914 before Local Brewery (InvSprite:Potion) and Ominous Banner (BlockSprite:ominous-banner)
     # joined the atlas. 1916 before 13 profession icons joined the atlas.
     assert snapshot.atlas_icon_count == 1929
