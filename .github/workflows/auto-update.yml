@@ -95,7 +95,20 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          uv run python -m pipeline build 2>&1 | tee /tmp/build.log
+          if [ "${{ steps.mode.outputs.mode }}" = "wiki" ]; then
+            # The weekly refresh exists to land wiki corrections WITHOUT a
+            # Minecraft release, so it has to stay on the version already
+            # pinned in the manifest. `pipeline build` with no
+            # --minecraft-version resolves Mojang's current release instead
+            # (pipeline/cli/build.py:583), which turned this job into a silent
+            # version upgrade and blocked it whenever mcmeta had not tagged
+            # that release yet.
+            PINNED=$(python -c "import json; print(json.load(open('data/dist/manifest.json'))['minecraftVersion'])")
+            echo "Wiki refresh pinned to Minecraft ${PINNED}."
+            uv run python -m pipeline build --minecraft-version "$PINNED" 2>&1 | tee /tmp/build.log
+          else
+            uv run python -m pipeline build 2>&1 | tee /tmp/build.log
+          fi
 
       - name: Classify build failure
         id: classify
