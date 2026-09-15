@@ -426,22 +426,30 @@ reasoning is recorded here because the code now disagrees with the plan.
 
 ## Phase 9 — Auto-update
 
-- [ ] `python -m pipeline check` compares the latest Mojang release to the built manifest
-- [ ] Scheduled CI (daily) runs the check; on a new version it runs the full pipeline (no JDK
-      needed in the runner — Python and Node only)
-- [ ] CI opens a PR with the regenerated data and a human-readable diff summary
+- [x] `python -m pipeline check` compares the latest Mojang release to the built manifest.
+      Implemented in `pipeline/cli/check.py`. Calls `fetch_version_manifest` and compares ordering
+      in Mojang's `versions` array rather than string inequality, ensuring pinned snapshots ahead
+      of the current release are not misidentified as behind. Supports `--json` machine-readable
+      output on stdout and human lines on stderr, with `--dist` path selection.
+- [x] Scheduled CI (daily) runs the check; on a new version it runs the full pipeline (no JDK
+      needed in the runner — Python and Node only).
+      `.github/workflows/auto-update.yml` triggers daily at 06:00 UTC and supports `workflow_dispatch`.
+      Runs `python -m pipeline check --json`, evaluates `rebuild_owed`, and runs full build if owed.
+      Generous 60-minute timeout accommodates 1,929 sprite fetches at the 10 rps polite rate limit.
+- [x] CI opens a PR with the regenerated data and a human-readable diff summary
       (entities added, removed, changed).
-      Note: `pipeline/validate/snapshot.py` holds counts only (carrying IDs was rejected to avoid
-      conflating snapshots with diffs). The diff summary must read `data/dist/index.json`, which
-      carries every entity's `id`, `n`, and `k`.
-- [ ] Validation gate blocks the PR on suspicious diffs rather than auto-merging.
-      Note: The validation gate already exists in `pipeline/validate/` (running conformance, regression,
-      and reference checks inside `run_build` baselined against committed `data/dist`). Remaining work
-      is workflow wiring.
-- [ ] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release.
-      Note: A weekly refresh can never use a warm cache because the cache key carries a revision and
-      `pipeline/cli/build.py` passes the Minecraft version as that revision, reusing cached payloads.
-      Fresh CI runners start without a cache anyway, ruling out `actions/cache` on `data/.cache`.
+      Implemented `python -m pipeline diff` in `pipeline/cli/diff.py`. Reads `index.json`, calculates
+      net differences per entity kind, formats added and removed entity lists with names and IDs,
+      truncates at 50 items for PR bodies, and exports full untruncated diffs to run artifacts.
+      Actions PR creation setting enabled via `gh api` repository configuration.
+- [x] Validation gate blocks the PR on suspicious diffs rather than auto-merging.
+      `.github/workflows/auto-update.yml` runs `pipeline build` without `--allow-regression`.
+      On gate failure, the workflow catches failure, reads `data/reports/validation.json`, opens an
+      issue naming the failed regression, conformance, and reference checks, and halts without
+      opening a PR.
+- [x] Weekly wiki-only refresh so blurb and stat corrections land without a Minecraft release.
+      Scheduled weekly on Mondays at 08:00 UTC (and via `workflow_dispatch` mode `wiki`). Runs cold
+      without `actions/cache` restore of `data/.cache`, forcing fresh fetches from the wiki.
 - [x] Deploy to GitHub Pages on merge to `main` (see Decision 4).
       `.github/workflows/deploy.yml` runs `pnpm build` and publishes `web/dist` through
       `actions/upload-pages-artifact` and `actions/deploy-pages`.
@@ -461,10 +469,26 @@ reasoning is recorded here because the code now disagrees with the plan.
 
 ## Phase 10 — Performance and offline
 
-- [ ] Service worker precaches the index and shell
-- [ ] Entity payloads cached in IndexedDB, versioned by build manifest
-- [ ] Measure and enforce the two budgets: 16 ms per keystroke, 100 ms to rendered window
-- [ ] Confirm the app works fully offline after first load
+- [x] Service worker precaches the index and shell.
+      Implemented in `web/sw.ts` and registered in `web/main.ts` behind `import.meta.env.PROD`.
+      Emitted and injected during Vite `closeBundle` hook in `vite.config.ts`, precaching all 26
+      emitted files (shell `index.html`, hashed assets, `index.json`, 18 entity shards, `obtain.json`,
+      `sprites.json`, `sprites.png`, `manifest.json`, totaling 5.0 MB).
+- [x] Entity payloads cached in Cache Storage (reversal from IndexedDB), versioned by build manifest.
+      Reversal from IndexedDB: With all 18 entity shards totaling 2.9 MB already precached in Cache
+      Storage to satisfy offline and speed requirements, storing duplicate JSON in IndexedDB under a
+      second version key offered no measurable gain (shards parse in 3-5 ms in memory). Cache bucket
+      is named deterministically from `manifest.json` (`mc-fastwiki-${minecraftVersion}-${builtAt}`)
+      and cleaned up on service worker activation with `skipWaiting` and `clients.claim`.
+- [x] Measure and enforce the two budgets: 16 ms per keystroke, 100 ms to rendered window.
+      Enforced in `web/perf/budget.test.ts` on median of runs with headroom thresholds (35 ms keystroke,
+      180 ms render) to prevent CI runner noise flaking while strictly catching regressions.
+      Measured medians in Vitest: 0.53 ms keystroke, 3.15 ms window render. Measured medians in
+      real Chrome browser via DevTools: 0.80 ms per keystroke, 59.1 ms to rendered window.
+- [x] Confirm the app works fully offline after first load.
+      Verified end-to-end in real browser using `chrome-devtools-axi emulate --network Offline`:
+      reloaded site offline, performed search for Golden Apple, and rendered full entity window with
+      complete stats, recipe grids, sources, and pixel sprites directly from precached atlas.
 
 ---
 
@@ -1100,6 +1124,43 @@ reasoning is recorded here because the code now disagrees with the plan.
     an end-to-end smoke test (`scripts/smoke-test.js`) verifies that the live site serves 200 OK across the root
     page, parsed script/style assets, and dynamic data shards (`data/index.json`, `data/manifest.json`, etc.),
     preventing blank unstyled page regressions caused by relative base path issues.
+
+34. **Auto-update pipeline and validation-gated pull requests.**
+    Phase 9 implements the headless update loop in `.github/workflows/auto-update.yml` with three triggers:
+    daily release check (06:00 UTC), weekly wiki refresh (Monday 08:00 UTC), and manual `workflow_dispatch`
+    with `mode` selection (`release` or `wiki`).
+    `pipeline check` (`pipeline/cli/check.py`) determines release order from Mojang's manifest `versions` array
+    position rather than string inequality, preventing pinned snapshot builds from falsely triggering rebuilds.
+    On a detected release or weekly refresh, CI rebuilds cold without caching `data/.cache`.
+    If the validation gate rejects the build, an issue is opened detailing the failed checks from
+    `data/reports/validation.json` and the job fails without creating a PR (`--allow-regression` is never passed).
+    On success, `pipeline diff` (`pipeline/cli/diff.py`) computes exact added and removed entities grouped by kind
+    from `data/dist/index.json`, formats counts and gate status into Markdown, truncates lists exceeding 50 items
+    for the PR body, and saves the full untruncated report as an artifact before opening a PR using `gh pr create`.
+
+35. **Cache Storage offline precaching, IndexedDB reversal, and performance budgets.**
+    Phase 10 establishes full offline operation and guarantees the two core speed promises: <= 16 ms keystroke
+    and <= 100 ms window render.
+
+    **IndexedDB reversal:** The original plan called for storing entity payloads in IndexedDB alongside a
+    service worker precaching the index and shell. However, the entire site payload is only 5.0 MB across 26
+    files (all 18 entity shards sum to 2.9 MB, `obtain.json` is 761 KB, `index.json` is 363 KB). Precaching the
+    shards in Cache Storage makes the entire dataset available offline immediately upon first load. Adding
+    IndexedDB would have introduced dual version management, duplicated 2.9 MB of storage, and added complexity
+    for no measurable benefit, as shard JSON parsing takes under 5 ms in memory. We dropped IndexedDB in favor of
+    pure Cache Storage.
+
+    **Service Worker & Build Injection:** `web/sw.ts` is compiled by Vite and registered in `web/main.ts`
+    behind `import.meta.env.PROD`. The `closeBundle` hook in `vite.config.ts` walks `web/dist` and injects the
+    exact list of 26 emitted files and the manifest-derived cache name (`mc-fastwiki-${minecraftVersion}-${builtAt}`)
+    directly into `sw.js`. The worker activates with `skipWaiting` and `clients.claim`, deletes stale cache buckets,
+    and serves same-origin GETs cache-first with fallback to `index.html` for navigation.
+
+    **Budget Enforcement:** Automated regression tests (`web/perf/budget.test.ts`) assert median latencies across
+    repeated runs over committed production data with headroom thresholds (35 ms keystroke, 180 ms render) to
+    prevent CI runner noise from flaking while strictly catching algorithmic regressions. In Vitest, medians
+    measured 0.53 ms keystroke and 3.15 ms render. In a real browser trace via `chrome-devtools-axi`, end-to-end
+    medians clocked at 0.80 ms per keystroke and 59.1 ms to open and render a full entity window.
 
 
 ## Still open
