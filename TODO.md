@@ -383,12 +383,29 @@ New collections the added data makes nearly free:
       5.4:1 - all at or above 4.5:1.
       Focus is one white outline rather than the old blue glow, on the focused window, the search bar
       and every control alike, so one visual language answers "where am I".
-- [x] Accessibility: a reduced-motion path.
-      Honors `(prefers-reduced-motion: reduce)`: pauses recipe slot ticker animation in
-      `web/render/station/ticker.ts`, provides keyboard arrow navigation (Left/Right) and a visible
-      step button on multi-member slots, enables full-list member view modal on click/Enter/Space,
-      and enforces `animation-duration: 0.01ms !important; transition-duration: 0.01ms !important;`
-      globally via media query in `web/theme/base.css`.
+- [ ] Accessibility: a reduced-motion path.
+      Built once, reviewed, and reverted on purpose. The reversal is recorded here rather than
+      dropped, so the next attempt does not rebuild the thing that was rejected.
+      The shipped attempt honoured `(prefers-reduced-motion: reduce)` four ways: it froze the
+      multi-member slot ticker in `web/render/station/ticker.ts`, added Left/Right stepping and a
+      visible `›` button on every cycling slot, moved click/Enter/Space onto a full-member-list
+      modal, and zeroed transition and animation durations globally via a media query in
+      `web/theme/base.css`.
+      It was reverted because freezing the cycle is the wrong trade for this product. The cycle is
+      not decoration: it is the only thing on screen that says a torch takes coal *or* charcoal and
+      that a plank slot accepts any of twelve woods. Windows sets the preference whenever "Show
+      animations" is off, which is a display preference rather than a vestibular one, so the freeze
+      reached readers who had asked for no such thing and deleted the information rather than the
+      motion. `ticker.ts` already argued this in its docstring, the plan overrode it, and seeing it
+      run settled it the other way.
+      Two further faults the review found, worth keeping whoever tries next:
+      the `›` step button and the list modal were built ungated, so they changed the default path
+      for every reader rather than only the reduced-motion one; and routing click onto the modal
+      displaced navigation on the two-second path, which no part of the plan asked for.
+      What is still worth having, and is the whole of what a retry should attempt first, is the
+      pure-CSS half: a `@media (prefers-reduced-motion: reduce)` block zeroing
+      `transition-duration` and `animation-duration`. It touches no slot behaviour, costs nothing,
+      and was removed only because it shipped inside the same commit as the part that was rejected.
 
 ### Palette, after review
 

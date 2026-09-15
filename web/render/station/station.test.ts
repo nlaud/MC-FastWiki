@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RenderContext } from "../context.js";
 import type { TreeProducer } from "../obtain-tree.js";
@@ -16,7 +15,6 @@ import {
   renderStonecutterCard,
   renderUsingCard,
   resetTickerForTesting,
-  shouldTick,
 } from "./index.js";
 
 function createMockContext(): RenderContext {
@@ -82,7 +80,7 @@ describe("StationSlot", () => {
     expect(badge?.textContent).toBe("3");
   });
 
-  it("cycles candidate items for tags with members using ticker and keeps aria-label in sync", () => {
+  it("cycles candidate items for tags with members using ticker", () => {
     const ctx = createMockContext();
     const slot = renderSlot(
       {
@@ -98,98 +96,14 @@ describe("StationSlot", () => {
 
     expect(slot.classList.contains("is-cycling")).toBe(true);
     expect(slot.title).toContain("Planks (2): Oak Planks");
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
 
     // Advance ticker
     advanceTickerForTesting();
     expect(slot.title).toContain("Planks (2): Birch Planks");
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Birch Planks");
 
     // Advance ticker again to wrap around
     advanceTickerForTesting();
     expect(slot.title).toContain("Planks (2): Oak Planks");
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
-  });
-
-  it("steps candidate items with keyboard Left/Right arrows", () => {
-    const ctx = createMockContext();
-    const slot = renderSlot(
-      {
-        label: "Planks",
-        item: "minecraft:oak_planks",
-        tag: "#minecraft:planks",
-        count: 1,
-        members: ["minecraft:oak_planks", "minecraft:birch_planks"],
-        node: null,
-      },
-      ctx,
-    );
-
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
-
-    slot.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Birch Planks");
-
-    slot.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
-  });
-
-  it("steps candidate items with visible next control", () => {
-    const ctx = createMockContext();
-    const slot = renderSlot(
-      {
-        label: "Planks",
-        item: "minecraft:oak_planks",
-        tag: "#minecraft:planks",
-        count: 1,
-        members: ["minecraft:oak_planks", "minecraft:birch_planks"],
-        node: null,
-      },
-      ctx,
-    );
-
-    const nextBtn = slot.querySelector<HTMLButtonElement>(".slot-step-next");
-    expect(nextBtn).not.toBeNull();
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
-
-    nextBtn?.click();
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Birch Planks");
-
-    nextBtn?.click();
-    expect(slot.getAttribute("aria-label")).toBe("Planks (2): Oak Planks");
-  });
-
-  it("opens member list modal on slot activation and allows navigation/closing", () => {
-    const ctx = createMockContext();
-    const slot = renderSlot(
-      {
-        label: "Planks",
-        item: "minecraft:oak_planks",
-        tag: "#minecraft:planks",
-        count: 1,
-        members: ["minecraft:oak_planks", "minecraft:birch_planks"],
-        node: null,
-      },
-      ctx,
-    );
-
-    slot.click();
-    const backdrop = document.querySelector(".slot-list-backdrop");
-    expect(backdrop).not.toBeNull();
-    expect(backdrop?.getAttribute("aria-label")).toBe("Planks (2)");
-
-    const title = backdrop?.querySelector(".slot-list-title");
-    expect(title?.textContent).toBe("Planks (2)");
-
-    const links = backdrop?.querySelectorAll(".entity-link");
-    expect(links?.length).toBe(2);
-
-    // Clicking a link invokes openRef and closes modal
-    const firstLink = links?.[0] as HTMLElement | undefined;
-    expect(firstLink).toBeDefined();
-    firstLink?.click();
-    expect(ctx.openRef).toHaveBeenCalledWith("minecraft:oak_planks");
-    expect(document.querySelector(".slot-list-backdrop")).toBeNull();
   });
 
   it("falls back to readable text when atlas sprite is missing", () => {
@@ -594,37 +508,5 @@ describe("StationPagination", () => {
 
     dots[1]?.click();
     expect(onSelect).toHaveBeenCalledWith(1);
-  });
-});
-
-describe("Reduced motion accessibility", () => {
-  it("halts ticker when prefers-reduced-motion is active", () => {
-    try {
-      vi.stubGlobal(
-        "matchMedia",
-        vi.fn((query: string) => ({
-          matches: query === "(prefers-reduced-motion: reduce)",
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      );
-
-      expect(shouldTick()).toBe(false);
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("defines prefers-reduced-motion blanket rules and .is-cycling in base.css", () => {
-    const css = fs.readFileSync("web/theme/base.css", "utf-8");
-    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(css).toContain("transition-duration: 0.01ms !important;");
-    expect(css).toContain("animation-duration: 0.01ms !important;");
-    expect(css).toMatch(/\.station-slot\.is-cycling/);
   });
 });

@@ -1,6 +1,5 @@
 import type { RenderContext } from "../context.js";
 import { createIconElement } from "../icon.js";
-import { entityLink } from "../link.js";
 import type { TreeInput } from "../obtain-tree.js";
 import { potionIconKey, potionName } from "../potion-icon.js";
 import { subscribeTicker } from "./ticker.js";
@@ -35,96 +34,6 @@ export interface SlotOptions {
   count?: number;
   role?: string;
   isResult?: boolean;
-}
-
-/**
- * Opens a modal dialog listing all candidate items for a multi-member slot.
- * Every member is rendered as an entity link allowing the user to view or navigate to it.
- */
-export function openSlotMemberList(
-  title: string,
-  items: string[],
-  ctx: RenderContext,
-  returnFocusEl?: HTMLElement,
-): HTMLElement {
-  const backdrop = document.createElement("div");
-  backdrop.className = "slot-list-backdrop";
-  backdrop.setAttribute("role", "dialog");
-  backdrop.setAttribute("aria-modal", "true");
-  backdrop.setAttribute("aria-label", title);
-
-  const panel = document.createElement("div");
-  panel.className = "slot-list-panel";
-
-  const header = document.createElement("div");
-  header.className = "slot-list-header";
-
-  const h2 = document.createElement("h2");
-  h2.className = "slot-list-title";
-  h2.textContent = title;
-
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "slot-list-close-btn";
-  closeBtn.setAttribute("aria-label", "Close alternatives list");
-  closeBtn.textContent = "×";
-
-  const close = (): void => {
-    backdrop.remove();
-    document.removeEventListener("keydown", onKeyDown);
-    if (returnFocusEl && typeof returnFocusEl.focus === "function") {
-      returnFocusEl.focus();
-    }
-  };
-
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      close();
-    }
-  };
-
-  closeBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    close();
-  });
-
-  header.append(h2, closeBtn);
-
-  const content = document.createElement("div");
-  content.className = "slot-list-content";
-
-  for (const item of items) {
-    const entry = ctx.lookup(item);
-    const displayName = entry?.n ?? potionName(item) ?? humaniseId(item);
-    const link = entityLink({ id: item, name: displayName }, ctx);
-    link.addEventListener("click", () => {
-      close();
-    });
-    link.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        close();
-      }
-    });
-    content.append(link);
-  }
-
-  panel.append(header, content);
-  backdrop.append(panel);
-
-  backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) {
-      close();
-    }
-  });
-
-  document.addEventListener("keydown", onKeyDown);
-  document.body.append(backdrop);
-  if (typeof closeBtn.focus === "function") {
-    closeBtn.focus();
-  }
-
-  return backdrop;
 }
 
 /**
@@ -193,10 +102,8 @@ export function renderSlot(
       const affordance = candidateItems.length > 1 ? ` (${candidateItems.length.toString()})` : "";
       slotEl.title = `${tagLabel}${affordance}: ${displayName}`;
     } else {
-      const affordance = candidateItems.length > 1 ? ` (${candidateItems.length.toString()})` : "";
-      slotEl.title = `${displayName}${affordance}`;
+      slotEl.title = displayName;
     }
-    slotEl.setAttribute("aria-label", slotEl.title);
   };
 
   if (candidateItems.length > 0) {
@@ -205,18 +112,9 @@ export function renderSlot(
       updateItemDisplay(initialItem);
     }
 
-    const step = (delta: number): void => {
-      currentItemIndex = (currentItemIndex + delta + candidateItems.length) % candidateItems.length;
-      const currentItem = candidateItems[currentItemIndex];
-      if (currentItem) {
-        updateItemDisplay(currentItem);
-      }
-    };
-
     // Subscribe to cycling if there are multiple candidate items
     if (candidateItems.length > 1) {
       slotEl.classList.add("is-cycling");
-      slotEl.setAttribute("aria-haspopup", "dialog");
       subscribeTicker((tick) => {
         currentItemIndex = tick % candidateItems.length;
         const currentItem = candidateItems[currentItemIndex];
@@ -224,58 +122,23 @@ export function renderSlot(
           updateItemDisplay(currentItem);
         }
       });
-
-      // Visible next control for mouse users to step forward through alternatives
-      const nextBtn = document.createElement("button");
-      nextBtn.type = "button";
-      nextBtn.className = "slot-step-next";
-      nextBtn.setAttribute("aria-label", "Next alternative");
-      nextBtn.textContent = "›";
-      nextBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        step(1);
-      });
-      slotEl.append(nextBtn);
     }
 
     slotEl.tabIndex = 0;
     slotEl.setAttribute("role", "button");
 
-    const modalTitle = tagLabel
-      ? `${tagLabel} (${candidateItems.length.toString()})`
-      : `Alternatives (${candidateItems.length.toString()})`;
-
-    const activateSlot = (e: Event): void => {
+    const openCurrent = (e: Event): void => {
       e.preventDefault();
-      if (candidateItems.length > 1) {
-        openSlotMemberList(modalTitle, candidateItems, ctx, slotEl);
-      } else {
-        const currentItem = candidateItems[0];
-        if (currentItem) {
-          ctx.openRef(currentItem);
-        }
+      const currentItem = candidateItems[currentItemIndex] ?? candidateItems[0];
+      if (currentItem) {
+        ctx.openRef(currentItem);
       }
     };
 
-    slotEl.addEventListener("click", activateSlot);
+    slotEl.addEventListener("click", openCurrent);
     slotEl.addEventListener("keydown", (e) => {
-      if (candidateItems.length > 1) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          e.stopPropagation();
-          step(-1);
-          return;
-        }
-        if (e.key === "ArrowRight") {
-          e.preventDefault();
-          e.stopPropagation();
-          step(1);
-          return;
-        }
-      }
       if (e.key === "Enter" || e.key === " ") {
-        activateSlot(e);
+        openCurrent(e);
       }
     });
   } else if (tagLabel) {
@@ -285,7 +148,6 @@ export function renderSlot(
     textFallback.textContent = tagLabel;
     contentContainer.append(textFallback);
     slotEl.title = tagLabel;
-    slotEl.setAttribute("aria-label", tagLabel);
   }
 
   // Count badge
