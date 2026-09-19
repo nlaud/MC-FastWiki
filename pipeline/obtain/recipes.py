@@ -162,6 +162,16 @@ COOKING_STATIONS: Mapping[str, str] = {
 _SPECIAL_CRAFTING_PREFIX = "minecraft:crafting_special_"
 _NAMED_SKIPS: frozenset[str] = frozenset()
 
+# Brewing became a data-driven recipe type in 26.3: 279 files of
+# `minecraft:brewing` state in the pack what the wiki used to be the only source
+# for. This module does not read them yet. `pipeline.enrich.brewing` still builds
+# the brewing producers from Tier B, so the answer a reader sees is unchanged --
+# but Tier A beats Tier B in this project, and moving brewing across is worth
+# doing on its own. Skipping by name rather than as "unhandled" keeps that fact
+# legible in the build report instead of burying it among genuinely unknown
+# types. See TODO.md.
+BREWING_TYPE = "minecraft:brewing"
+
 # A JSON pattern row's empty cell.
 _EMPTY_CELL = " "
 
@@ -532,6 +542,31 @@ def extract_recipes(files: Mapping[str, bytes], *, tags: TagIndex) -> RecipeExtr
         if not isinstance(recipe_type, str):
             raise ObtainError(f"{source} carries no 'type'.")
 
+        # A transmute hands the input's own components to the output, so the game
+        # may state the output without naming an item. 26.3 made `map_cloning`
+        # the first vanilla recipe to do it: its input widened from
+        # `minecraft:filled_map` to the tag `#minecraft:clonable_maps`, and the
+        # `result` went empty because no one item is the answer any more.
+        #
+        # That is reported rather than raised on, and rather than filled in with
+        # the id the file used to carry -- Decision 3 forbids the guess, and a
+        # skipped recipe is counted in `skipped` and printed by the build, so it
+        # stays visible. The test is narrow on purpose: it asks about the one
+        # recipe type that derives its output, so a `smelting` recipe with an
+        # empty result is still the malformed file it has always been and still
+        # raises in `_result`.
+        if recipe_type == CRAFTING_TRANSMUTE_TYPE:
+            result = document.get("result")
+            if isinstance(result, Mapping) and not isinstance(result.get("id"), str):
+                skipped.append(
+                    SkippedRecipe(
+                        recipe_id=recipe_id,
+                        recipe_type=recipe_type,
+                        reason="a transmute whose result names no item derives it from the input",
+                    )
+                )
+                continue
+
         if recipe_path.startswith("dye_white_") or recipe_id.startswith("minecraft:dye_white_"):
             skipped.append(
                 SkippedRecipe(
@@ -612,6 +647,16 @@ def extract_recipes(files: Mapping[str, bytes], *, tags: TagIndex) -> RecipeExtr
         elif recipe_type == CRAFTING_DECORATED_POT_TYPE:
             producers.append(
                 _crafting_decorated_pot(document, recipe_id=recipe_id, tags=tags, source=source)
+            )
+        elif recipe_type == BREWING_TYPE:
+            skipped.append(
+                SkippedRecipe(
+                    recipe_id=recipe_id,
+                    recipe_type=recipe_type,
+                    reason=(
+                        "brewing is read from Tier B; this Tier A recipe type is not read yet"
+                    ),
+                )
             )
         elif recipe_type in _NAMED_SKIPS:
             skipped.append(

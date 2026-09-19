@@ -75,6 +75,106 @@ HUD_SPRITE_TITLES = tuple(
 )
 
 
+def _worldgen_members() -> dict[str, bytes]:
+    """Return the smallest worldgen pack a real build always carries.
+
+    `read_data_archive` refuses any group of `DATA_GROUPS` that matched no file,
+    because an empty group is a renamed directory rather than a Minecraft
+    version with no ore -- the fault that broke the 26.3 auto-update. A real
+    archive always holds all ten groups, so this fixture holds all ten too.
+
+    The worldgen half is not filler. `feature_place` reads the curated dungeon
+    out of `data/curated/feature-places.json` and refuses to find nothing, so
+    the pack carries the configured feature, both of its placed-feature passes,
+    a biome that runs them, and the three dimension tags that decide which world
+    that biome sits in. Its numbers match the real pack: 10 shallow attempts and
+    4 deep ones.
+    """
+    def dumped(value: object) -> bytes:
+        return json.dumps(value).encode("utf-8")
+
+    def pass_placement(count: int, low: object, high: object) -> bytes:
+        return dumped(
+            {
+                "feature": "minecraft:monster_room",
+                "placement": [
+                    {"type": "minecraft:count", "count": count},
+                    {
+                        "type": "minecraft:height_range",
+                        "height": {
+                            "type": "minecraft:uniform",
+                            "min_inclusive": low,
+                            "max_inclusive": high,
+                        },
+                    },
+                ],
+            }
+        )
+
+    return {
+        "data/minecraft/worldgen/feature/monster_room.json": dumped(
+            {"type": "minecraft:monster_room"}
+        ),
+        "data/minecraft/worldgen/placed_feature/monster_room.json": pass_placement(
+            10, {"absolute": 0}, {"below_top": 0}
+        ),
+        "data/minecraft/worldgen/placed_feature/monster_room_deep.json": pass_placement(
+            4, {"above_bottom": 6}, {"absolute": -1}
+        ),
+        "data/minecraft/worldgen/biome/plains.json": dumped(
+            {
+                "features": [[], ["minecraft:monster_room", "minecraft:monster_room_deep"]],
+                "temperature": 0.8,
+                "downfall": 0.4,
+                "has_precipitation": True,
+                # 26.3 states a biome's spawn table behind a gameplay attribute
+                # rather than at the top level. Empty here: this fixture's
+                # question is the pack layout, not what spawns in it.
+                "attributes": {
+                    "minecraft:gameplay/natural_mob_spawns": {
+                        "modifier": "overlay",
+                        "argument": {"spawns_by_category": {}, "spawn_costs": {}},
+                    }
+                },
+            }
+        ),
+        "data/minecraft/tags/worldgen/biome/is_overworld.json": dumped(
+            {"values": ["minecraft:plains"]}
+        ),
+        "data/minecraft/tags/worldgen/biome/is_nether.json": dumped({"values": []}),
+        "data/minecraft/tags/worldgen/biome/is_end.json": dumped({"values": []}),
+        "data/minecraft/worldgen/structure/village_plains.json": dumped(
+            {
+                "type": "minecraft:jigsaw",
+                "step": "surface_structures",
+                "biomes": "#minecraft:is_overworld",
+            }
+        ),
+        # `predicate` is a group of its own from 26.3 on: a loot table names a
+        # shared condition rather than spelling it out. The pack carries the one
+        # the block tables reach for, so the reader finds the group non-empty and
+        # `pipeline.obtain.loot` can resolve a name to the object behind it.
+        "data/minecraft/predicate/tool/can_silk_touch.json": dumped(
+            {
+                "type": "minecraft:match_tool",
+                "predicate": {
+                    "predicates": {
+                        "minecraft:enchantments": [
+                            {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}
+                        ]
+                    }
+                },
+            }
+        ),
+        "data/minecraft/worldgen/structure_set/villages.json": dumped(
+            {
+                "structures": [{"structure": "minecraft:village_plains", "weight": 1}],
+                "placement": {"type": "minecraft:random_spread", "spacing": 34, "separation": 8},
+            }
+        ),
+    }
+
+
 def _sprite_url(file_title: str) -> str:
     """Return the fixture image URL of one `File:` title."""
     if file_title == "File:Creeper.png":
@@ -339,6 +439,7 @@ def _build_fixtures() -> dict[str, bytes]:
             "data/minecraft/tags/block/needs_stone_tool.json": b'{"values":[]}',
             "data/minecraft/tags/block/needs_iron_tool.json": b'{"values":[]}',
             "data/minecraft/tags/block/needs_diamond_tool.json": b'{"values":[]}',
+            **_worldgen_members(),
         },
         root=f"mcmeta-{DATA_SHA}",
     )
@@ -355,13 +456,31 @@ def _build_fixtures() -> dict[str, bytes]:
     )
     fixtures[resource_location_url] = _bucket_answer([resource_location_row])
 
-    sprite_row = {
-        "page_name": "Creeper",
-        "name": "EntitySprite",
-        "id": "creeper",
-        "file": "File:Creeper.png",
-    }
-    fixtures[_bucket_url("spritefile", SPRITE_COLUMNS)] = _bucket_answer([sprite_row])
+    # A structure and a feature place carry no sprite of their own -- the wiki
+    # publishes none -- so `data/curated/overrides.json` lends each the sprite of
+    # a block that is characteristic of it. This build reads that real file, so
+    # the two borrowed keys need rows here the same as the creeper's own key.
+    sprite_rows = [
+        {
+            "page_name": "Creeper",
+            "name": "EntitySprite",
+            "id": "creeper",
+            "file": "File:Creeper.png",
+        },
+        {
+            "page_name": "Oak Planks",
+            "name": "InvSprite",
+            "id": "Oak Planks",
+            "file": "File:Oak Planks.png",
+        },
+        {
+            "page_name": "Monster Spawner",
+            "name": "InvSprite",
+            "id": "Monster Spawner",
+            "file": "File:Monster Spawner.png",
+        },
+    ]
+    fixtures[_bucket_url("spritefile", SPRITE_COLUMNS)] = _bucket_answer(sprite_rows)
 
     # The sprite-atlas stage: `Creeper`'s icon key is `EntitySprite:creeper`, which resolves to
     # `File:Creeper.png` through the bucket row above, so a build needs that file's imageinfo and
@@ -371,7 +490,9 @@ def _build_fixtures() -> dict[str, bytes]:
     # atlas through `data/curated/hud-sprites.json`, which this build reads
     # from the real curated directory, so an atlas fixture that named only
     # `File:Creeper.png` would fail the moment that file existed.
-    sprite_titles = ["File:Creeper.png", *sorted(HUD_SPRITE_TITLES)]
+    sprite_titles = sorted(
+        {row["file"] for row in sprite_rows} | set(HUD_SPRITE_TITLES)
+    )
     imageinfo_url = build_imageinfo_url(sprite_titles)
     fixtures[imageinfo_url] = json.dumps(
         {
@@ -408,17 +529,20 @@ def _build_fixtures() -> dict[str, bytes]:
     )
     fixtures[advancement_url] = _bucket_answer([])
 
-    fixtures[build_extracts_url(["Creeper"])] = json.dumps(
+    # The worldgen half of the pack reaches the page layer too: a structure and a
+    # curated feature place each want a blurb, the same as the mob does.
+    extract_blurbs = {
+        "Creeper": "A hissing creature that explodes.",
+        "Monster Room": "A small room that spawns monsters.",
+        "Village Plains": "A village of the plains.",
+    }
+    fixtures[build_extracts_url(sorted(extract_blurbs))] = json.dumps(
         {
             "batchcomplete": True,
             "query": {
                 "pages": [
-                    {
-                        "pageid": 1,
-                        "ns": 0,
-                        "title": "Creeper",
-                        "extract": "A hissing creature that explodes.",
-                    }
+                    {"pageid": index, "ns": 0, "title": title, "extract": blurb}
+                    for index, (title, blurb) in enumerate(sorted(extract_blurbs.items()), start=1)
                 ]
             },
         }
@@ -547,8 +671,9 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     assert outcome.minecraft_version == VERSION
     assert outcome.mcmeta_summary_ref == SUMMARY_TAG
     assert outcome.mcmeta_data_ref == DATA_TAG
-    # The mob, its spawn egg item, and the one advancement of the fixture.
-    assert outcome.entity_count == 3
+    # The mob, its spawn egg item, the one advancement, and the two places the
+    # worldgen half of the pack carries: a structure and the curated dungeon.
+    assert outcome.entity_count == 5
     assert outcome.pages_without_infobox == ()
 
     dist = tmp_path / "dist"
@@ -558,8 +683,9 @@ def test_a_whole_build_produces_the_expected_entities_and_writes_dist(tmp_path: 
     assert (dist / "sprites.png").is_file()
     sprites_map = json.loads((dist / "sprites.json").read_text(encoding="utf-8"))
     assert sprites_map["sprites"]["EntitySprite:creeper"] == {"x": 0, "y": 0, "w": 2, "h": 2}
-    # One creeper sprite plus the four curated hunger shanks.
-    assert outcome.emit_report.atlas_frame_count == 5
+    # One creeper sprite, the two block sprites the two places borrow, and the
+    # four curated hunger shanks.
+    assert outcome.emit_report.atlas_frame_count == 7
     assert outcome.emit_report.atlas_png_bytes > 0
 
     mob_shard = json.loads((dist / "entities" / "mob-0.json").read_text(encoding="utf-8"))
@@ -704,14 +830,14 @@ def test_offline_completes_a_whole_build_against_a_cache_one_online_build_primed
     )
     outcome = run_build(offline, cache=cache, now=BUILT_AT)
 
-    assert outcome.entity_count == 3
+    assert outcome.entity_count == 5
 
     # The second run: no `--offline` at all, and a transport that refuses. The
     # store alone has to carry the whole build for this to return.
     no_flag = _base_options(tmp_path).model_copy(
         update={"dist": tmp_path / "dist-cached", "reports": tmp_path / "reports-cached"}
     )
-    assert run_build(no_flag, transport=refuse, cache=cache, now=BUILT_AT).entity_count == 3
+    assert run_build(no_flag, transport=refuse, cache=cache, now=BUILT_AT).entity_count == 5
 
     # And the payload is the payload the online build wrote, byte for byte.
     # A cache that answered with something else would still have produced a
@@ -782,7 +908,7 @@ def test_allow_regression_completes_the_build_and_still_records_every_downgraded
 
     outcome = run_build(options, transport=transport, cache=cache, now=BUILT_AT)
 
-    assert outcome.entity_count == 3
+    assert outcome.entity_count == 5
     blocking = outcome.validation_report.regression.blocking_failures
     assert blocking == ()
 
@@ -869,12 +995,14 @@ def test_the_sprite_atlas_progress_line_names_every_count(tmp_path: Path) -> Non
     atlas_line = next(
         line for line in stream.getvalue().splitlines() if line.startswith("sprite atlas:")
     )
-    # Five, not one: the creeper's own icon plus the four hunger shanks that
-    # `data/curated/hud-sprites.json` adds to every build's atlas.
-    assert "5 icon keys requested" in atlas_line
-    assert "5 files resolved" in atlas_line
-    assert "5 sprites downloaded" in atlas_line
-    assert "5 frames packed" in atlas_line
+    # Seven, not one: the creeper's own icon, the two block sprites that the
+    # structure and the dungeon borrow through `data/curated/overrides.json`,
+    # and the four hunger shanks that `data/curated/hud-sprites.json` adds to
+    # every build's atlas.
+    assert "7 icon keys requested" in atlas_line
+    assert "7 files resolved" in atlas_line
+    assert "7 sprites downloaded" in atlas_line
+    assert "7 frames packed" in atlas_line
     assert "0 failures" in atlas_line
 
 
@@ -903,8 +1031,8 @@ def test_stage_7a_collection_manifest_resolves_and_emits(tmp_path: Path) -> None
     stream = io.StringIO()
     outcome = run_build(options, transport=transport, cache=cache, now=BUILT_AT, stream=stream)
 
-    # 3 fixture entities + 1 collection entity
-    assert outcome.entity_count == 4
+    # 5 fixture entities + 1 collection entity
+    assert outcome.entity_count == 6
 
     dist = tmp_path / "dist"
     shard_path = dist / "entities" / "collection-0.json"

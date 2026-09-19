@@ -4,11 +4,22 @@ A biome page must answer what spawns there, what generates there, and what its
 climate is: the temperature, downfall, precipitation, and dimension.
 
 Upstream Minecraft Java data packs express biomes in `worldgen/biome/*.json`.
-Measured against the `26.2-data` tag on 2026-09-09, the `spawners` field is
-populated for 64 of the 66 biomes, carrying 790 mob/biome pairs across 7 spawn
-categories (ambient, axolotls, creature, monster, underground_water_creature,
-water_ambient, water_creature). The two biomes with empty spawners are
-`deep_dark` and `the_void`, and both are correctly empty in vanilla.
+
+## Where the spawn table lives
+
+Up to 26.2 a biome stated `spawners` and `spawn_costs` at its top level, and gave
+each entry a `minCount` and a `maxCount`. 26.3 moved both facts behind a named
+gameplay attribute and merged the two counts into one:
+
+    attributes["minecraft:gameplay/natural_mob_spawns"].argument
+        .spawns_by_category[<category>][] = {type, weight, count}
+        .spawn_costs
+
+`count` is a fixed integer or an int provider; `_group_size` resolves both into
+the `(min, max)` pair the rest of this module already spoke. Measured against
+the `26.3-data` tag, all 67 biomes carry the attribute and 811 mob/biome pairs
+come out of it. `deep_dark` and `the_void` carry it with empty categories, which
+is what the game really says about them.
 
 ## Precipitation rule
 
@@ -51,6 +62,12 @@ __all__ = [
 BIOME_DIRECTORY = "worldgen/biome/"
 DEFAULT_NAMESPACE = "minecraft"
 SNOW_TEMPERATURE_THRESHOLD = 0.15
+
+# Where a biome states what spawns in it. Up to 26.2 a biome carried `spawners`
+# and `spawn_costs` at its top level. 26.3 moved both behind a named gameplay
+# attribute, so the same two facts now sit under
+# `attributes["minecraft:gameplay/natural_mob_spawns"].argument`.
+NATURAL_MOB_SPAWNS = "minecraft:gameplay/natural_mob_spawns"
 
 Precipitation = Literal["rain", "snow", "none"]
 
@@ -125,6 +142,52 @@ def _namespaced(path: str) -> str:
     return f"{DEFAULT_NAMESPACE}:{path}"
 
 
+def _natural_mob_spawns(data: Mapping[str, Any], path: str) -> Mapping[str, Any]:
+    """Return the `argument` of a biome's natural-mob-spawns attribute.
+
+    Raises `ExtractError` when the attribute is absent. Every biome of the pack
+    carries it -- `deep_dark` and `the_void` carry it with empty categories,
+    which is what the game really says about them -- so a biome without one is a
+    pack this reader does not understand, not a biome where nothing spawns.
+    """
+    attributes = data.get("attributes")
+    if not isinstance(attributes, Mapping):
+        raise ExtractError(f"{path} missing or invalid 'attributes' mapping")
+    attribute = attributes.get(NATURAL_MOB_SPAWNS)
+    if not isinstance(attribute, Mapping):
+        raise ExtractError(f"{path} carries no {NATURAL_MOB_SPAWNS!r} attribute")
+    argument = attribute.get("argument")
+    if not isinstance(argument, Mapping):
+        raise ExtractError(
+            f"{path} carries a {NATURAL_MOB_SPAWNS!r} attribute with no 'argument' mapping"
+        )
+    return argument
+
+
+def _group_size(count: Any) -> tuple[int, int] | None:
+    """Return the `(min, max)` group size of one spawner entry, or `None`.
+
+    26.2 stated this as two integers, `minCount` and `maxCount`. 26.3 states it
+    as one `count`, which is either a fixed integer or an int provider -- in
+    vanilla, always `minecraft:uniform` with an inclusive pair. A fixed count is
+    the same number twice, which is exactly what the two old fields held for the
+    605 entries that did not vary.
+
+    Any other provider returns `None` and the entry is dropped rather than
+    guessed at, the same rule this module already applied to a malformed entry.
+    """
+    if isinstance(count, bool):
+        return None
+    if isinstance(count, int):
+        return count, count
+    if isinstance(count, Mapping):
+        low = count.get("min_inclusive")
+        high = count.get("max_inclusive")
+        if isinstance(low, int) and isinstance(high, int) and not isinstance(low, bool):
+            return low, high
+    return None
+
+
 def extract_biomes(files: Mapping[str, bytes]) -> BiomeIndex:
     """Extract all biomes from vanilla worldgen data pack files.
 
@@ -194,9 +257,13 @@ def extract_biomes(files: Mapping[str, bytes]) -> BiomeIndex:
         precipitation = resolve_precipitation(has_precip, temperature_val)
 
         # Spawners extraction with duplicate merging per (category, entity_type)
-        raw_spawners = data.get("spawners")
+        spawn_argument = _natural_mob_spawns(data, path)
+        raw_spawners = spawn_argument.get("spawns_by_category")
         if not isinstance(raw_spawners, Mapping):
-            raise ExtractError(f"{path} missing or invalid 'spawners' mapping")
+            raise ExtractError(
+                f"{path} missing or invalid 'spawns_by_category' mapping under "
+                f"attributes.{NATURAL_MOB_SPAWNS!r}"
+            )
 
         category_entries: dict[str, list[BiomeSpawnEntry]] = {}
         category_totals: dict[str, int] = {}
@@ -212,14 +279,9 @@ def extract_biomes(files: Mapping[str, bytes]) -> BiomeIndex:
                     continue
                 etype = entry.get("type")
                 wt = entry.get("weight")
-                min_c = entry.get("minCount")
-                max_c = entry.get("maxCount")
-                if (
-                    isinstance(etype, str)
-                    and isinstance(wt, int)
-                    and isinstance(min_c, int)
-                    and isinstance(max_c, int)
-                ):
+                group = _group_size(entry.get("count"))
+                if isinstance(etype, str) and isinstance(wt, int) and group is not None:
+                    min_c, max_c = group
                     namespaced_etype = _namespaced(etype)
                     if namespaced_etype in merged:
                         curr = merged[namespaced_etype]
@@ -245,14 +307,19 @@ def extract_biomes(files: Mapping[str, bytes]) -> BiomeIndex:
             category_entries[category] = list(entries)
             category_totals[category] = sum(e.weight for e in entries)
 
-        # Optional fields: creature_spawn_probability, spawn_costs
+        # `creature_spawn_probability` is read where the game still states it.
+        # 26.3 dropped the field from every biome file -- five carried it in 26.2,
+        # all of them badlands or snowy variants -- so this resolves to `None`
+        # everywhere on that pack. The field stays optional rather than removed,
+        # because a value that upstream stopped publishing is not a value this
+        # project may invent, and the game may state it again.
         raw_prob = data.get("creature_spawn_probability")
         creature_spawn_probability = (
             float(raw_prob) if isinstance(raw_prob, int | float) else None
         )
 
         spawn_costs_out: dict[str, dict[str, float]] = {}
-        raw_costs = data.get("spawn_costs")
+        raw_costs = spawn_argument.get("spawn_costs")
         if isinstance(raw_costs, Mapping):
             for cost_type, cost_dict in raw_costs.items():
                 if isinstance(cost_dict, Mapping):

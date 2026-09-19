@@ -461,21 +461,35 @@ ARCHIVE_ROOT = f"mcmeta-{FIXTURE_SHA}"
 # each group of `DATA_GROUPS`. Three are not: `structure` is a group this
 # project does not read, `datapacks` is the experimental trade rebalance pack
 # rather than the vanilla game, and `pack.mcmeta` sits outside the namespace.
-ARCHIVE_MEMBERS: Mapping[str, bytes] = {
+# One file per group of `DATA_GROUPS`, because a real archive holds one per
+# group and the reader now refuses any group that matched nothing. A fixture
+# that covered four groups would fail that check for the six it left out, which
+# is the check doing its job rather than a fixture worth keeping.
+#
+# The four named files stay spelled out: several tests below assert on their
+# exact paths and bodies, and the last three members are the ones the reader
+# must drop.
+_GROUP_MEMBERS: dict[str, bytes] = {
     "data/minecraft/advancement/story/root.json": b'{"parent": null}',
     "data/minecraft/loot_table/entities/creeper.json": b'{"pools": []}',
     "data/minecraft/recipe/oak_stairs.json": b'{"type": "minecraft:crafting_shaped"}',
     "data/minecraft/tags/item/planks.json": b'{"values": ["minecraft:oak_planks"]}',
+} | {
+    f"data/minecraft/{group}/filler.json": b"{}"
+    for group in DATA_GROUPS
+    if group not in {"advancement", "loot_table", "recipe", "tags"}
+}
+
+ARCHIVE_MEMBERS: Mapping[str, bytes] = _GROUP_MEMBERS | {
     "data/minecraft/structure/village/plains/houses/small.nbt": b"not read",
     "data/minecraft/datapacks/trade_rebalance/data/minecraft/tags/item/x.json": b"not read",
     "pack.mcmeta": b'{"pack": {}}',
 }
 
+# What the reader keeps: every group member above, with the namespace root
+# stripped from the key, and none of the three members that follow them.
 WANTED_MEMBERS = {
-    "advancement/story/root.json": b'{"parent": null}',
-    "loot_table/entities/creeper.json": b'{"pools": []}',
-    "recipe/oak_stairs.json": b'{"type": "minecraft:crafting_shaped"}',
-    "tags/item/planks.json": b'{"values": ["minecraft:oak_planks"]}',
+    name.removeprefix("data/minecraft/"): body for name, body in _GROUP_MEMBERS.items()
 }
 
 ARCHIVE_SOURCE = "test-archive"
@@ -578,10 +592,11 @@ def test_the_data_groups_cover_the_rest_of_phase_one() -> None:
         "advancement",
         "enchantment",
         "loot_table",
+        "predicate",
         "recipe",
         "tags",
         "worldgen/biome",
-        "worldgen/configured_feature",
+        "worldgen/feature",
         "worldgen/placed_feature",
         "worldgen/structure",
         "worldgen/structure_set",
@@ -811,6 +826,44 @@ def test_the_archive_reader_refuses_an_archive_with_no_wanted_file() -> None:
     payload = _data_archive({"data/minecraft/structure/village/a.nbt": b"x"})
     with pytest.raises(FetchError, match="holds no file under"):
         read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_refuses_one_empty_group_among_full_ones() -> None:
+    """A renamed directory must fail here, not as data with a hole in it.
+
+    This is the failure Minecraft 26.3 really shipped. The game renamed the
+    `configured_feature` registry to `feature`, mcmeta renamed the directory to
+    match, and every other group of `DATA_GROUPS` still matched. A reader that
+    asked only whether the archive held *any* wanted file returned nine full
+    groups and one empty one without a word, and the build that followed died
+    far away in a curated cross-check, blaming a file nobody had touched.
+
+    So the reader names the group that matched nothing, which is the one fact a
+    reader of the failure needs.
+    """
+    members = {
+        f"data/minecraft/{group}/a.json": b"{}"
+        for group in DATA_GROUPS
+        if group != "worldgen/feature"
+    }
+    payload = _data_archive(members)
+    with pytest.raises(FetchError, match="data/minecraft/worldgen/feature/"):
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+
+
+def test_the_archive_reader_names_every_empty_group_at_once() -> None:
+    """A reader who is about to chase a rename wants the whole list, not the first of it."""
+    members = {
+        f"data/minecraft/{group}/a.json": b"{}"
+        for group in DATA_GROUPS
+        if not group.startswith("worldgen/")
+    }
+    payload = _data_archive(members)
+    with pytest.raises(FetchError) as caught:
+        read_data_archive(payload, source=ARCHIVE_SOURCE)
+    for group in DATA_GROUPS:
+        if group.startswith("worldgen/"):
+            assert f"data/minecraft/{group}/" in str(caught.value)
 
 
 def test_the_archive_reader_stops_at_the_size_limit(monkeypatch: pytest.MonkeyPatch) -> None:

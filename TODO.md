@@ -1254,9 +1254,19 @@ reasoning is recorded here because the code now disagrees with the plan.
 
 ## Still open
 
-1. **Match-specific extras.** Since this is for draftout matches — is there value in pinning
+1. **Brewing is Tier A now, and this project still reads it from Tier B.**
+   Minecraft 26.3 made brewing data-driven: `recipe/` carries 279 files of type
+   `minecraft:brewing` that state in the pack what only the wiki used to state.
+   `pipeline.obtain.recipes` skips them by name and `pipeline.enrich.brewing` still builds
+   the 112 brewing producers from the wiki, so what a reader sees is unchanged and nothing
+   is broken.
+   It is still the wrong tier. Tier A beats Tier B everywhere else in this pipeline, and a
+   brewing path read from the pack cannot drift the way a parsed wiki page can.
+   Moving it is its own task: the recipe reader needs a brewing branch, and the Tier B
+   brewing enricher needs either removing or demoting to a cross-check.
+2. **Match-specific extras.** Since this is for draftout matches — is there value in pinning
    frequently used entities, or a saved layout you can restore between rounds?
-2. **Scope ceiling.** The additions in Phases 6b/6c are the ones with clear match value. Paintings,
+3. **Scope ceiling.** The additions in Phases 6b/6c are the ones with clear match value. Paintings,
    music discs, and sound events are all reachable but look like noise — leaving them out unless
    you disagree.
 

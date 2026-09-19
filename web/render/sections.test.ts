@@ -2096,11 +2096,21 @@ describe("Section renderers with real committed build data", () => {
       );
       const el = renderGenerationInfo(genSection, ctx);
 
-      // Overworld dimension, peak -64, 13 attempts/chunk, all biomes
+      // Overworld dimension, peak -64, 13 attempts/chunk, all biomes.
+      //
+      // The biome count comes from the section rather than a literal. Every
+      // Minecraft release that adds one overworld biome moves it -- 26.3 added
+      // Dappled Forest and took it from 55 to 56 -- and a literal here would
+      // fail the build for a number nobody got wrong.
+      const overworld = requireItem(
+        genSection.scopes.find((scope) => scope.dimension === "overworld"),
+        "Diamond Ore overworld scope",
+      );
+      expect(overworld.allBiomesOfDimension).toBe(true);
       expect(el.textContent).toContain("Overworld");
       expect(el.textContent).toContain("Y -64 to 16 (peak: Y -64)");
       expect(el.textContent).toContain("13");
-      expect(el.textContent).toContain("All Overworld biomes (55)");
+      expect(el.textContent).toContain(`All Overworld biomes (${String(overworld.biomeCount)})`);
 
       // Veins table with 4 rows
       const table = requireItem(el.querySelector(".generation-veins-table"), "veins table");

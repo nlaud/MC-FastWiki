@@ -159,14 +159,24 @@ ARCHIVE_NAMESPACE_ROOT = "data/minecraft"
 # trade rebalance pack, which is not the vanilla game. The prefix test below
 # excludes it, because its path is `data/minecraft/datapacks/...` rather than
 # `data/minecraft/tags/...`.
+# `worldgen/feature` was `worldgen/configured_feature` up to Minecraft 26.2.
+# 26.3 dropped the `configured_` prefix from the game's own registry names --
+# `configured_carver` became `carver` in the same release -- and mcmeta mirrors
+# the registry directories, so the directory moved with it. This project reads
+# the current names only. A pack of an older layout fails the per-group check in
+# `read_data_archive`, which names the directory it found nothing under.
 DATA_GROUPS = (
     "advancement",
     "enchantment",
     "loot_table",
+    # New in 26.3. A loot condition that several tables share is no longer
+    # spelled out in each of them; it lives here and the tables name it.
+    # `pipeline.obtain.loot` resolves those names.
+    "predicate",
     "recipe",
     "tags",
     "worldgen/biome",
-    "worldgen/configured_feature",
+    "worldgen/feature",
     "worldgen/placed_feature",
     "worldgen/structure",
     "worldgen/structure_set",
@@ -538,13 +548,23 @@ def read_data_archive(
 
     Every fault raises `FetchError`: a body that is not a gzip archive, a member
     that is not a regular file, a member name that could leave the archive, two
-    members of one name, an archive that goes past `MAX_ARCHIVE_BYTES`, and an
-    archive that holds no wanted file at all. The last one matters as much as
-    the rest. mcmeta could rename a directory in a future version, and an empty
-    answer would then travel down the pipeline as "Minecraft has no recipes"
-    rather than as a broken read.
+    members of one name, an archive that goes past `MAX_ARCHIVE_BYTES`, and any
+    wanted group that the archive holds no file for. The last one matters as
+    much as the rest, and it is checked one group at a time on purpose.
+
+    mcmeta mirrors the game's own registry directories, so a registry rename in
+    a Minecraft release renames a directory here. Minecraft 26.3 renamed
+    `worldgen/configured_feature` to `worldgen/feature`, and a check that asked
+    only whether the archive held *any* wanted file passed that release without
+    a word: nine groups still matched, the tenth returned nothing, and the empty
+    answer travelled down the pipeline as "this version of Minecraft places no
+    ore" rather than as a broken read. The build that followed died 200 lines
+    later inside a curated cross-check, naming a file nobody had touched. So
+    every group is counted on its own, and a group that matched nothing names
+    itself here, where the fault is.
     """
-    prefixes = tuple(f"{ARCHIVE_NAMESPACE_ROOT}/{group}/" for group in groups)
+    wanted_groups = tuple(groups)
+    prefixes = tuple(f"{ARCHIVE_NAMESPACE_ROOT}/{group}/" for group in wanted_groups)
     if not prefixes:
         raise FetchError(f"{source} was read with no group to look for.")
 
@@ -614,11 +634,18 @@ def read_data_archive(
     except (tarfile.TarError, EOFError, OSError) as error:
         raise FetchError(f"{source} is not a readable gzip archive: {error}") from error
 
-    if not files:
-        wanted = ", ".join(prefixes)
+    empty = [
+        group
+        for group, prefix in zip(wanted_groups, prefixes, strict=True)
+        if not any(key.startswith(f"{group}/") for key in files)
+    ]
+    if empty:
+        missing = ", ".join(f"{ARCHIVE_NAMESPACE_ROOT}/{group}/" for group in empty)
         raise FetchError(
-            f"{source} holds no file under any of: {wanted}. An empty read is a broken scrape, "
-            f"not a version of Minecraft with no data."
+            f"{source} holds no file under: {missing}. An empty group is a broken scrape or an "
+            f"upstream rename, not a version of Minecraft with no data. Check whether the game "
+            f"renamed that registry directory, and update DATA_GROUPS and the extractors that "
+            f"read it together."
         )
     return files
 

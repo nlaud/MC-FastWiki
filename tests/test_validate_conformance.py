@@ -81,8 +81,17 @@ def test_the_real_committed_dist_passes_conformance() -> None:
 
     assert report.failures == ()
     assert report.truncated_count == 0
-    assert report.checked["entity"] == 2191
-    assert report.checked["shard"] == 18
+
+    # The counts come from the tree the gate just read, not from literals. The
+    # question this test asks is whether the gate checked *everything* the
+    # committed payload holds, and a written-down total answers a different one:
+    # it fails on every Minecraft release that adds an entity, which is not a
+    # fault in the gate and is not something a reader of the failure can fix.
+    expected_entities = sum(
+        len(shard["entities"]) for shard in documents.shards.values()
+    )
+    assert report.checked["entity"] == expected_entities
+    assert report.checked["shard"] == len(documents.shards)
     assert report.checked["index"] == 1
     assert report.checked["obtain"] == 1
     assert report.checked["manifest"] == 1

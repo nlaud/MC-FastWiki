@@ -171,7 +171,11 @@ def test_advancements_drift_guard() -> None:
 
 
 def test_compostable_drift_guard() -> None:
-    """The built compostable page holds exactly 116 items sorted descending by chance."""
+    """The built compostable page holds exactly 120 items sorted descending by chance.
+
+    26.3 added the poplar tree: its sapling and its three leaf colours are the four
+    that took this list from 116.
+    """
     collection_entities = _load_shard_entities("collection-0")
     compost_entity = next(
         (e for e in collection_entities if e.get("id") == "collection:compostable"),
@@ -190,7 +194,7 @@ def test_compostable_drift_guard() -> None:
     assert members_section is not None, "CollectionMembers section not found on compostable"
 
     members = members_section.get("members", [])
-    assert len(members) == 116, f"Expected 116 compostable members, got {len(members)}"
+    assert len(members) == 120, f"Expected 120 compostable members, got {len(members)}"
 
     # Check anchors and formatting
     members_by_id = {m["ref"]["id"]: m for m in members}
@@ -207,7 +211,11 @@ def test_compostable_drift_guard() -> None:
 
 
 def test_fuel_drift_guard() -> None:
-    """The built fuel page holds exactly 280 items sorted descending by burn time."""
+    """The built fuel page holds exactly 299 items sorted descending by burn time.
+
+    26.3 added the poplar wood set -- logs, planks, and the nineteen things made
+    of them -- which is the whole of the growth from 280.
+    """
     collection_entities = _load_shard_entities("collection-0")
     fuel_entity = next(
         (e for e in collection_entities if e.get("id") == "collection:fuel"),
@@ -226,7 +234,7 @@ def test_fuel_drift_guard() -> None:
     assert members_section is not None, "CollectionMembers section not found on fuel"
 
     members = members_section.get("members", [])
-    assert len(members) == 280, f"Expected 280 fuel members, got {len(members)}"
+    assert len(members) == 299, f"Expected 299 fuel members, got {len(members)}"
 
     # Check anchors and formatting
     members_by_id = {m["ref"]["id"]: m for m in members}
@@ -256,7 +264,11 @@ def test_fuel_drift_guard() -> None:
 
 
 def test_chest_loot_drift_guard() -> None:
-    """The built chest_loot page holds exactly 31 structures sorted ascending by name."""
+    """The built chest_loot page holds exactly 49 structures sorted ascending by name.
+
+    26.3 added the Abandoned Camp, which the game registers once per biome, so
+    all 18 of its variants join this list.
+    """
     collection_entities = _load_shard_entities("collection-0")
     chest_entity = next(
         (e for e in collection_entities if e.get("id") == "collection:chest_loot"),
@@ -275,7 +287,7 @@ def test_chest_loot_drift_guard() -> None:
     assert members_section is not None, "CollectionMembers section not found on chest_loot"
 
     members = members_section.get("members", [])
-    assert len(members) == 31, f"Expected 31 chest_loot members, got {len(members)}"
+    assert len(members) == 49, f"Expected 49 chest_loot members, got {len(members)}"
 
     # Check anchors and formatting against reference data
     members_by_id = {m["ref"]["id"]: m for m in members}

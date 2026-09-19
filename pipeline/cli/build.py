@@ -612,23 +612,10 @@ def run_build(
     )
     food_index = extract_food(item_components)
     rarity_index = extract_rarity(item_components)
-    files = fetch_data_files(
-        data_tag,
-        groups=(
-            "advancement",
-            "enchantment",
-            "loot_table",
-            "recipe",
-            "tags",
-            "worldgen/biome",
-            "worldgen/configured_feature",
-            "worldgen/placed_feature",
-            "worldgen/structure",
-            "worldgen/structure_set",
-        ),
-        cache=store,
-        transport=mcmeta_transport,
-    )
+    # The groups are not restated here. `DATA_GROUPS` is the one list, and it is
+    # the list `read_data_archive` checks each group of for an empty read, so a
+    # group added there and forgotten here would be fetched by neither.
+    files = fetch_data_files(data_tag, cache=store, transport=mcmeta_transport)
     advancement_ids = extract_advancement_ids(files)
     classification = classify_entity_types(files, registries)
     harvest_index = extract_block_harvest(files)

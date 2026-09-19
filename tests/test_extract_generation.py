@@ -18,11 +18,12 @@ from pipeline.extract.generation import (
     rate_of_placement,
     resolve_anchor,
 )
+from pipeline.fetch import FetchError
 from pipeline.fetch.cache import ContentCache
 from pipeline.fetch.mcmeta import fetch_data_files, resolve_mcmeta_tag
 
 WORLDGEN_GROUPS = (
-    "worldgen/configured_feature",
+    "worldgen/feature",
     "worldgen/placed_feature",
     "worldgen/biome",
     "tags",
@@ -57,44 +58,55 @@ def test_resolve_anchor() -> None:
 
 
 def test_extract_blocks_from_config() -> None:
+    """Every shape 26.3 writes a block state in, across the five supported types.
+
+    A state is the bare id, or an object with an `id` and the properties it pins.
+    A provider that names one state is written as that state; one that carries a
+    `type` places several blocks and is not read here.
+    """
     # Ore
     ore_cfg = {
         "size": 8,
         "targets": [
-            {"state": {"Name": "minecraft:coal_ore"}},
-            {"state": {"Name": "minecraft:deepslate_coal_ore"}},
+            {"state": "minecraft:coal_ore"},
+            {"state": "minecraft:deepslate_coal_ore"},
         ],
     }
     blocks, size = _extract_blocks_from_config("minecraft:ore", ore_cfg)
     assert blocks == ["minecraft:coal_ore", "minecraft:deepslate_coal_ore"]
     assert size == 8
 
-    # Simple block
+    # Simple block, whose state pins a property. The property is not part of the
+    # answer: a sweet berry bush at age 3 is still a sweet berry bush.
     simple_cfg = {
-        "to_place": {
-            "type": "minecraft:simple_state_provider",
-            "state": {"Name": "minecraft:sweet_berry_bush"},
-        }
+        "to_place": {"id": "minecraft:sweet_berry_bush", "properties": {"age": "3"}}
     }
     blocks, size = _extract_blocks_from_config("minecraft:simple_block", simple_cfg)
     assert blocks == ["minecraft:sweet_berry_bush"]
     assert size is None
 
+    # Simple block written as the bare id.
+    blocks, _ = _extract_blocks_from_config(
+        "minecraft:simple_block", {"to_place": "minecraft:kelp_plant"}
+    )
+    assert blocks == ["minecraft:kelp_plant"]
+
     # Disk
-    disk_cfg = {
-        "state_provider": {
-            "type": "minecraft:simple_state_provider",
-            "state": {"Name": "minecraft:clay"},
-        },
-        "radius": 2,
-    }
+    disk_cfg = {"state_provider": {"id": "minecraft:clay"}, "radius": 2}
     blocks, size = _extract_blocks_from_config("minecraft:disk", disk_cfg)
     assert blocks == ["minecraft:clay"]
     assert size is None
 
+    # A provider that carries a `type` places several blocks, so it names none.
+    blocks, _ = _extract_blocks_from_config(
+        "minecraft:disk",
+        {"state_provider": {"type": "minecraft:noise_threshold_provider", "fallback": {}}},
+    )
+    assert blocks == []
+
     # Block blob
     blob_cfg = {
-        "state": {"Name": "minecraft:moss_block"},
+        "state": "minecraft:moss_block",
         "radius": 5,
     }
     blocks, size = _extract_blocks_from_config("minecraft:block_blob", blob_cfg)
@@ -219,19 +231,17 @@ def test_synthetic_extraction_and_unsupported_skips() -> None:
                 ]
             }
         ).encode("utf-8"),
-        "worldgen/configured_feature/fancy_tree.json": json.dumps(
-            {"type": "minecraft:tree", "config": {}}
+        "worldgen/feature/fancy_tree.json": json.dumps(
+            {"type": "minecraft:tree"}
         ).encode("utf-8"),
         "worldgen/placed_feature/fancy_tree_placed.json": json.dumps(
             {"feature": "minecraft:fancy_tree", "placement": []}
         ).encode("utf-8"),
-        "worldgen/configured_feature/ore_test.json": json.dumps(
+        "worldgen/feature/ore_test.json": json.dumps(
             {
                 "type": "minecraft:ore",
-                "config": {
-                    "size": 4,
-                    "targets": [{"state": {"Name": "minecraft:iron_ore"}}],
-                },
+                "size": 4,
+                "targets": [{"state": "minecraft:iron_ore"}],
             }
         ).encode("utf-8"),
         "worldgen/placed_feature/ore_test_placed.json": json.dumps(
@@ -295,11 +305,8 @@ def test_a_feature_in_two_dimensions_becomes_two_scopes() -> None:
         "worldgen/biome/nether_wastes.json": json.dumps(
             {"features": [["minecraft:both_worlds_placed"]]}
         ).encode("utf-8"),
-        "worldgen/configured_feature/both_worlds.json": json.dumps(
-            {
-                "type": "minecraft:ore",
-                "config": {"size": 3, "targets": [{"state": {"Name": "minecraft:gravel"}}]},
-            }
+        "worldgen/feature/both_worlds.json": json.dumps(
+            {"type": "minecraft:ore", "size": 3, "targets": [{"state": "minecraft:gravel"}]}
         ).encode("utf-8"),
         "worldgen/placed_feature/both_worlds_placed.json": json.dumps(
             {
@@ -334,29 +341,52 @@ def test_a_feature_in_two_dimensions_becomes_two_scopes() -> None:
     assert nether.all_biomes_of_dimension is True
 
 
+# The release this test reads out of the cache. It moves with `data/dist`.
+LIVE_VERSION_ID = "26.3"
+
+
 def test_real_cached_generation_extraction() -> None:
+    """Read the real pinned archive out of the cache and pin what it must say.
+
+    A machine with no primed cache skips: this test opens no network, and asking
+    it to would make an offline run fail for a reason that is not a fault.
+    A cache that *is* primed and then cannot be read does not skip. It fails.
+    An earlier cut caught every exception here and skipped on all of them, so
+    when 26.3 renamed `worldgen/configured_feature` this test went quietly green
+    by never running -- the one test that would have caught the rename on its own.
+    """
     cache_dir = Path("data/.cache")
     if not cache_dir.is_dir():
-        pytest.skip("Cache not primed")
+        pytest.skip("cache not primed: no data/.cache directory")
 
     store = ContentCache(cache_dir)
     transport = _mcmeta_transport(_offline_transport(store))
     try:
-        data_tag = resolve_mcmeta_tag("26.2", branch="data", cache=store, transport=transport)
+        data_tag = resolve_mcmeta_tag(
+            LIVE_VERSION_ID, branch="data", cache=store, transport=transport
+        )
         files = fetch_data_files(
             data_tag,
             groups=WORLDGEN_GROUPS,
             cache=store,
             transport=transport,
         )
-    except Exception:
-        pytest.skip("mcmeta cache not primed")
+    except FetchError as error:
+        # `_offline_transport` raises this for a URL the store does not hold,
+        # which is the "not primed for this version" case and the only one worth
+        # skipping. Anything the store *does* hold and cannot be read -- a
+        # renamed group among them -- is a failure and is raised.
+        if "is not in the cache at" not in str(error):
+            raise
+        pytest.skip(f"cache not primed for {LIVE_VERSION_ID}: {error}")
 
     result = extract_generation(files)
 
-    # Invariants from plan:
-    assert len(result.blocks) == 52
-    assert len(result.report.skipped_features) == 156
+    # Invariants from plan, moved to 26.3 with the pinned archive. Every spot
+    # check below held unchanged across the move; only these two totals grew,
+    # with the release's new blocks and its new feature types.
+    assert len(result.blocks) == 57
+    assert len(result.report.skipped_features) == 165
 
     # An ore whose band is clipped, and whose four veins agree on the peak.
     diamond = _scope(result.blocks["minecraft:diamond_ore"], Dimension.OVERWORLD)

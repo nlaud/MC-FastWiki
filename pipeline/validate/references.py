@@ -107,9 +107,22 @@ def classify_unplaced_row(row: UnplacedRow) -> BenignGroup | None:
     if row.subject.startswith("Any color "):
         return BenignGroup.VARIANT_GROUP
 
-    # Group 2: STACK_DATA (one item carrying map or banner data). `endswith` already
-    # covers the bare "Explorer Map" as well as every qualified one.
-    if row.subject.endswith("Explorer Map"):
+    # Group 2: STACK_DATA (one item carrying map or banner data).
+    #
+    # The test is the whole word "Map", not "Explorer Map". Every map a trade or a
+    # chest names is one `minecraft:filled_map` carrying the location in its stack
+    # data, and the name says which location rather than which item -- so the
+    # qualifier in front of it is not the part that makes the row benign. An
+    # earlier cut keyed on "Explorer Map" and broke the first time the game added
+    # another kind: 26.3's cartographer sells a Village Map, which is the same
+    # item, the same stack data, and the same non-answer to "which registry ID".
+    # That is the failure this module's own docstring warns a name list will
+    # always have.
+    #
+    # It cannot launder a real miss. The two map items that *are* registry entries,
+    # `minecraft:map` and `minecraft:filled_map`, resolve by name and never reach
+    # this function at all.
+    if row.subject == "Map" or row.subject.endswith(" Map"):
         return BenignGroup.STACK_DATA
     if row.subject == "Banner" and "ambiguous" in row.reason.lower():
         return BenignGroup.STACK_DATA
