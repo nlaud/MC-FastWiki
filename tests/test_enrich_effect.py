@@ -212,6 +212,68 @@ Table here
     assert "Bedrock detail" not in behaviour
 
 
+def test_a_maintenance_banner_does_not_take_the_behaviour_with_it() -> None:
+    """An editor's note above the prose must not swallow the prose.
+
+    This is the real Strength page. Someone added `{{Needs update|...}}` above
+    the one sentence that says what Strength does, and the whole effect lost its
+    behaviour: the banner is not a template this module rewrites, so it survived
+    cleaning whole; it carries no full stop, so it merged with the sentence under
+    it into a single sentence; and that sentence then mentioned "bedrock
+    edition", so the other-edition filter discarded both halves together.
+
+    Nothing about the page's own description had changed. It failed CI on a
+    Wednesday because of a note one editor left for another.
+    """
+    page = """
+== Effect ==
+{{Needs update|Damage equation in bedrock edition got changed}}
+{{IN|java}}, it increases melee damage by {{hp|3}} x ''level''.
+
+{{IN|bedrock}}, melee damage can be found through an equation.
+
+== Causes ==
+Table here
+"""
+    behaviour = _extract_behaviour(page, title="Strength")
+    assert behaviour is not None
+    assert "increases melee damage" in behaviour
+    assert "Needs update" not in behaviour
+    assert "equation" not in behaviour
+
+
+def test_every_maintenance_banner_is_dropped_the_same_way() -> None:
+    """The fix is the family, not the one banner that broke.
+
+    Each of these is a maintenance template minecraft.wiki uses, and each would
+    fail exactly as `{{Needs update}}` did on whichever page an editor adds it to
+    next.
+    """
+    banners = (
+        "{{Needs update|something}}",
+        "{{Update}}",
+        "{{Outdated}}",
+        "{{Cleanup|prose}}",
+        "{{Rewrite}}",
+        "{{Expand section}}",
+        "{{Stub}}",
+        "{{Merge|Speed}}",
+        "{{Dispute|talk}}",
+        "{{more info needed}}",
+    )
+    for banner in banners:
+        page = f"""
+== Effect ==
+{banner}
+It increases melee damage.
+
+== Causes ==
+Table here
+"""
+        behaviour = _extract_behaviour(page, title="Strength")
+        assert behaviour == "It increases melee damage.", banner
+
+
 def test_extract_behaviour_water_breathing_lead() -> None:
     page = """
 {{Infobox effect

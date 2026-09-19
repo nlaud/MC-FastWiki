@@ -340,6 +340,66 @@ def _drop_other_edition_sentences(paragraph: str) -> str:
     return " ".join(kept).strip()
 
 
+# Line openings that never carry effect prose: an image, a hatnote, an infobox, a
+# transclusion, and table markup.
+#
+# Matched case-insensitively, because the wiki spells its templates both ways and
+# an earlier cut listed each one twice to cope with that.
+_NON_PROSE_PREFIXES: Final[tuple[str, ...]] = (
+    "[[file:",
+    "{{see also",
+    "{{about",
+    "{{infobox",
+    "{{:",
+    "{|",
+    "|-",
+    "!",
+    "|",
+)
+
+# Maintenance banners. An editor adds one to the top of a section to flag work
+# the article needs; it is a note to other editors and never describes the game.
+#
+# They have to be dropped rather than cleaned, and the Strength page shows why.
+# Someone added `{{Needs update|Damage equation in bedrock edition got changed}}`
+# above the one sentence that says what Strength does. The banner is not a
+# template this module knows, so it survived cleaning whole; it carries no full
+# stop, so it merged with the sentence below it into one; and that sentence now
+# mentioned "bedrock edition", so `_drop_other_edition_sentences` threw the pair
+# away and the page reported no behaviour at all. The page still said exactly
+# what it had always said.
+#
+# The list is wider than the one banner that broke. These are the maintenance
+# templates minecraft.wiki actually uses, and every one of them would fail the
+# same way, on whichever page an editor adds it to next.
+_MAINTENANCE_TEMPLATE_PREFIXES: Final[tuple[str, ...]] = (
+    "{{needs update",
+    "{{update",
+    "{{outdated",
+    "{{cleanup",
+    "{{rewrite",
+    "{{expand",
+    "{{stub",
+    "{{merge",
+    "{{split",
+    "{{move",
+    "{{delete",
+    "{{dispute",
+    "{{disputed",
+    "{{verify",
+    "{{citation needed",
+    "{{more info",
+)
+
+
+def _is_not_prose(line: str) -> bool:
+    """Return whether `line` is markup or an editor's note rather than effect prose."""
+    lowered = line.lower()
+    return lowered.startswith(_NON_PROSE_PREFIXES) or lowered.startswith(
+        _MAINTENANCE_TEMPLATE_PREFIXES
+    )
+
+
 def _extract_behaviour(wikitext: str, *, title: str) -> str | None:
     """Extract the first concise Java Edition prose paragraph describing effect behaviour."""
     matches = list(_HEADING_PATTERN.finditer(wikitext))
@@ -380,21 +440,7 @@ def _extract_behaviour(wikitext: str, *, title: str) -> str | None:
                 paragraphs.append(" ".join(current))
                 current = []
             continue
-        if (
-            line.startswith("[[File:")
-            or line.startswith("[[file:")
-            or line.startswith("{{See also")
-            or line.startswith("{{see also")
-            or line.startswith("{{About")
-            or line.startswith("{{about")
-            or line.startswith("{{Infobox")
-            or line.startswith("{{infobox")
-            or line.startswith("{{:")
-            or line.startswith("{|")
-            or line.startswith("|-")
-            or line.startswith("!")
-            or line.startswith("|")
-        ):
+        if _is_not_prose(line):
             continue
 
         cleaned = _tidy_spacing(

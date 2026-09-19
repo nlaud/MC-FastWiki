@@ -185,7 +185,15 @@ def main() -> None:
 
     slug = SNAPSHOT_VERSION_ID.replace(".", "_")
     out = Path("tests") / "fixtures" / f"mcmeta_{slug}_loot_gates.json"
-    out.write_text(json.dumps(document, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    # `newline` is pinned like every other builder in this directory. Without it
+    # a rebuild on Windows writes CRLF and trips the repository's line-ending
+    # invariant, which is then a failure about the machine that ran the rebuild
+    # rather than about the snapshot it produced.
+    out.write_text(
+        json.dumps(document, indent=2, sort_keys=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
     print(f"wrote {out}")
     print(f"  version_id  {tag.version_id}")
