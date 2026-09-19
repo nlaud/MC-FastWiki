@@ -260,7 +260,41 @@ def decode_sprite(payload: bytes, *, title: str) -> DecodedSprite:
             f"{title} decoded to a {converted.width}x{converted.height} image, which an atlas "
             f"cannot place. This is a decode fault, not a real sprite."
         )
-    return DecodedSprite(width=converted.width, height=converted.height, rgba=converted.tobytes())
+    return DecodedSprite(
+        width=converted.width,
+        height=converted.height,
+        rgba=_clear_invisible_colour(converted.tobytes()),
+    )
+
+
+def _clear_invisible_colour(rgba: bytes) -> bytes:
+    """Return `rgba` with the colour of every fully transparent pixel set to black.
+
+    A pixel at alpha 0 draws nothing, so its three colour bytes are unobservable --
+    and because they are unobservable, nothing upstream keeps them stable. A source
+    PNG stores whatever its author left there, and a decoder is free to hand back
+    something else again: the same wiki sprite decodes to white under transparency on
+    one Pillow build and black on another.
+
+    That is invisible in the page and loud in Git. The first real weekly refresh after
+    26.3 landed produced a pull request whose entire content was a new `builtAt` and
+    928 transparent pixels that had changed from white to black -- no entity added, none
+    removed, every check passing, and nothing whatsoever for a reviewer to review. A
+    weekly diff that always says something is a weekly diff nobody reads, and the week
+    a sprite really changes it would look exactly the same.
+
+    The module docstring argues at length for owning PNG encoding rather than trusting
+    `Image.save`'s per-row filter heuristic, for exactly this reason. This closes the
+    other half of the same hole: the encoder is deterministic, so the pixels handed to
+    it must be too.
+    """
+    pixels = bytearray(rgba)
+    for i in range(3, len(pixels), 4):
+        if pixels[i] == 0:
+            pixels[i - 3] = 0
+            pixels[i - 2] = 0
+            pixels[i - 1] = 0
+    return bytes(pixels)
 
 
 def _chunk(chunk_type: bytes, data: bytes) -> bytes:

@@ -308,3 +308,38 @@ def test_collect_sprite_files_over_no_entities_returns_an_empty_selection() -> N
     assert selection.file_titles == ()
     assert selection.icon_to_file == {}
     assert selection.unresolved_icons == ()
+
+
+def test_a_fully_transparent_pixel_decodes_to_one_colour_whatever_it_held() -> None:
+    """Two sprites that look identical must decode identically.
+
+    The colour bytes under alpha 0 draw nothing, so nothing upstream keeps them
+    stable: the same wiki sprite decodes to white under transparency on one
+    Pillow build and black on another. That is invisible on the page and loud in
+    Git, and it made the first real weekly refresh after 26.3 open a pull request
+    whose whole content was a new timestamp and 928 transparent pixels that had
+    changed from white to black.
+
+    `pipeline.emit.atlas`'s own docstring argues for owning the PNG encoder
+    rather than trusting `Image.save`'s filter heuristic, for this same reason.
+    A deterministic encoder is worth nothing if the pixels going into it are not.
+    """
+    white_under = decode_sprite(_png_bytes(2, 2, (255, 255, 255, 0)), title="File:A.png")
+    black_under = decode_sprite(_png_bytes(2, 2, (0, 0, 0, 0)), title="File:B.png")
+    red_under = decode_sprite(_png_bytes(2, 2, (255, 0, 0, 0)), title="File:C.png")
+
+    assert white_under.rgba == black_under.rgba == red_under.rgba
+    assert white_under.rgba == bytes(16)
+
+
+def test_normalising_the_invisible_colour_leaves_every_visible_pixel_alone() -> None:
+    """Only alpha 0 is touched. A visible pixel keeps its exact colour."""
+    image = Image.new("RGBA", (2, 1))
+    image.putpixel((0, 0), (12, 34, 56, 255))
+    image.putpixel((1, 0), (200, 100, 50, 1))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    decoded = decode_sprite(buffer.getvalue(), title="File:Visible.png")
+
+    assert decoded.rgba == bytes([12, 34, 56, 255, 200, 100, 50, 1])
