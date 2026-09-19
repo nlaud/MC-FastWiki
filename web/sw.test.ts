@@ -16,15 +16,13 @@ describe("service worker precache and versioning", () => {
     expect(cacheName).toBe(`mc-fastwiki-${manifest.minecraftVersion}-${manifest.builtAt}`);
   });
 
-  it("collects all 26 emitted files and excludes sw.js itself", () => {
+  it("collects every emitted file and excludes sw.js itself", () => {
     if (!fs.existsSync(distDir)) {
       return;
     }
 
     const precacheList = collectPrecacheFiles(distDir);
 
-    // Shell (index.html), 2 assets (css, js), 5 root data files, 18 entity shards = 26 files
-    expect(precacheList.length).toBe(26);
     expect(precacheList).not.toContain("sw.js");
     expect(precacheList).toContain("index.html");
     expect(precacheList).toContain("data/index.json");
@@ -33,8 +31,21 @@ describe("service worker precache and versioning", () => {
     expect(precacheList).toContain("data/sprites.json");
     expect(precacheList).toContain("data/sprites.png");
 
-    const shardEntries = precacheList.filter((f) => f.startsWith("data/entities/"));
-    expect(shardEntries.length).toBe(18);
+    // The shard count is read off the build, not written down. It moves with
+    // every Minecraft release that adds entities -- 26.3 took it from 18 to 19 --
+    // and a literal here fails the build for a number nobody got wrong. What
+    // must hold is that *every* emitted shard is precached, which is the thing
+    // an offline app actually depends on.
+    const shardsOnDisk = fs
+      .readdirSync(path.join(distDir, "data", "entities"))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => `data/entities/${name}`)
+      .sort();
+    const shardEntries = precacheList.filter((f) => f.startsWith("data/entities/")).sort();
+    expect(shardEntries).toEqual(shardsOnDisk);
+
+    // Shell (index.html), 2 assets (css, js), 5 root data files, and the shards.
+    expect(precacheList.length).toBe(3 + 5 + shardsOnDisk.length);
 
     // Every precached file must exist on disk
     for (const relPath of precacheList) {

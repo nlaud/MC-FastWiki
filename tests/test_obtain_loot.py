@@ -25,7 +25,8 @@ from pipeline.obtain.loot import (
     SHEARS_NOTE,
     SILK_TOUCH_NOTE,
     SKIPPED_FAMILIES,
-    _conditions_gate,
+    _condition_gate,
+    _predicate_index,
     extract_block_and_chest_loot,
     extract_loot,
     producers_from_drop_index,
@@ -36,7 +37,7 @@ from pipeline.obtain.producer import ObtainMethod, Producer, ProducerOutput
 
 # The committed snapshot of the pinned archive's tool gates. Rebuilt by hand with
 # `python -m tests.fixtures.build_loot_gate_snapshot`; the name carries the version.
-GATE_FIXTURE = "mcmeta_26_2_loot_gates.json"
+GATE_FIXTURE = "mcmeta_26_3_loot_gates.json"
 
 
 def archive(*, blocks: Mapping[str, Any] = {}, chests: Mapping[str, Any] = {}) -> dict[str, bytes]:
@@ -48,9 +49,10 @@ def archive(*, blocks: Mapping[str, Any] = {}, chests: Mapping[str, Any] = {}) -
     return files
 
 
-# The real shape of `diamond_ore.json`, verified live 2026-09-01: silk touch
-# gates the "drop the block itself" branch through `minecraft:match_tool`,
-# never through `minecraft:tool/can_silk_touch`.
+# `diamond_ore.json` with its silk-touch condition written inline. The real
+# 26.3 file names `minecraft:tool/can_silk_touch` instead and the snapshot
+# fixture carries that form; this one keeps the inline `minecraft:match_tool`
+# object, because both spellings reach the reader and both must work.
 DIAMOND_ORE = {
     "type": "minecraft:block",
     "pools": [
@@ -63,28 +65,26 @@ DIAMOND_ORE = {
                         {
                             "type": "minecraft:item",
                             "name": "minecraft:diamond_ore",
-                            "conditions": [
-                                {
-                                    "condition": "minecraft:match_tool",
-                                    "predicate": {
-                                        "predicates": {
-                                            "minecraft:enchantments": [
-                                                {
-                                                    "enchantments": "minecraft:silk_touch",
-                                                    "levels": {"min": 1},
-                                                }
-                                            ]
-                                        }
-                                    },
-                                }
-                            ],
+                            "condition": {
+                                "type": "minecraft:match_tool",
+                                "predicate": {
+                                    "predicates": {
+                                        "minecraft:enchantments": [
+                                            {
+                                                "enchantments": "minecraft:silk_touch",
+                                                "levels": {"min": 1},
+                                            }
+                                        ]
+                                    }
+                                },
+                            },
                         },
                         {
                             "type": "minecraft:item",
                             "name": "minecraft:diamond",
-                            "functions": [
+                            "modifier": [
                                 {
-                                    "function": "minecraft:apply_bonus",
+                                    "type": "minecraft:apply_bonus",
                                     "enchantment": "minecraft:fortune",
                                     "formula": "minecraft:ore_drops",
                                 }
@@ -115,21 +115,19 @@ def test_pool_level_silk_touch_gate_carries_note_and_retains_odds() -> None:
                 "pools": [
                     {
                         "rolls": 1.0,
-                        "conditions": [
-                            {
-                                "condition": "minecraft:match_tool",
-                                "predicate": {
-                                    "predicates": {
-                                        "minecraft:enchantments": [
-                                            {
-                                                "enchantments": "minecraft:silk_touch",
-                                                "levels": {"min": 1},
-                                            }
-                                        ]
-                                    }
-                                },
-                            }
-                        ],
+                        "condition": {
+                            "type": "minecraft:match_tool",
+                            "predicate": {
+                                "predicates": {
+                                    "minecraft:enchantments": [
+                                        {
+                                            "enchantments": "minecraft:silk_touch",
+                                            "levels": {"min": 1},
+                                        }
+                                    ]
+                                }
+                            },
+                        },
                         "entries": [{"type": "minecraft:item", "name": "minecraft:glass"}],
                     }
                 ],
@@ -154,12 +152,10 @@ def test_pool_level_shears_gate_carries_shears_note() -> None:
                 "pools": [
                     {
                         "rolls": 1.0,
-                        "conditions": [
-                            {
-                                "condition": "minecraft:match_tool",
-                                "predicate": {"items": "minecraft:shears"},
-                            }
-                        ],
+                        "condition": {
+                            "type": "minecraft:match_tool",
+                            "predicate": {"items": "minecraft:shears"},
+                        },
                         "entries": [{"type": "minecraft:item", "name": "minecraft:vine"}],
                     }
                 ],
@@ -204,12 +200,34 @@ def _gate_snapshot() -> dict[str, Any]:
     return document
 
 
+def _gate_files(snapshot: dict[str, Any]) -> dict[str, bytes]:
+    """Return the snapshot's tables *and* its predicate registry, as a pack would hold them.
+
+    The predicates travel in the snapshot because 26.3 stopped spelling a shared
+    condition out in each table: 123 of them name `minecraft:tool/can_silk_touch`
+    instead. A replay given the tables alone would read every one of those as
+    ungated and still pass a test that only counted what it found, so the
+    registry is part of the fixture rather than something the test invents.
+    """
+    files = {
+        path: json.dumps(document).encode()
+        for path, document in snapshot["tables"].items()
+    }
+    files.update(
+        {
+            path: json.dumps(document).encode()
+            for path, document in snapshot.get("predicates", {}).items()
+        }
+    )
+    return files
+
+
 def test_the_gate_snapshot_names_the_archive_this_suite_pins() -> None:
     """A snapshot of another version answers another question, so the header is checked."""
     snapshot = _gate_snapshot()
-    assert snapshot["version_id"] == "26.2"
-    assert snapshot["tag"] == "26.2-data"
-    assert snapshot["commit_sha"] == "4d12c0553e21e461085d08dcb2c5d412398c494e"
+    assert snapshot["version_id"] == "26.3"
+    assert snapshot["tag"] == "26.3-data"
+    assert snapshot["commit_sha"] == "538b2b167248c648b2198f2c0d56eced10dfc0cf"
 
 
 def test_pool_level_tool_gates_across_the_pinned_archive() -> None:
@@ -223,11 +241,12 @@ def test_pool_level_tool_gates_across_the_pinned_archive() -> None:
     snapshot = _gate_snapshot()
     tables = snapshot["tables"]
 
+    predicates = _predicate_index(_gate_files(snapshot))
     pool_silk = 0
     pool_shears = 0
     for document in tables.values():
         gates = {
-            _conditions_gate(pool.get("conditions"))
+            _condition_gate(pool.get("condition"), predicates)
             for pool in document.get("pools", [])
             if isinstance(pool, dict)
         }
@@ -248,11 +267,7 @@ def test_the_walk_notes_every_gated_drop_of_the_pinned_archive() -> None:
     into an `alternatives` child fails here.
     """
     snapshot = _gate_snapshot()
-    files = {
-        path: json.dumps(document).encode() for path, document in snapshot["tables"].items()
-    }
-
-    result = extract_loot(files)
+    result = extract_loot(_gate_files(snapshot))
     notes = {
         f"{producer.source_id}|{producer.output.item}": producer.note
         for producer in result.producers
@@ -263,11 +278,9 @@ def test_the_walk_notes_every_gated_drop_of_the_pinned_archive() -> None:
 def test_the_gated_drops_a_player_would_check_by_hand() -> None:
     """Spot checks against the game, so the snapshot is not only self-consistent."""
     snapshot = _gate_snapshot()
-    files = {
-        path: json.dumps(document).encode() for path, document in snapshot["tables"].items()
-    }
     by_source_and_item = {
-        (p.source_id, p.output.item): p for p in extract_loot(files).producers
+        (p.source_id, p.output.item): p
+        for p in extract_loot(_gate_files(snapshot)).producers
     }
 
     # Pool-level gate: the block drops itself only under silk touch.
@@ -326,9 +339,9 @@ def test_set_count_reads_the_uniform_minimum_not_a_modifier_field() -> None:
                             {
                                 "type": "minecraft:item",
                                 "name": "minecraft:flint",
-                                "functions": [
+                                "modifier": [
                                     {
-                                        "function": "minecraft:set_count",
+                                        "type": "minecraft:set_count",
                                         "count": {
                                             "type": "minecraft:uniform",
                                             "min": 2.0,
@@ -1067,9 +1080,9 @@ def test_a_count_range_carries_both_ends_and_the_expected_yield() -> None:
             "type": "minecraft:item",
             "name": "minecraft:iron_nugget",
             "weight": 25,
-            "functions": [
+            "modifier": [
                 {
-                    "function": "minecraft:set_count",
+                    "type": "minecraft:set_count",
                     "count": {"type": "minecraft:uniform", "min": 10.0, "max": 36.0},
                 }
             ],
@@ -1136,7 +1149,7 @@ def test_a_conditioned_entry_forfeits_its_odds() -> None:
         {
             "type": "minecraft:item",
             "name": "minecraft:gravel",
-            "conditions": [{"condition": "minecraft:random_chance", "chance": 0.5}],
+            "condition": {"type": "minecraft:random_chance", "chance": 0.5},
         },
         {"type": "minecraft:item", "name": "minecraft:string"},
     ])
@@ -1224,3 +1237,130 @@ def test_the_three_odds_fields_cannot_be_set_apart() -> None:
             source_id="test",
             chance=0.5,
         )
+
+
+# --- 26.3 condition and modifier spellings -----------------------------------
+
+SILK_TOUCH_PREDICATE = {
+    "type": "minecraft:match_tool",
+    "predicate": {
+        "predicates": {
+            "minecraft:enchantments": [
+                {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}
+            ]
+        }
+    },
+}
+SHEARS_PREDICATE = {"type": "minecraft:match_tool", "predicate": {"items": "minecraft:shears"}}
+
+
+def _with_predicates(files: dict[str, bytes]) -> dict[str, bytes]:
+    """Return `files` plus the two tool predicates a 26.3 pack holds."""
+    return files | {
+        "predicate/tool/can_silk_touch.json": json.dumps(SILK_TOUCH_PREDICATE).encode(),
+        "predicate/tool/can_shear.json": json.dumps(SHEARS_PREDICATE).encode(),
+    }
+
+
+def _one_block_pool(condition: Any) -> dict[str, bytes]:
+    """Return a one-pool glass table whose pool carries `condition`."""
+    return _with_predicates(
+        archive(
+            blocks={
+                "glass": {
+                    "type": "minecraft:block",
+                    "pools": [
+                        {
+                            "rolls": 1.0,
+                            "condition": condition,
+                            "entries": [
+                                {"type": "minecraft:item", "name": "minecraft:glass"}
+                            ],
+                        }
+                    ],
+                }
+            }
+        )
+    )
+
+
+def test_a_named_predicate_reference_is_followed_to_the_object_it_names() -> None:
+    """26.3 tables name a shared condition instead of spelling it out.
+
+    123 block tables carry the string `minecraft:tool/can_silk_touch` where 26.2
+    carried the whole `match_tool` object. A reader that did not resolve the name
+    would read every one of those drops as needing no tool at all -- it would tell
+    someone to break Glass by hand.
+    """
+    result = extract_block_and_chest_loot(_one_block_pool("minecraft:tool/can_silk_touch"))
+    assert result.producers[0].note == SILK_TOUCH_NOTE
+
+
+def test_an_all_of_condition_is_read_as_the_list_that_26_2_wrote_by_hand() -> None:
+    """`conditions: [a, b]` became `condition: {all_of, terms: [a, b]}`.
+
+    Unwrapping `all_of` is what keeps a gate readable when the table also carries
+    an ordinary condition beside it, which 26.2 expressed as a two-element list.
+    """
+    condition = {
+        "type": "minecraft:all_of",
+        "terms": ["minecraft:tool/can_silk_touch", {"type": "minecraft:survives_explosion"}],
+    }
+    result = extract_block_and_chest_loot(_one_block_pool(condition))
+    assert result.producers[0].note == SILK_TOUCH_NOTE
+
+
+def test_an_any_of_condition_names_no_single_tool() -> None:
+    """"Shears or silk touch" is not "requires shears", and was never read as one.
+
+    `acacia_leaves` is the real table: it drops the leaves under either tool. 26.2
+    carried that as one `any_of` entry inside the conditions list and this reader
+    matched none of it, so it stated no requirement. The 26.3 spelling must keep
+    stating none rather than picking whichever term comes first.
+    """
+    condition = {
+        "type": "minecraft:any_of",
+        "terms": ["minecraft:tool/can_shear", "minecraft:tool/can_silk_touch"],
+    }
+    result = extract_block_and_chest_loot(_one_block_pool(condition))
+    assert result.producers[0].note is None
+
+
+def test_an_inverted_tool_condition_is_not_that_tool_s_gate() -> None:
+    """A drop that happens *without* silk touch must not claim to require it."""
+    condition = {"type": "minecraft:inverted", "term": "minecraft:tool/can_silk_touch"}
+    result = extract_block_and_chest_loot(_one_block_pool(condition))
+    assert result.producers[0].note is None
+
+
+def test_a_modifier_written_as_one_object_reads_like_a_list_of_one() -> None:
+    """26.3 lets `modifier` hold a single object as well as an array of them."""
+    files = archive(
+        blocks={
+            "gravel": {
+                "type": "minecraft:block",
+                "pools": [
+                    {
+                        "rolls": 1.0,
+                        "entries": [
+                            {
+                                "type": "minecraft:item",
+                                "name": "minecraft:flint",
+                                "modifier": {
+                                    "type": "minecraft:set_count",
+                                    "count": {
+                                        "type": "minecraft:uniform",
+                                        "min": 2.0,
+                                        "max": 5.0,
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+    )
+    producer = extract_block_and_chest_loot(files).producers[0]
+    assert producer.output.count == 2
+    assert producer.count_max == 5

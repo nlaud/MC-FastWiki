@@ -94,18 +94,26 @@ does not.
 ### The data half maps path for path
 
 `fetch_data_files` keys every file it returns by the path under `data/minecraft/`, such as
-`recipe/oak_stairs.json`. `DATA_GROUPS` names the ten groups that the pipeline reads:
+`recipe/oak_stairs.json`. `DATA_GROUPS` names the eleven groups that the pipeline reads:
 
 - `advancement`
 - `enchantment`
 - `loot_table`
+- `predicate`
 - `recipe`
 - `tags`
 - `worldgen/biome`
-- `worldgen/configured_feature`
+- `worldgen/feature`
 - `worldgen/placed_feature`
 - `worldgen/structure`
 - `worldgen/structure_set`
+
+Two of these changed in Minecraft 26.3, and the change is worth knowing before you pack a
+local archive from an older jar. The game dropped the `configured_` prefix from its registry
+names, so `worldgen/configured_feature` became `worldgen/feature`, and it lifted loot
+conditions that several tables share into a new `predicate` registry. `read_data_archive`
+checks each group for an empty read on its own, so an archive built from a pre-26.3 jar fails
+naming the directory it found nothing under rather than building with a hole in it.
 
 The generator writes that same tree under `generated/data/minecraft/`, so no path changes here.
 
@@ -121,7 +129,7 @@ tar -czf mcmeta-data.tar.gz generated
 Do not pack `generated/data`. The reader strips the root directory of the archive, so each member
 would then read as `minecraft/recipe/...` and match no group. Every file is skipped, and the read
 raises `FetchError` to say that the archive holds no file under `data/minecraft/advancement/` or
-the other three prefixes — which is the message this pipeline gives for a broken scrape.
+the other prefixes — which is the message this pipeline gives for a broken scrape.
 
 ### Hand the payload to the reader
 

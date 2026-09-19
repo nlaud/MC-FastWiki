@@ -7,29 +7,39 @@ Three sources feed this module, and they are not read the same way.
 `loot_table/blocks/*.json` and `loot_table/chests/*.json` are exact,
 versioned data, so this module walks them the way `pipeline.extract.harvest`
 walks a block tag: raise on a shape it does not recognize, never guess.
-**The shapes verified live against the pinned `26.2-data` archive on
-2026-09-01 disagree with an earlier draft of this task's implementation
-notes, and the live shapes are what this module reads.** Two corrections,
-both load-bearing for a project whose stated worst failure is a wrong
+The shapes below were verified live against the pinned `26.3-data` archive,
+and the live shapes are what this module reads. Three of them changed in 26.3,
+and each is load-bearing for a project whose stated worst failure is a wrong
 recipe:
 
-1. A count is never a bare `modifier` field on the entry. It is
-   `entry.functions[]`, an array of function objects, and the one this
-   module reads is `{"function": "minecraft:set_count", "count": {"type":
-   "minecraft:uniform", "min": N, "max": M}}` (or a bare integer `count`
-   for a fixed drop). A `functions` entry can also be `minecraft:
-   apply_bonus` (fortune) or `minecraft:explosion_decay`, both left
-   unread here -- they scale a *drop chance*, not the existence of a
-   producer, and `TODO.md` Phase 6's looting-tier display is `pipeline.
-   enrich.droptable`'s job for mobs, with no chest/block equivalent
-   requested yet.
-2. Silk touch is never `condition: "minecraft:tool/can_silk_touch"`, which
-   appears only on newer snapshots. It is `condition: "minecraft:match_tool"`
-   whose `predicate.predicates."minecraft:enchantments"` array names
-   `"minecraft:silk_touch"` with a `levels.min` of at least 1.
+1. A count is never a bare field on the entry. It sits in a modifier object,
+   `{"type": "minecraft:set_count", "count": {"type": "minecraft:uniform",
+   "min": N, "max": M}}`, or with a bare integer `count` for a fixed drop.
+   Up to 26.2 those objects sat in `entry.functions[]` and named themselves
+   with a `function` key; 26.3 renamed the key to `modifier`, let it hold one
+   object as well as an array, and renamed the discriminator to `type`.
+   `_modifiers` returns both spellings as one list. A modifier can also be
+   `minecraft:apply_bonus` (fortune) or `minecraft:explosion_decay`, both left
+   unread here -- they scale a *drop chance*, not the existence of a producer,
+   and `TODO.md` Phase 6's looting-tier display is `pipeline.enrich.droptable`'s
+   job for mobs, with no chest/block equivalent requested yet.
+2. Silk touch is a `minecraft:match_tool` condition whose
+   `predicate.predicates."minecraft:enchantments"` array names
+   `"minecraft:silk_touch"` with a `levels.min` of at least 1. In 26.3 the 123
+   block tables that ask for it no longer spell that object out: they name
+   `minecraft:tool/can_silk_touch`, a file of the new `predicate` registry
+   holding exactly that object. `_predicate_index` reads the registry and
+   `_resolved_condition` follows the name, so the leaf checks here are the same
+   checks they were. Shears moved the same way, to
+   `minecraft:tool/can_shear`.
    Tool gates appear both at the entry level inside `minecraft:alternatives`
-   (verified on `diamond_ore.json` and `coal_ore.json`) and at the pool level
-   (on 82 block tables across the pinned archive: 76 silk-touch and 6 shears).
+   (verified on `diamond_ore.json` and `coal_ore.json`) and at the pool level.
+3. A node states one `condition`, not a list of them. Up to 26.2 it carried
+   `conditions: [a, b]`, an implicit AND; 26.3 writes that same pair as
+   `condition: {"type": "minecraft:all_of", "terms": [a, b]}`. `_condition_terms`
+   unwraps `all_of` to recover the list, and deliberately unwraps nothing else:
+   `any_of` and `inverted` were single entries of the old list, so a block gated
+   on "shears OR silk touch" carries neither note now, exactly as before.
 
 Pool-level conditions such as `survives_explosion` (on roughly 825 tables)
 and pool-level tool gates (silk touch and shears) do not forfeit odds: a
@@ -137,9 +147,15 @@ LOOT_SOURCES_FILENAME = "loot-sources.json"
 DEFAULT_LOOT_SOURCES_PATH = Path("data/curated") / LOOT_SOURCES_FILENAME
 NAMESPACE = "minecraft"
 
+# `barrels` and `till` are new in 26.3 and carry table types this module already
+# reads: the abandoned camp's barrel is a `minecraft:chest`, and tilling rooted
+# dirt for hanging roots is a `minecraft:block_interact` exactly as the `harvest`
+# family is. They are named here rather than left to raise, because a family that
+# is real content and not a broken read belongs in the answer.
 READ_FAMILIES = frozenset(
     {
         "archaeology",
+        "barrels",
         "blocks",
         "brush",
         "carve",
@@ -150,6 +166,7 @@ READ_FAMILIES = frozenset(
         "pots",
         "shearing",
         "spawners",
+        "till",
     }
 )
 
@@ -183,6 +200,20 @@ _CONTAINER_TYPES = frozenset(
     {"minecraft:alternatives", "minecraft:group", "minecraft:sequence"}
 )
 _ITEM_TYPE = "minecraft:item"
+
+# The registry of named predicates, new in 26.3. A loot condition that used to
+# be written inline is now often a string naming a file of this group.
+PREDICATE_DIRECTORY = "predicate/"
+
+# The two composite conditions that this module unwraps, and the one it does
+# not. `all_of` is what 26.2 wrote as a list of conditions on one node -- the
+# implicit AND -- so its terms are read as that list was. `any_of` and
+# `inverted` were single entries of that list and stay single terms here, which
+# keeps `acacia_leaves` (shears OR silk touch) carrying no single tool note,
+# exactly as it did before the format changed.
+ALL_OF_CONDITION = "minecraft:all_of"
+
+MATCH_TOOL_CONDITION = "minecraft:match_tool"
 
 SILK_TOUCH_ENCHANTMENT = "minecraft:silk_touch"
 
@@ -340,11 +371,8 @@ def _entry_count(entry: Mapping[str, Any]) -> tuple[int, int]:
     deciding whether a barter is worth the gold -- and the ceiling was sitting
     unread in the same object the floor was taken from.
     """
-    functions = entry.get("functions")
-    if not isinstance(functions, list):
-        return 1, 1
-    for function in functions:
-        if not isinstance(function, Mapping) or function.get("function") != "minecraft:set_count":
+    for function in _modifiers(entry):
+        if function.get("type") != "minecraft:set_count":
             continue
         count = function.get("count", 1)
         if isinstance(count, int | float):
@@ -401,7 +429,7 @@ def _condition_is_silk_touch(condition: Mapping[str, Any]) -> bool:
     predicates."minecraft:enchantments"` array names `minecraft:silk_touch`
     with `levels.min >= 1`.
     """
-    if condition.get("condition") != "minecraft:match_tool":
+    if condition.get("type") != MATCH_TOOL_CONDITION:
         return False
     predicate = condition.get("predicate")
     if not isinstance(predicate, Mapping):
@@ -430,7 +458,7 @@ def _condition_is_shears(condition: Mapping[str, Any]) -> bool:
     The real shape in 26.2: `condition: "minecraft:match_tool"` whose
     `predicate.items` is `"minecraft:shears"` (or `["minecraft:shears"]`).
     """
-    if condition.get("condition") != "minecraft:match_tool":
+    if condition.get("type") != MATCH_TOOL_CONDITION:
         return False
     predicate = condition.get("predicate")
     if not isinstance(predicate, Mapping):
@@ -439,16 +467,93 @@ def _condition_is_shears(condition: Mapping[str, Any]) -> bool:
     return items == "minecraft:shears" or items == ["minecraft:shears"]
 
 
-def _conditions_gate(conditions: Any) -> str | None:
-    """Return the first matching gate note from `conditions`, or `None`."""
-    if not isinstance(conditions, list):
-        return None
-    for condition in conditions:
-        if not isinstance(condition, Mapping):
+def _modifiers(entry: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Return the modifier objects of one entry, however the pack spelled them.
+
+    `entry.functions[]` up to 26.2. 26.3 renamed the key to `modifier` and let
+    it hold either one object or an array of them, so both shapes come back as
+    a list here and every caller reads one thing.
+    """
+    modifier = entry.get("modifier")
+    if isinstance(modifier, Mapping):
+        return [modifier]
+    if isinstance(modifier, list):
+        return [item for item in modifier if isinstance(item, Mapping)]
+    return []
+
+
+def _predicate_index(files: Mapping[str, bytes]) -> dict[str, Mapping[str, Any]]:
+    """Return the named predicates of the pack, keyed by their namespaced id.
+
+    26.3 lifted conditions that several tables share into their own registry:
+    `predicate/tool/can_silk_touch.json` holds the very `match_tool` object that
+    123 block tables used to spell out, and a table now names it instead. The
+    file bodies are the old inline objects unchanged apart from `condition`
+    becoming `type`, so resolving a reference here lets every check below stay
+    the leaf check it was.
+    """
+    out: dict[str, Mapping[str, Any]] = {}
+    for path, raw in sorted(files.items()):
+        if not path.startswith(PREDICATE_DIRECTORY) or not path.endswith(".json"):
             continue
-        if _condition_is_silk_touch(condition):
+        rel = path.removeprefix(PREDICATE_DIRECTORY).removesuffix(".json")
+        document = _decoded(raw, source=path)
+        out[_namespaced(rel)] = document
+    return out
+
+
+def _condition_terms(
+    condition: Any, predicates: Mapping[str, Mapping[str, Any]]
+) -> list[Mapping[str, Any]]:
+    """Return one node's conditions as the flat list 26.2 wrote by hand.
+
+    A node carried `conditions: [a, b]` up to 26.2 and carries `condition: <one>`
+    in 26.3, where a two-element list became `{"type": "all_of", "terms": [a, b]}`.
+    Unwrapping `all_of` therefore recovers the old list exactly, and a string
+    term resolves through the predicate registry to the object it names.
+
+    Nothing else is unwrapped. `any_of` and `inverted` were single entries of the
+    old list too, so they stay one term and match no tool check -- which is what
+    26.2 did with them and why a leaf block gated on "shears OR silk touch"
+    carries neither note.
+    """
+    if condition is None:
+        return []
+    resolved = _resolved_condition(condition, predicates)
+    if resolved is None:
+        return []
+    if resolved.get("type") == ALL_OF_CONDITION:
+        terms = resolved.get("terms")
+        if not isinstance(terms, list):
+            return [resolved]
+        out: list[Mapping[str, Any]] = []
+        for term in terms:
+            term_resolved = _resolved_condition(term, predicates)
+            if term_resolved is not None:
+                out.append(term_resolved)
+        return out
+    return [resolved]
+
+
+def _resolved_condition(
+    condition: Any, predicates: Mapping[str, Mapping[str, Any]]
+) -> Mapping[str, Any] | None:
+    """Return one condition as an object, following a named-predicate reference."""
+    if isinstance(condition, str):
+        return predicates.get(_namespaced(condition))
+    if isinstance(condition, Mapping):
+        return condition
+    return None
+
+
+def _condition_gate(
+    condition: Any, predicates: Mapping[str, Mapping[str, Any]]
+) -> str | None:
+    """Return the first matching gate note from one node's condition, or `None`."""
+    for term in _condition_terms(condition, predicates):
+        if _condition_is_silk_touch(term):
             return SILK_TOUCH_NOTE
-        if _condition_is_shears(condition):
+        if _condition_is_shears(term):
             return SHEARS_NOTE
     return None
 
@@ -459,6 +564,7 @@ def _walk_entries(
     gate: str | None,
     source: str,
     skipped: list[SkippedLootEntry],
+    predicates: Mapping[str, Mapping[str, Any]],
     pool_weight: int | None = None,
     rolls: float | None = None,
 ) -> list[LootLeaf]:
@@ -484,13 +590,21 @@ def _walk_entries(
         entry_type = entry.get("type")
         if not isinstance(entry_type, str):
             raise ObtainError(f"{source} holds a loot entry with no 'type'.")
-        conditioned = isinstance(entry.get("conditions"), list) and bool(entry["conditions"])
-        entry_gate = gate or _conditions_gate(entry.get("conditions"))
+        conditioned = entry.get("condition") is not None
+        entry_gate = gate or _condition_gate(entry.get("condition"), predicates)
         if entry_type in _CONTAINER_TYPES:
             children = entry.get("children")
             if not isinstance(children, list):
                 raise ObtainError(f"{source} holds a {entry_type} entry with no 'children' list.")
-            found.extend(_walk_entries(children, gate=entry_gate, source=source, skipped=skipped))
+            found.extend(
+                _walk_entries(
+                    children,
+                    gate=entry_gate,
+                    source=source,
+                    skipped=skipped,
+                    predicates=predicates,
+                )
+            )
         elif entry_type == _ITEM_TYPE:
             name = entry.get("name")
             if not isinstance(name, str) or not name:
@@ -524,7 +638,11 @@ def _walk_entries(
 
 
 def _table_leaves(
-    document: Mapping[str, Any], *, source: str, skipped: list[SkippedLootEntry]
+    document: Mapping[str, Any],
+    *,
+    source: str,
+    skipped: list[SkippedLootEntry],
+    predicates: Mapping[str, Mapping[str, Any]],
 ) -> list[LootLeaf]:
     # A loot table with no `pools` key at all is a table that drops nothing,
     # not a broken file. `loot_table/blocks/budding_amethyst.json` is the
@@ -567,13 +685,14 @@ def _table_leaves(
         # table states, so the base roll count is what an unluck-ed attempt
         # actually gets -- and that is the number this tool's reader wants.
         rolls = _numeric_average(pool.get("rolls", 1))
-        gate = _conditions_gate(pool.get("conditions"))
+        gate = _condition_gate(pool.get("condition"), predicates)
         leaves.extend(
             _walk_entries(
                 pool_entries,
                 gate=gate,
                 source=source,
                 skipped=skipped,
+                predicates=predicates,
                 pool_weight=total_weight if total_weight > 0 else None,
                 rolls=rolls,
             )
@@ -603,6 +722,9 @@ def extract_loot(files: Mapping[str, bytes]) -> LootExtractionResult:
     producers: list[Producer] = []
     skipped: list[SkippedLootEntry] = []
     tables_by_family: dict[str, int] = {}
+    # Read once for the whole pass: 137 of the block tables name a predicate of
+    # this registry rather than spelling the condition out.
+    predicates = _predicate_index(files)
 
     for key in sorted(loot_entries):
         parts = key.split("/")
@@ -624,7 +746,7 @@ def extract_loot(files: Mapping[str, bytes]) -> LootExtractionResult:
         method = TYPE_TO_METHOD[declared_type]
         tables_by_family[family] = tables_by_family.get(family, 0) + 1
 
-        leaves = _table_leaves(document, source=key, skipped=skipped)
+        leaves = _table_leaves(document, source=key, skipped=skipped, predicates=predicates)
 
         # One shape for every family. A block drop is the only method whose
         # producer names an input -- the block you break -- and every other

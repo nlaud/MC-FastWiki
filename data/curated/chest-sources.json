@@ -1,7 +1,79 @@
 {
-  "verifiedFor": "26.2",
-  "note": "Hand-maintained structure and container attribution for all 63 chest, dispenser, pot, and spawner loot tables in Java Edition 26.2. Structure names use Title Case and link to structure pages via structureRef. Container labels describe the specific chest, barrel, dispenser, pot, or spawner vault within that structure.",
+  "verifiedFor": "26.3",
+  "note": "Hand-maintained structure and container attribution for all 66 chest, barrel, dispenser, pot, and spawner loot tables in Java Edition 26.3. The Abandoned Camp arrived in 26.3 and is one structure the game registers once per biome, so its three containers each name all 18 `abandoned_camp_*` variants, the same way a Shipwreck names its two. Structure names use Title Case and link to structure pages via structureRef. Container labels describe the specific chest, barrel, dispenser, pot, or spawner vault within that structure.",
   "chests": {
+    "loot_table/barrels/abandoned_camp_barrel.json": {
+      "structure": "Abandoned Camp",
+      "container": "Barrel",
+      "structureRef": [
+        "minecraft:abandoned_camp_bamboo_jungle",
+        "minecraft:abandoned_camp_birch_forest",
+        "minecraft:abandoned_camp_cherry_grove",
+        "minecraft:abandoned_camp_dappled_forest",
+        "minecraft:abandoned_camp_flower_forest",
+        "minecraft:abandoned_camp_forest",
+        "minecraft:abandoned_camp_meadow",
+        "minecraft:abandoned_camp_old_growth_birch_forest",
+        "minecraft:abandoned_camp_old_growth_pine_taiga",
+        "minecraft:abandoned_camp_old_growth_spruce_taiga",
+        "minecraft:abandoned_camp_pale_garden",
+        "minecraft:abandoned_camp_savanna",
+        "minecraft:abandoned_camp_snowy_taiga",
+        "minecraft:abandoned_camp_sparse_jungle",
+        "minecraft:abandoned_camp_swamp",
+        "minecraft:abandoned_camp_taiga",
+        "minecraft:abandoned_camp_windswept_forest",
+        "minecraft:abandoned_camp_wooded_badlands"
+      ]
+    },
+    "loot_table/chests/abandoned_camp_common_chest.json": {
+      "structure": "Abandoned Camp",
+      "container": "Common Chest",
+      "structureRef": [
+        "minecraft:abandoned_camp_bamboo_jungle",
+        "minecraft:abandoned_camp_birch_forest",
+        "minecraft:abandoned_camp_cherry_grove",
+        "minecraft:abandoned_camp_dappled_forest",
+        "minecraft:abandoned_camp_flower_forest",
+        "minecraft:abandoned_camp_forest",
+        "minecraft:abandoned_camp_meadow",
+        "minecraft:abandoned_camp_old_growth_birch_forest",
+        "minecraft:abandoned_camp_old_growth_pine_taiga",
+        "minecraft:abandoned_camp_old_growth_spruce_taiga",
+        "minecraft:abandoned_camp_pale_garden",
+        "minecraft:abandoned_camp_savanna",
+        "minecraft:abandoned_camp_snowy_taiga",
+        "minecraft:abandoned_camp_sparse_jungle",
+        "minecraft:abandoned_camp_swamp",
+        "minecraft:abandoned_camp_taiga",
+        "minecraft:abandoned_camp_windswept_forest",
+        "minecraft:abandoned_camp_wooded_badlands"
+      ]
+    },
+    "loot_table/chests/abandoned_camp_secret_chest.json": {
+      "structure": "Abandoned Camp",
+      "container": "Secret Chest",
+      "structureRef": [
+        "minecraft:abandoned_camp_bamboo_jungle",
+        "minecraft:abandoned_camp_birch_forest",
+        "minecraft:abandoned_camp_cherry_grove",
+        "minecraft:abandoned_camp_dappled_forest",
+        "minecraft:abandoned_camp_flower_forest",
+        "minecraft:abandoned_camp_forest",
+        "minecraft:abandoned_camp_meadow",
+        "minecraft:abandoned_camp_old_growth_birch_forest",
+        "minecraft:abandoned_camp_old_growth_pine_taiga",
+        "minecraft:abandoned_camp_old_growth_spruce_taiga",
+        "minecraft:abandoned_camp_pale_garden",
+        "minecraft:abandoned_camp_savanna",
+        "minecraft:abandoned_camp_snowy_taiga",
+        "minecraft:abandoned_camp_sparse_jungle",
+        "minecraft:abandoned_camp_swamp",
+        "minecraft:abandoned_camp_taiga",
+        "minecraft:abandoned_camp_windswept_forest",
+        "minecraft:abandoned_camp_wooded_badlands"
+      ]
+    },
     "loot_table/chests/abandoned_mineshaft.json": {
       "structure": "Mineshaft",
       "container": "Chest",

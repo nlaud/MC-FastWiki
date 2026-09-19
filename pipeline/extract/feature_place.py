@@ -2,7 +2,7 @@
 
 A dungeon is the case this module exists for. Every player calls it a structure and
 `data/curated/chest-sources.json` files its chest under one, but `worldgen/structure`
-does not list it: the game holds it as `worldgen/configured_feature/monster_room.json`
+does not list it: the game holds it as `worldgen/feature/monster_room.json`
 and runs it through two placed features. Before this module it was the only lootable
 place in the game with no page, and the chest that names it had nothing to link to.
 
@@ -19,7 +19,7 @@ hand would be the guess Decision 3 forbids.
 
 `pipeline.extract.generation` answers "where does this *block* generate" and keys its
 result by block id, reading the five configured feature types that name a block state
-outright. A dungeon names none: `monster_room` carries `config: {}` because the game
+outright. A dungeon names none: `monster_room` carries nothing but its `type`, because the game
 builds the room in Java code rather than describing it in data. So the feature is
 invisible to that module by construction, and it is reported in the skipped list of
 `generation-report.json` along with every other type that places no single block.
@@ -69,7 +69,11 @@ __all__ = [
     "load_feature_places",
 ]
 
-CONFIGURED_FEATURE_DIRECTORY = "worldgen/configured_feature/"
+# `worldgen/configured_feature` up to Minecraft 26.2. 26.3 dropped the
+# `configured_` prefix from the game's registry names and mcmeta's directory
+# moved with it. `pipeline.extract.generation.FEATURE_DIRECTORY` is the same
+# string; the two modules read the same group for different questions.
+CONFIGURED_FEATURE_DIRECTORY = "worldgen/feature/"
 PLACED_FEATURE_DIRECTORY = "worldgen/placed_feature/"
 BIOME_DIRECTORY = "worldgen/biome/"
 
@@ -143,10 +147,14 @@ def extract_feature_places(
     configured feature, a placed feature, or a dimension the pack does not hold,
     because a curated row that has silently stopped matching upstream is a data gap
     rather than a page to render empty.
-    """
-    if not any(path.startswith("worldgen/") for path in files):
-        return FeaturePlaceIndex()
 
+    There is no "the pack carries no worldgen, so skip quietly" path. An earlier
+    cut had one, and it was the same shape of leniency that let Minecraft 26.3's
+    registry rename travel as data: a pack with no worldgen in it is a broken
+    read, and `read_data_archive` now refuses one group at a time before this
+    module is ever reached. So a curated id that matches nothing here means what
+    it says -- the curated row, not the pack, is what went stale.
+    """
     configured = _read_group(files, CONFIGURED_FEATURE_DIRECTORY)
     placed = _read_group(files, PLACED_FEATURE_DIRECTORY)
 

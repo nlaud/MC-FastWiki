@@ -7,6 +7,13 @@
           "method": "chest_loot",
           "station": null,
           "note": null,
+          "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+          "inputs": []
+        },
+        {
+          "method": "chest_loot",
+          "station": null,
+          "note": null,
           "source_id": "loot_table/chests/abandoned_mineshaft.json",
           "inputs": []
         },
@@ -2485,7 +2492,7 @@
                           "item": "minecraft:chainmail_boots",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.21.inputs.0.producers.6.inputs.0"
+                          "back_reference": "root.producers.22.inputs.0.producers.6.inputs.0"
                         }
                       }
                     ]
@@ -2668,7 +2675,7 @@
                 "item": "minecraft:deepslate_iron_ore",
                 "producers": [],
                 "expandable": false,
-                "back_reference": "root.producers.26.inputs.0"
+                "back_reference": "root.producers.27.inputs.0"
               }
             }
           ]
@@ -2689,7 +2696,7 @@
                 "item": "minecraft:iron_ore",
                 "producers": [],
                 "expandable": false,
-                "back_reference": "root.producers.27.inputs.0"
+                "back_reference": "root.producers.28.inputs.0"
               }
             }
           ]
@@ -2710,7 +2717,7 @@
                 "item": "minecraft:raw_iron",
                 "producers": [],
                 "expandable": false,
-                "back_reference": "root.producers.28.inputs.0"
+                "back_reference": "root.producers.29.inputs.0"
               }
             }
           ]
@@ -3427,6 +3434,13 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/chests/abandoned_mineshaft.json",
                     "inputs": []
                   },
@@ -3749,7 +3763,7 @@
                                     "item": "minecraft:chainmail_boots",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.39.inputs.0.producers.21.inputs.0.producers.6.inputs.0"
+                                    "back_reference": "root.producers.39.inputs.0.producers.22.inputs.0.producers.6.inputs.0"
                                   }
                                 }
                               ]
@@ -3932,7 +3946,7 @@
                           "item": "minecraft:deepslate_iron_ore",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.39.inputs.0.producers.26.inputs.0"
+                          "back_reference": "root.producers.39.inputs.0.producers.27.inputs.0"
                         }
                       }
                     ]
@@ -3953,7 +3967,7 @@
                           "item": "minecraft:iron_ore",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.39.inputs.0.producers.27.inputs.0"
+                          "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0"
                         }
                       }
                     ]
@@ -3974,7 +3988,7 @@
                           "item": "minecraft:raw_iron",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0"
+                          "back_reference": "root.producers.39.inputs.0.producers.29.inputs.0"
                         }
                       }
                     ]
@@ -4020,6 +4034,13 @@
                               "method": "chest_loot",
                               "station": null,
                               "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
                               "source_id": "loot_table/chests/simple_dungeon.json",
                               "inputs": []
                             },
@@ -4059,6 +4080,13 @@
                                   "node": {
                                     "item": "minecraft:iron_ingot",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "chest_loot",
                                         "station": null,
@@ -4484,6 +4512,13 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/chests/abandoned_mineshaft.json",
                     "inputs": []
                   },
@@ -4802,6 +4837,13 @@
                     "station": null,
                     "note": null,
                     "source_id": "loot_table/archaeology/trail_ruins_common.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
                     "inputs": []
                   },
                   {
@@ -5280,27 +5322,6 @@
                     ]
                   },
                   {
-                    "method": "block_drop",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/blocks/sweet_berry_bush.json",
-                    "inputs": [
-                      {
-                        "label": "minecraft:sweet_berry_bush",
-                        "item": "minecraft:sweet_berry_bush",
-                        "tag": null,
-                        "count": 1,
-                        "members": [],
-                        "node": {
-                          "item": "minecraft:sweet_berry_bush",
-                          "producers": [],
-                          "expandable": false,
-                          "back_reference": "root.producers.47.inputs.0.producers.0.inputs.0"
-                        }
-                      }
-                    ]
-                  },
-                  {
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
@@ -5525,6 +5546,13 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/chests/ancient_city.json",
                     "inputs": []
                   },
@@ -5571,6 +5599,13 @@
                         "node": {
                           "item": "minecraft:iron_ingot",
                           "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                              "inputs": []
+                            },
                             {
                               "method": "chest_loot",
                               "station": null,
@@ -5945,7 +5980,7 @@
                                     "item": "minecraft:deepslate_iron_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0.producers.0.inputs.0"
+                                    "back_reference": "root.producers.39.inputs.0.producers.29.inputs.0.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -5966,7 +6001,7 @@
                                     "item": "minecraft:iron_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0.producers.1.inputs.0"
+                                    "back_reference": "root.producers.39.inputs.0.producers.29.inputs.0.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -6072,7 +6107,7 @@
                                     "item": "minecraft:deepslate_iron_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0.producers.0.inputs.0"
+                                    "back_reference": "root.producers.39.inputs.0.producers.29.inputs.0.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -6093,7 +6128,7 @@
                                     "item": "minecraft:iron_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.39.inputs.0.producers.28.inputs.0.producers.1.inputs.0"
+                                    "back_reference": "root.producers.39.inputs.0.producers.29.inputs.0.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -6114,7 +6149,7 @@
                                     "item": "minecraft:raw_iron",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.52.inputs.0.producers.5.inputs.0.producers.28.inputs.0"
+                                    "back_reference": "root.producers.52.inputs.0.producers.6.inputs.0.producers.29.inputs.0"
                                   }
                                 }
                               ]
@@ -6289,7 +6324,7 @@
                                     "item": "minecraft:deepslate_redstone_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.52.inputs.0.producers.5.inputs.1.producers.0.inputs.0"
+                                    "back_reference": "root.producers.52.inputs.0.producers.6.inputs.1.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -6310,7 +6345,7 @@
                                     "item": "minecraft:redstone_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.52.inputs.0.producers.5.inputs.1.producers.1.inputs.0"
+                                    "back_reference": "root.producers.52.inputs.0.producers.6.inputs.1.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -6331,7 +6366,7 @@
                                     "item": "minecraft:deepslate_redstone_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.52.inputs.0.producers.5.inputs.1.producers.0.inputs.0"
+                                    "back_reference": "root.producers.52.inputs.0.producers.6.inputs.1.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -6352,7 +6387,7 @@
                                     "item": "minecraft:redstone_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.52.inputs.0.producers.5.inputs.1.producers.1.inputs.0"
+                                    "back_reference": "root.producers.52.inputs.0.producers.6.inputs.1.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -6464,6 +6499,13 @@
               "node": {
                 "item": "minecraft:gold_ingot",
                 "producers": [
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                    "inputs": []
+                  },
                   {
                     "method": "chest_loot",
                     "station": null,
@@ -6961,7 +7003,7 @@
                                     "item": "minecraft:golden_axe",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.54.inputs.0.producers.19.inputs.0.producers.15.inputs.0"
+                                    "back_reference": "root.producers.54.inputs.0.producers.20.inputs.0.producers.15.inputs.0"
                                   }
                                 }
                               ]
@@ -7144,7 +7186,7 @@
                           "item": "minecraft:deepslate_gold_ore",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.54.inputs.0.producers.21.inputs.0"
+                          "back_reference": "root.producers.54.inputs.0.producers.22.inputs.0"
                         }
                       }
                     ]
@@ -7165,7 +7207,7 @@
                           "item": "minecraft:gold_ore",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.54.inputs.0.producers.22.inputs.0"
+                          "back_reference": "root.producers.54.inputs.0.producers.23.inputs.0"
                         }
                       }
                     ]
@@ -7186,7 +7228,7 @@
                           "item": "minecraft:nether_gold_ore",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.54.inputs.0.producers.23.inputs.0"
+                          "back_reference": "root.producers.54.inputs.0.producers.24.inputs.0"
                         }
                       }
                     ]
@@ -7207,7 +7249,7 @@
                           "item": "minecraft:raw_gold",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.54.inputs.0.producers.24.inputs.0"
+                          "back_reference": "root.producers.54.inputs.0.producers.25.inputs.0"
                         }
                       }
                     ]
@@ -7263,6 +7305,20 @@
               "node": {
                 "item": "minecraft:glass_bottle",
                 "producers": [
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                    "inputs": []
+                  },
                   {
                     "method": "crafting",
                     "station": null,
@@ -7644,6 +7700,13 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/chests/igloo_chest.json",
                     "inputs": []
                   },
@@ -7775,27 +7838,6 @@
                     ]
                   },
                   {
-                    "method": "block_drop",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/blocks/potatoes.json",
-                    "inputs": [
-                      {
-                        "label": "minecraft:potatoes",
-                        "item": "minecraft:potatoes",
-                        "tag": null,
-                        "count": 1,
-                        "members": [],
-                        "node": {
-                          "item": "minecraft:potatoes",
-                          "producers": [],
-                          "expandable": false,
-                          "back_reference": "root.producers.63.inputs.0.producers.0.inputs.0"
-                        }
-                      }
-                    ]
-                  },
-                  {
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
@@ -7890,27 +7932,6 @@
                           "producers": [],
                           "expandable": false,
                           "back_reference": null
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "method": "block_drop",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/blocks/carrots.json",
-                    "inputs": [
-                      {
-                        "label": "minecraft:carrots",
-                        "item": "minecraft:carrots",
-                        "tag": null,
-                        "count": 1,
-                        "members": [],
-                        "node": {
-                          "item": "minecraft:carrots",
-                          "producers": [],
-                          "expandable": false,
-                          "back_reference": "root.producers.64.inputs.0.producers.0.inputs.0"
                         }
                       }
                     ]
@@ -8313,7 +8334,22 @@
                         "members": [],
                         "node": {
                           "item": "minecraft:cobweb",
-                          "producers": [],
+                          "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            }
+                          ],
                           "expandable": false,
                           "back_reference": null
                         }
@@ -8346,6 +8382,13 @@
                     "station": null,
                     "note": null,
                     "source_id": "loot_table/archaeology/trail_ruins_common.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
                     "inputs": []
                   },
                   {
@@ -8690,6 +8733,7 @@
                           "minecraft:mangrove_planks",
                           "minecraft:oak_planks",
                           "minecraft:pale_oak_planks",
+                          "minecraft:poplar_planks",
                           "minecraft:spruce_planks",
                           "minecraft:warped_planks"
                         ],
@@ -8705,7 +8749,7 @@
                           "item": "minecraft:iron_ingot",
                           "producers": [],
                           "expandable": false,
-                          "back_reference": "root.producers.52.inputs.0.producers.5.inputs.0"
+                          "back_reference": "root.producers.52.inputs.0.producers.6.inputs.0"
                         }
                       },
                       {
@@ -8967,6 +9011,27 @@
                               "method": "block_drop",
                               "station": null,
                               "note": null,
+                              "source_id": "loot_table/blocks/orange_poplar_leaves.json",
+                              "inputs": [
+                                {
+                                  "label": "minecraft:orange_poplar_leaves",
+                                  "item": "minecraft:orange_poplar_leaves",
+                                  "tag": null,
+                                  "count": 1,
+                                  "members": [],
+                                  "node": {
+                                    "item": "minecraft:orange_poplar_leaves",
+                                    "producers": [],
+                                    "expandable": false,
+                                    "back_reference": null
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "method": "block_drop",
+                              "station": null,
+                              "note": null,
                               "source_id": "loot_table/blocks/pale_oak_leaves.json",
                               "inputs": [
                                 {
@@ -8988,6 +9053,27 @@
                               "method": "block_drop",
                               "station": null,
                               "note": null,
+                              "source_id": "loot_table/blocks/red_poplar_leaves.json",
+                              "inputs": [
+                                {
+                                  "label": "minecraft:red_poplar_leaves",
+                                  "item": "minecraft:red_poplar_leaves",
+                                  "tag": null,
+                                  "count": 1,
+                                  "members": [],
+                                  "node": {
+                                    "item": "minecraft:red_poplar_leaves",
+                                    "producers": [],
+                                    "expandable": false,
+                                    "back_reference": null
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "method": "block_drop",
+                              "station": null,
+                              "note": null,
                               "source_id": "loot_table/blocks/spruce_leaves.json",
                               "inputs": [
                                 {
@@ -8998,6 +9084,27 @@
                                   "members": [],
                                   "node": {
                                     "item": "minecraft:spruce_leaves",
+                                    "producers": [],
+                                    "expandable": false,
+                                    "back_reference": null
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "method": "block_drop",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/blocks/yellow_poplar_leaves.json",
+                              "inputs": [
+                                {
+                                  "label": "minecraft:yellow_poplar_leaves",
+                                  "item": "minecraft:yellow_poplar_leaves",
+                                  "tag": null,
+                                  "count": 1,
+                                  "members": [],
+                                  "node": {
+                                    "item": "minecraft:yellow_poplar_leaves",
                                     "producers": [],
                                     "expandable": false,
                                     "back_reference": null
@@ -9069,6 +9176,7 @@
                                     "minecraft:mangrove_planks",
                                     "minecraft:oak_planks",
                                     "minecraft:pale_oak_planks",
+                                    "minecraft:poplar_planks",
                                     "minecraft:spruce_planks",
                                     "minecraft:warped_planks"
                                   ],
@@ -9468,6 +9576,27 @@
                     "method": "block_drop",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/blocks/orange_poplar_leaves.json",
+                    "inputs": [
+                      {
+                        "label": "minecraft:orange_poplar_leaves",
+                        "item": "minecraft:orange_poplar_leaves",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:orange_poplar_leaves",
+                          "producers": [],
+                          "expandable": false,
+                          "back_reference": null
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "method": "block_drop",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/blocks/pale_oak_leaves.json",
                     "inputs": [
                       {
@@ -9489,6 +9618,27 @@
                     "method": "block_drop",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/blocks/red_poplar_leaves.json",
+                    "inputs": [
+                      {
+                        "label": "minecraft:red_poplar_leaves",
+                        "item": "minecraft:red_poplar_leaves",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:red_poplar_leaves",
+                          "producers": [],
+                          "expandable": false,
+                          "back_reference": null
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "method": "block_drop",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/blocks/spruce_leaves.json",
                     "inputs": [
                       {
@@ -9499,6 +9649,27 @@
                         "members": [],
                         "node": {
                           "item": "minecraft:spruce_leaves",
+                          "producers": [],
+                          "expandable": false,
+                          "back_reference": null
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "method": "block_drop",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/blocks/yellow_poplar_leaves.json",
+                    "inputs": [
+                      {
+                        "label": "minecraft:yellow_poplar_leaves",
+                        "item": "minecraft:yellow_poplar_leaves",
+                        "tag": null,
+                        "count": 1,
+                        "members": [],
+                        "node": {
+                          "item": "minecraft:yellow_poplar_leaves",
                           "producers": [],
                           "expandable": false,
                           "back_reference": null
@@ -9570,6 +9741,7 @@
                           "minecraft:mangrove_planks",
                           "minecraft:oak_planks",
                           "minecraft:pale_oak_planks",
+                          "minecraft:poplar_planks",
                           "minecraft:spruce_planks",
                           "minecraft:warped_planks"
                         ],
@@ -9748,6 +9920,20 @@
                 "item": "minecraft:rabbit_hide",
                 "producers": [
                   {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                    "inputs": []
+                  },
+                  {
                     "method": "gift",
                     "station": null,
                     "note": null,
@@ -9788,6 +9974,20 @@
                     "station": null,
                     "note": null,
                     "source_id": "loot_table/gameplay/piglin_bartering.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
                     "inputs": []
                   },
                   {
@@ -9861,6 +10061,20 @@
                         "node": {
                           "item": "minecraft:rabbit_hide",
                           "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            },
                             {
                               "method": "gift",
                               "station": null,
@@ -10018,6 +10232,7 @@
                                     "minecraft:mangrove_planks",
                                     "minecraft:oak_planks",
                                     "minecraft:pale_oak_planks",
+                                    "minecraft:poplar_planks",
                                     "minecraft:spruce_planks",
                                     "minecraft:warped_planks"
                                   ],
@@ -10143,27 +10358,6 @@
                     "station": null,
                     "note": null,
                     "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/chests/trial_chambers/reward_rare.json",
                     "inputs": []
                   },
                   {
@@ -10297,6 +10491,20 @@
                               "method": "chest_loot",
                               "station": null,
                               "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
                               "source_id": "loot_table/chests/ancient_city.json",
                               "inputs": []
                             },
@@ -10364,6 +10572,20 @@
                                   "node": {
                                     "item": "minecraft:rabbit_hide",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "gift",
                                         "station": null,
@@ -10557,6 +10779,7 @@
                                               "minecraft:mangrove_planks",
                                               "minecraft:oak_planks",
                                               "minecraft:pale_oak_planks",
+                                              "minecraft:poplar_planks",
                                               "minecraft:spruce_planks",
                                               "minecraft:warped_planks"
                                             ],
@@ -10688,27 +10911,6 @@
                               "method": "chest_loot",
                               "station": null,
                               "note": null,
-                              "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                              "inputs": []
-                            },
-                            {
-                              "method": "chest_loot",
-                              "station": null,
-                              "note": null,
-                              "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                              "inputs": []
-                            },
-                            {
-                              "method": "chest_loot",
-                              "station": null,
-                              "note": null,
-                              "source_id": "loot_table/chests/trial_chambers/reward_rare.json",
-                              "inputs": []
-                            },
-                            {
-                              "method": "chest_loot",
-                              "station": null,
-                              "note": null,
                               "source_id": "loot_table/chests/trial_chambers/reward_rare.json",
                               "inputs": []
                             },
@@ -10830,6 +11032,20 @@
                                         "station": null,
                                         "note": null,
                                         "source_id": "loot_table/gameplay/piglin_bartering.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
                                         "inputs": []
                                       },
                                       {
@@ -11929,6 +12145,7 @@
                                               "minecraft:mangrove_slab",
                                               "minecraft:oak_slab",
                                               "minecraft:pale_oak_slab",
+                                              "minecraft:poplar_slab",
                                               "minecraft:spruce_slab",
                                               "minecraft:warped_slab"
                                             ],
@@ -11965,6 +12182,20 @@
                                   "node": {
                                     "item": "minecraft:bone",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "chest_loot",
                                         "station": null,
@@ -15974,7 +16205,22 @@
                                   "members": [],
                                   "node": {
                                     "item": "minecraft:cobweb",
-                                    "producers": [],
+                                    "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      }
+                                    ],
                                     "expandable": false,
                                     "back_reference": null
                                   }
@@ -16007,6 +16253,13 @@
                               "station": null,
                               "note": null,
                               "source_id": "loot_table/archaeology/trail_ruins_common.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
                               "inputs": []
                             },
                             {
@@ -16298,6 +16551,13 @@
                                         "station": null,
                                         "note": null,
                                         "source_id": "loot_table/archaeology/trail_ruins_common.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
                                         "inputs": []
                                       },
                                       {
@@ -16733,6 +16993,13 @@
                               "method": "chest_loot",
                               "station": null,
                               "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
                               "source_id": "loot_table/chests/igloo_chest.json",
                               "inputs": []
                             },
@@ -16846,6 +17113,13 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
                     "source_id": "loot_table/chests/ancient_city.json",
                     "inputs": []
                   },
@@ -16867,28 +17141,7 @@
                     "method": "chest_loot",
                     "station": null,
                     "note": null,
-                    "source_id": "loot_table/chests/trial_chambers/supply.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
                     "source_id": "loot_table/spawners/ominous/trial_chamber/consumables.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/spawners/ominous/trial_chamber/consumables.json",
-                    "inputs": []
-                  },
-                  {
-                    "method": "chest_loot",
-                    "station": null,
-                    "note": null,
-                    "source_id": "loot_table/spawners/trial_chamber/consumables.json",
                     "inputs": []
                   },
                   {
@@ -17015,27 +17268,6 @@
                                     "producers": [],
                                     "expandable": false,
                                     "back_reference": null
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "method": "block_drop",
-                              "station": null,
-                              "note": null,
-                              "source_id": "loot_table/blocks/potatoes.json",
-                              "inputs": [
-                                {
-                                  "label": "minecraft:potatoes",
-                                  "item": "minecraft:potatoes",
-                                  "tag": null,
-                                  "count": 1,
-                                  "members": [],
-                                  "node": {
-                                    "item": "minecraft:potatoes",
-                                    "producers": [],
-                                    "expandable": false,
-                                    "back_reference": "root.producers.118.inputs.0.producers.8.inputs.0.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -17487,7 +17719,7 @@
                                     "item": "minecraft:sugar_cane",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.82.inputs.0.producers.25.inputs.0.producers.4.inputs.0"
+                                    "back_reference": "root.producers.82.inputs.0.producers.22.inputs.0.producers.4.inputs.0"
                                   }
                                 }
                               ]
@@ -17635,6 +17867,7 @@
                 "minecraft:mangrove_planks",
                 "minecraft:oak_planks",
                 "minecraft:pale_oak_planks",
+                "minecraft:poplar_planks",
                 "minecraft:spruce_planks",
                 "minecraft:warped_planks"
               ],
@@ -17656,6 +17889,7 @@
                 "minecraft:mangrove_slab",
                 "minecraft:oak_slab",
                 "minecraft:pale_oak_slab",
+                "minecraft:poplar_slab",
                 "minecraft:spruce_slab",
                 "minecraft:warped_slab"
               ],
@@ -17699,6 +17933,13 @@
                     "station": null,
                     "note": null,
                     "source_id": "loot_table/archaeology/desert_pyramid.json",
+                    "inputs": []
+                  },
+                  {
+                    "method": "chest_loot",
+                    "station": null,
+                    "note": null,
+                    "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
                     "inputs": []
                   },
                   {
@@ -18090,7 +18331,7 @@
                                     "item": "minecraft:deepslate_emerald_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.0.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -18111,7 +18352,7 @@
                                     "item": "minecraft:emerald_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.1.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -18132,7 +18373,7 @@
                                     "item": "minecraft:deepslate_emerald_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.0.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.0.inputs.0"
                                   }
                                 }
                               ]
@@ -18153,7 +18394,7 @@
                                     "item": "minecraft:emerald_ore",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.1.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.1.inputs.0"
                                   }
                                 }
                               ]
@@ -18173,6 +18414,13 @@
                                   "node": {
                                     "item": "minecraft:iron_ingot",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "chest_loot",
                                         "station": null,
@@ -18627,6 +18875,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/abandoned_mineshaft.json",
                                         "inputs": []
                                       },
@@ -18929,6 +19184,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/abandoned_mineshaft.json",
                                         "inputs": []
                                       },
@@ -19151,7 +19413,7 @@
                                     "item": "minecraft:coal",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.42.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.42.inputs.0"
                                   }
                                 }
                               ]
@@ -19293,27 +19555,6 @@
                                   "node": {
                                     "item": "minecraft:sweet_berries",
                                     "producers": [
-                                      {
-                                        "method": "block_drop",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/blocks/sweet_berry_bush.json",
-                                        "inputs": [
-                                          {
-                                            "label": "minecraft:sweet_berry_bush",
-                                            "item": "minecraft:sweet_berry_bush",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": {
-                                              "item": "minecraft:sweet_berry_bush",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          }
-                                        ]
-                                      },
                                       {
                                         "method": "block_drop",
                                         "station": null,
@@ -19540,6 +19781,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/ancient_city.json",
                                         "inputs": []
                                       },
@@ -19705,6 +19953,13 @@
                                   "node": {
                                     "item": "minecraft:gold_ingot",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "chest_loot",
                                         "station": null,
@@ -20100,6 +20355,20 @@
                                     "item": "minecraft:glass_bottle",
                                     "producers": [
                                       {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      },
+                                      {
                                         "method": "crafting",
                                         "station": null,
                                         "note": null,
@@ -20480,6 +20749,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/igloo_chest.json",
                                         "inputs": []
                                       },
@@ -20611,27 +20887,6 @@
                                         ]
                                       },
                                       {
-                                        "method": "block_drop",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/blocks/potatoes.json",
-                                        "inputs": [
-                                          {
-                                            "label": "minecraft:potatoes",
-                                            "item": "minecraft:potatoes",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": {
-                                              "item": "minecraft:potatoes",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          }
-                                        ]
-                                      },
-                                      {
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
@@ -20709,27 +20964,6 @@
                                   "node": {
                                     "item": "minecraft:carrot",
                                     "producers": [
-                                      {
-                                        "method": "block_drop",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/blocks/carrots.json",
-                                        "inputs": [
-                                          {
-                                            "label": "minecraft:carrots",
-                                            "item": "minecraft:carrots",
-                                            "tag": null,
-                                            "count": 1,
-                                            "members": [],
-                                            "node": {
-                                              "item": "minecraft:carrots",
-                                              "producers": [],
-                                              "expandable": true,
-                                              "back_reference": null
-                                            }
-                                          }
-                                        ]
-                                      },
                                       {
                                         "method": "block_drop",
                                         "station": null,
@@ -21188,6 +21422,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/bastion_bridge.json",
                                         "inputs": []
                                       },
@@ -21298,7 +21539,7 @@
                                     "item": "minecraft:coal",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.42.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.42.inputs.0"
                                   }
                                 }
                               ]
@@ -21469,7 +21710,7 @@
                                     "item": "minecraft:string",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.71.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.71.inputs.0"
                                   }
                                 }
                               ]
@@ -21518,6 +21759,7 @@
                                               "minecraft:mangrove_planks",
                                               "minecraft:oak_planks",
                                               "minecraft:pale_oak_planks",
+                                              "minecraft:poplar_planks",
                                               "minecraft:spruce_planks",
                                               "minecraft:warped_planks"
                                             ],
@@ -21794,6 +22036,27 @@
                                         "method": "block_drop",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/blocks/orange_poplar_leaves.json",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:orange_poplar_leaves",
+                                            "item": "minecraft:orange_poplar_leaves",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:orange_poplar_leaves",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "block_drop",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/blocks/pale_oak_leaves.json",
                                         "inputs": [
                                           {
@@ -21815,6 +22078,27 @@
                                         "method": "block_drop",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/blocks/red_poplar_leaves.json",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:red_poplar_leaves",
+                                            "item": "minecraft:red_poplar_leaves",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:red_poplar_leaves",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "block_drop",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/blocks/spruce_leaves.json",
                                         "inputs": [
                                           {
@@ -21825,6 +22109,27 @@
                                             "members": [],
                                             "node": {
                                               "item": "minecraft:spruce_leaves",
+                                              "producers": [],
+                                              "expandable": true,
+                                              "back_reference": null
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "method": "block_drop",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/blocks/yellow_poplar_leaves.json",
+                                        "inputs": [
+                                          {
+                                            "label": "minecraft:yellow_poplar_leaves",
+                                            "item": "minecraft:yellow_poplar_leaves",
+                                            "tag": null,
+                                            "count": 1,
+                                            "members": [],
+                                            "node": {
+                                              "item": "minecraft:yellow_poplar_leaves",
                                               "producers": [],
                                               "expandable": true,
                                               "back_reference": null
@@ -21896,6 +22201,7 @@
                                               "minecraft:mangrove_planks",
                                               "minecraft:oak_planks",
                                               "minecraft:pale_oak_planks",
+                                              "minecraft:poplar_planks",
                                               "minecraft:spruce_planks",
                                               "minecraft:warped_planks"
                                             ],
@@ -21961,7 +22267,7 @@
                                     "item": "minecraft:flint",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.73.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.73.inputs.0"
                                   }
                                 }
                               ]
@@ -21982,7 +22288,7 @@
                                     "item": "minecraft:turtle_scute",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.55.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.55.inputs.0"
                                   }
                                 }
                               ]
@@ -22002,6 +22308,20 @@
                                   "node": {
                                     "item": "minecraft:rabbit_hide",
                                     "producers": [
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                                        "inputs": []
+                                      },
                                       {
                                         "method": "gift",
                                         "station": null,
@@ -22043,6 +22363,20 @@
                                         "station": null,
                                         "note": null,
                                         "source_id": "loot_table/gameplay/piglin_bartering.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
                                         "inputs": []
                                       },
                                       {
@@ -22351,27 +22685,6 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
-                                        "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/chests/trial_chambers/reward_ominous_rare.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/chests/trial_chambers/reward_rare.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
                                         "source_id": "loot_table/chests/trial_chambers/reward_rare.json",
                                         "inputs": []
                                       },
@@ -22535,7 +22848,7 @@
                                     "item": "minecraft:writable_book",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.83.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.83.inputs.0"
                                   }
                                 }
                               ]
@@ -22592,7 +22905,7 @@
                                     "item": "minecraft:paper",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.53.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.53.inputs.0"
                                   }
                                 }
                               ]
@@ -24810,7 +25123,7 @@
                                     "item": "minecraft:iron_ingot",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.39.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.39.inputs.0"
                                   }
                                 }
                               ]
@@ -24831,7 +25144,7 @@
                                     "item": "minecraft:diamond",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.41.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.41.inputs.0"
                                   }
                                 }
                               ]
@@ -24852,7 +25165,7 @@
                                     "item": "minecraft:flint",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.73.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.73.inputs.0"
                                   }
                                 }
                               ]
@@ -24873,7 +25186,7 @@
                                     "item": "minecraft:coal",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.42.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.42.inputs.0"
                                   }
                                 }
                               ]
@@ -24954,6 +25267,13 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
+                                        "source_id": "loot_table/chests/abandoned_camp_secret_chest.json",
+                                        "inputs": []
+                                      },
+                                      {
+                                        "method": "chest_loot",
+                                        "station": null,
+                                        "note": null,
                                         "source_id": "loot_table/chests/ancient_city.json",
                                         "inputs": []
                                       },
@@ -24975,28 +25295,7 @@
                                         "method": "chest_loot",
                                         "station": null,
                                         "note": null,
-                                        "source_id": "loot_table/chests/trial_chambers/supply.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
                                         "source_id": "loot_table/spawners/ominous/trial_chamber/consumables.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/spawners/ominous/trial_chamber/consumables.json",
-                                        "inputs": []
-                                      },
-                                      {
-                                        "method": "chest_loot",
-                                        "station": null,
-                                        "note": null,
-                                        "source_id": "loot_table/spawners/trial_chamber/consumables.json",
                                         "inputs": []
                                       },
                                       {
@@ -25360,7 +25659,7 @@
                                     "item": "minecraft:iron_ingot",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.39.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.39.inputs.0"
                                   }
                                 }
                               ]
@@ -25381,7 +25680,7 @@
                                     "item": "minecraft:diamond",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.41.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.41.inputs.0"
                                   }
                                 }
                               ]
@@ -25402,7 +25701,7 @@
                                     "item": "minecraft:flint",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.73.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.73.inputs.0"
                                   }
                                 }
                               ]
@@ -25423,7 +25722,7 @@
                                     "item": "minecraft:coal",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.42.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.42.inputs.0"
                                   }
                                 }
                               ]
@@ -25501,7 +25800,7 @@
                                     "item": "minecraft:glass_bottle",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.56.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.56.inputs.0"
                                   }
                                 }
                               ]
@@ -25734,7 +26033,7 @@
                                     "item": "minecraft:nether_wart",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.58.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.58.inputs.0"
                                   }
                                 },
                                 {
@@ -30101,7 +30400,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -30205,7 +30504,7 @@
                                     "item": "minecraft:rabbit_foot",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.57.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.57.inputs.0"
                                   }
                                 },
                                 {
@@ -30886,7 +31185,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -30920,7 +31219,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -31358,7 +31657,7 @@
                                     "item": "minecraft:pufferfish",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.69.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.69.inputs.0"
                                   }
                                 },
                                 {
@@ -31462,7 +31761,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -32099,7 +32398,22 @@
                         "members": [],
                         "node": {
                           "item": "minecraft:cobweb",
-                          "producers": [],
+                          "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            }
+                          ],
                           "expandable": false,
                           "back_reference": null
                         }
@@ -32296,7 +32610,7 @@
                                     "item": "minecraft:carrot",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.64.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.64.inputs.0"
                                   }
                                 }
                               ]
@@ -33200,7 +33514,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -33234,7 +33548,7 @@
                                     "item": "minecraft:fermented_spider_eye",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.121.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.121.inputs.0"
                                   }
                                 },
                                 {
@@ -34153,7 +34467,7 @@
                                     "item": "minecraft:turtle_scute",
                                     "producers": [],
                                     "expandable": false,
-                                    "back_reference": "root.producers.1.inputs.0.producers.8.inputs.0.producers.55.inputs.0"
+                                    "back_reference": "root.producers.1.inputs.0.producers.9.inputs.0.producers.55.inputs.0"
                                   }
                                 }
                               ]
@@ -34228,6 +34542,20 @@
                         "node": {
                           "item": "minecraft:glass_bottle",
                           "producers": [
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/barrels/abandoned_camp_barrel.json",
+                              "inputs": []
+                            },
+                            {
+                              "method": "chest_loot",
+                              "station": null,
+                              "note": null,
+                              "source_id": "loot_table/chests/abandoned_camp_common_chest.json",
+                              "inputs": []
+                            },
                             {
                               "method": "crafting",
                               "station": null,
@@ -34615,20 +34943,6 @@
               }
             }
           ]
-        },
-        {
-          "method": "chest_loot",
-          "station": null,
-          "note": null,
-          "source_id": "loot_table/dispensers/trial_chambers/chamber.json",
-          "inputs": []
-        },
-        {
-          "method": "chest_loot",
-          "station": null,
-          "note": null,
-          "source_id": "loot_table/dispensers/trial_chambers/chamber.json",
-          "inputs": []
         },
         {
           "method": "chest_loot",

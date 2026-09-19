@@ -5,7 +5,7 @@ the Y height band, the peak density depth for trapezoid distributions, the place
 attempts per chunk, the vein size, and the biomes that run the feature.
 
 Upstream Minecraft Java data packs express generation across three layers:
-1. `worldgen/configured_feature`: what gets placed (the block state and vein configuration).
+1. `worldgen/feature`: what gets placed (the block state and vein configuration).
 2. `worldgen/placed_feature`: where and how often (height range/map, count, rarity filters).
 3. `worldgen/biome`: which placed features run in that biome across 11 generation steps.
 
@@ -112,6 +112,12 @@ class Dimension(StrEnum):
 # These are not in the data branch -- mcmeta publishes no `dimension_type` group -- so
 # they are stated here, and `test_extract_generation` pins them against the anchors of
 # real features that reach the floor and the ceiling of each world.
+
+# The worldgen group that states what a feature places. `worldgen/configured_feature`
+# up to 26.2; the game dropped the `configured_` prefix from the registry name in
+# 26.3 and mcmeta's directory moved with it.
+FEATURE_DIRECTORY = "worldgen/feature/"
+
 DIMENSION_BOUNDS: Mapping[Dimension, tuple[int, int]] = {
     Dimension.OVERWORLD: (-64, 320),
     Dimension.NETHER: (0, 128),
@@ -216,35 +222,73 @@ def resolve_anchor(anchor: Any, *, floor: int, top: int) -> int:
     raise ExtractError(f"unrecognized anchor format: {anchor!r}")
 
 
+def _block_of_state(state: Any) -> str | None:
+    """Return the block id of one block state, or `None` when it names no single block.
+
+    26.3 rewrote how a data pack spells a block state. `{"Name": "minecraft:clay"}`
+    became either the bare id `"minecraft:clay"` or, when the state pins block
+    properties, `{"id": "minecraft:clay", "properties": {"age": "3"}}`. The
+    properties are not read here: this module answers which block generates, and
+    a sweet berry bush at age 3 is still a sweet berry bush.
+    """
+    if isinstance(state, str):
+        return state
+    if isinstance(state, Mapping):
+        block_id = state.get("id")
+        if isinstance(block_id, str):
+            return block_id
+    return None
+
+
+def _block_of_provider(provider: Any) -> str | None:
+    """Return the block id of one state provider, or `None` when it places several.
+
+    A provider that names one state is now written as that state, with no
+    wrapper: the `minecraft:simple_state_provider` spelling is gone, and so is
+    the `state` key that held its payload. Every other provider still carries a
+    `type` -- weighted lists, noise-driven rules, property mappers -- and every
+    one of those places more than one block, which is the case this module has
+    always skipped and reported rather than guessed at.
+    """
+    if isinstance(provider, Mapping) and "type" in provider:
+        return None
+    return _block_of_state(provider)
+
+
 def _extract_blocks_from_config(
     cf_type: str, config: Mapping[str, Any]
 ) -> tuple[list[str], int | None]:
-    """Return the list of block IDs placed by this configured feature, and optional vein size."""
+    """Return the list of block IDs placed by this configured feature, and optional vein size.
+
+    `config` is the feature document itself. 26.3 inlined what used to sit under
+    a `config` key, so there is no longer a wrapper to unpack.
+    """
     blocks: list[str] = []
     vein_size: int | None = None
 
     if cf_type in ("minecraft:ore", "minecraft:scattered_ore"):
-        vein_size = config.get("size")
-        for target in config.get("targets", []):
-            state = target.get("state", {})
-            if "Name" in state:
-                blocks.append(state["Name"])
+        size = config.get("size")
+        vein_size = size if isinstance(size, int) else None
+        targets = config.get("targets")
+        if isinstance(targets, list):
+            for target in targets:
+                if not isinstance(target, Mapping):
+                    continue
+                block = _block_of_state(target.get("state"))
+                if block is not None:
+                    blocks.append(block)
     elif cf_type == "minecraft:simple_block":
-        to_place = config.get("to_place", {})
-        if to_place.get("type") == "minecraft:simple_state_provider":
-            state = to_place.get("state", {})
-            if "Name" in state:
-                blocks.append(state["Name"])
+        block = _block_of_provider(config.get("to_place"))
+        if block is not None:
+            blocks.append(block)
     elif cf_type == "minecraft:disk":
-        sp = config.get("state_provider", {})
-        if sp.get("type") == "minecraft:simple_state_provider":
-            state = sp.get("state", {})
-            if "Name" in state:
-                blocks.append(state["Name"])
+        block = _block_of_provider(config.get("state_provider"))
+        if block is not None:
+            blocks.append(block)
     elif cf_type == "minecraft:block_blob":
-        state = config.get("state", {})
-        if "Name" in state:
-            blocks.append(state["Name"])
+        block = _block_of_state(config.get("state"))
+        if block is not None:
+            blocks.append(block)
 
     return blocks, vein_size
 
@@ -375,7 +419,7 @@ def extract_generation(files: Mapping[str, bytes]) -> GenerationExtractionResult
 
     configured: dict[str, dict[str, Any]] = {}
     skipped: list[SkippedFeature] = []
-    for cf_id, data in _read_group(files, "worldgen/configured_feature/").items():
+    for cf_id, data in _read_group(files, FEATURE_DIRECTORY).items():
         cf_type = str(data.get("type", ""))
         if cf_type in SUPPORTED_CONFIGURED_TYPES:
             configured[cf_id] = data
@@ -400,11 +444,12 @@ def extract_generation(files: Mapping[str, bytes]) -> GenerationExtractionResult
         reference = placed.get("feature")
         if not isinstance(reference, str) or reference not in configured:
             continue
-        config = configured[reference].get("config", {})
-        if not isinstance(config, dict):
-            continue
+        # 26.3 inlined the configuration: a feature document that used to carry
+        # its settings under `config` now states them at the top level, beside
+        # `type`. So the document is the config.
+        feature = configured[reference]
         blocks, vein_size = _extract_blocks_from_config(
-            str(configured[reference].get("type", "")), config
+            str(feature.get("type", "")), feature
         )
         if not blocks:
             continue

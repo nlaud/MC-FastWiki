@@ -11,8 +11,8 @@ from pipeline.extract.feature_place import extract_feature_places, load_feature_
 def _files(**overrides: object) -> dict[str, bytes]:
     """Return a minimal worldgen pack holding a two-pass overworld feature."""
     files: dict[str, bytes] = {
-        "worldgen/configured_feature/monster_room.json": json.dumps(
-            {"type": "minecraft:monster_room", "config": {}}
+        "worldgen/feature/monster_room.json": json.dumps(
+            {"type": "minecraft:monster_room"}
         ).encode(),
         "worldgen/placed_feature/monster_room.json": json.dumps(
             {

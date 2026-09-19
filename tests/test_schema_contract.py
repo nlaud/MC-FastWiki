@@ -538,9 +538,13 @@ def test_curated_chest_sources_completeness() -> None:
 
     assert DEFAULT_CHEST_SOURCES_PATH.is_file()
     chests = load_chest_sources(DEFAULT_CHEST_SOURCES_PATH)
-    assert len(chests) == 63
+    assert len(chests) == 66
 
     valid_prefixes = (
+        # `barrels` arrived in 26.3 with the Abandoned Camp. Its table is a
+        # `minecraft:chest` like every other entry here, so it belongs in this
+        # file rather than in `loot-sources.json`.
+        "loot_table/barrels/",
         "loot_table/chests/",
         "loot_table/dispensers/",
         "loot_table/pots/",
@@ -572,7 +576,7 @@ def test_curated_loot_sources_completeness() -> None:
 
     assert DEFAULT_LOOT_SOURCES_PATH.is_file()
     loot = load_loot_sources(DEFAULT_LOOT_SOURCES_PATH)
-    assert len(loot) == 56
+    assert len(loot) == 57
 
     for path, entry in loot.items():
         assert path.startswith("loot_table/")

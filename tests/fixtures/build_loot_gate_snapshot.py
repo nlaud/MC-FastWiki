@@ -51,17 +51,22 @@ To move the snapshot to a new Minecraft version:
 """
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from pipeline.fetch.cache import ContentCache
 from pipeline.fetch.mcmeta import MCMETA_REPOSITORY, fetch_data_files, resolve_mcmeta_tag
-from pipeline.obtain.loot import BLOCK_LOOT_DIRECTORY, extract_loot
-from pipeline.obtain.loot import _conditions_gate as conditions_gate
+from pipeline.obtain.loot import BLOCK_LOOT_DIRECTORY, PREDICATE_DIRECTORY, extract_loot
+from pipeline.obtain.loot import _condition_gate as condition_gate
+from pipeline.obtain.loot import _predicate_index as predicate_index
 
 # The release this snapshot pins. Read `pipeline.fetch.mcmeta`'s module docstring
 # before changing it: a snapshot tag must never become the pinned fixture of a
 # release build.
-SNAPSHOT_VERSION_ID = "26.2"
+Predicates = Mapping[str, Mapping[str, Any]]
+
+SNAPSHOT_VERSION_ID = "26.3"
 BRANCH = "data"
 
 # Two tables that carry no tool gate at all and must never grow one. They travel
@@ -78,7 +83,7 @@ CONTROL_TABLES = (
 ENTRY_GATED_CONTROL = f"{BLOCK_LOOT_DIRECTORY}/diamond_ore.json"
 
 
-def _table_names_a_gate(document: object) -> bool:
+def _table_names_a_gate(document: object, predicates: Predicates) -> bool:
     """Return whether `document` names a tool gate on any pool or any entry."""
     if not isinstance(document, dict):
         return False
@@ -88,23 +93,23 @@ def _table_names_a_gate(document: object) -> bool:
     for pool in pools:
         if not isinstance(pool, dict):
             continue
-        if conditions_gate(pool.get("conditions")) is not None:
+        if condition_gate(pool.get("condition"), predicates) is not None:
             return True
-        if _entries_name_a_gate(pool.get("entries")):
+        if _entries_name_a_gate(pool.get("entries"), predicates):
             return True
     return False
 
 
-def _entries_name_a_gate(entries: object) -> bool:
+def _entries_name_a_gate(entries: object, predicates: Predicates) -> bool:
     """Return whether any entry reachable from `entries` names a tool gate."""
     if not isinstance(entries, list):
         return False
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        if conditions_gate(entry.get("conditions")) is not None:
+        if condition_gate(entry.get("condition"), predicates) is not None:
             return True
-        if _entries_name_a_gate(entry.get("children")):
+        if _entries_name_a_gate(entry.get("children"), predicates):
             return True
     return False
 
@@ -113,7 +118,16 @@ def main() -> None:
     """Write the gate snapshot of `SNAPSHOT_VERSION_ID` and print its header."""
     cache = ContentCache(Path("data") / ".cache")
     tag = resolve_mcmeta_tag(SNAPSHOT_VERSION_ID, BRANCH, cache=cache)
-    files = fetch_data_files(tag, groups=("loot_table",), cache=cache)
+    # `predicate` travels with the tables from 26.3 on: a table names
+    # `minecraft:tool/can_silk_touch` rather than spelling the condition out, so
+    # the gate is unreadable without the registry that holds it.
+    files = fetch_data_files(tag, groups=("loot_table", "predicate"), cache=cache)
+    predicates = predicate_index(files)
+    predicate_files = {
+        path: payload
+        for path, payload in files.items()
+        if path.startswith(PREDICATE_DIRECTORY)
+    }
 
     block_tables = {
         path: json.loads(payload)
@@ -124,7 +138,7 @@ def main() -> None:
     keep = {
         path: document
         for path, document in sorted(block_tables.items())
-        if _table_names_a_gate(document)
+        if _table_names_a_gate(document, predicates)
     }
     for path in (*CONTROL_TABLES, ENTRY_GATED_CONTROL):
         if path in block_tables:
@@ -134,7 +148,7 @@ def main() -> None:
     pool_shears = 0
     for document in block_tables.values():
         gates = {
-            conditions_gate(pool.get("conditions"))
+            condition_gate(pool.get("condition"), predicates)
             for pool in document.get("pools", [])
             if isinstance(pool, dict)
         }
@@ -145,6 +159,7 @@ def main() -> None:
 
     replay = extract_loot(
         {path: json.dumps(document).encode() for path, document in sorted(keep.items())}
+        | predicate_files
     )
     notes = {
         f"{producer.source_id}|{producer.output.item}": producer.note
@@ -157,6 +172,9 @@ def main() -> None:
         "commit_sha": tag.commit_sha,
         "source_url": f"https://github.com/{MCMETA_REPOSITORY}/tree/{tag.commit_sha}",
         "blockTablesScanned": len(block_tables),
+        "predicates": {
+            path: json.loads(payload) for path, payload in sorted(predicate_files.items())
+        },
         "answer": {
             "poolSilkTouchTables": pool_silk,
             "poolShearsTables": pool_shears,
@@ -167,7 +185,15 @@ def main() -> None:
 
     slug = SNAPSHOT_VERSION_ID.replace(".", "_")
     out = Path("tests") / "fixtures" / f"mcmeta_{slug}_loot_gates.json"
-    out.write_text(json.dumps(document, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    # `newline` is pinned like every other builder in this directory. Without it
+    # a rebuild on Windows writes CRLF and trips the repository's line-ending
+    # invariant, which is then a failure about the machine that ran the rebuild
+    # rather than about the snapshot it produced.
+    out.write_text(
+        json.dumps(document, indent=2, sort_keys=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
     print(f"wrote {out}")
     print(f"  version_id  {tag.version_id}")

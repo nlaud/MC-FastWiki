@@ -105,7 +105,7 @@ restructuring asked for: "just confirm that we can make the same obtaining
 tree in the end."
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from pydantic import BaseModel, Field
 
@@ -287,16 +287,53 @@ def build_obtain_graph(
     output`'s own iteration order, and for why the order of producers
     *within* one item id is left exactly as `index.producers_of` already
     returns it.
+
+    Producers that are identical in every field are collapsed to one, keeping
+    the first. Two of them are not two ways to get the item; they are the same
+    sentence printed twice, and the page prints it twice. The Abandoned Camp
+    Map is what makes this impossible to ignore: its chest table holds eight
+    entries, one per biome the camp generates in, and all eight name the same
+    registry item and differ only in the map name and the biome check, neither
+    of which this pipeline reads. So its page listed "Abandoned Camp - Common
+    Chest" eight times, each with the same eighteen structure links under it,
+    and hid five of them behind a "show more" -- for one fact.
+
+    The collapse is on exact identity, so anything that really differs still
+    lists separately: a second source, a different tool note, different odds, a
+    different count. Deduplicating here rather than in the walk keeps every
+    stage report counting the rows it actually read.
     """
     if sources is None:
         sources = load_merged_sources()
 
     sorted_sources = {k: sources[k] for k in sorted(sources)}
     producers = {
-        item_id: tuple(_to_obtain_producer(producer) for producer in index.producers_of(item_id))
+        item_id: _unique_in_order(
+            _to_obtain_producer(producer) for producer in index.producers_of(item_id)
+        )
         for item_id in sorted(index.by_output)
     }
     return ObtainGraph(producers=producers, sources=sorted_sources)
+
+
+def _unique_in_order(
+    producers: Iterable[ObtainProducer],
+) -> tuple[ObtainProducer, ...]:
+    """Return `producers` with exact duplicates dropped, first occurrence kept.
+
+    Identity is the serialized model, so every field counts -- inputs, source,
+    note, odds, counts and grid alike. `ObtainProducer` holds lists, so it is
+    not hashable and a `set` cannot do this.
+    """
+    seen: set[str] = set()
+    out: list[ObtainProducer] = []
+    for producer in producers:
+        key = producer.model_dump_json()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(producer)
+    return tuple(out)
 
 
 def _from_obtain_input(input_spec: ObtainProducerInput) -> ProducerInput:
