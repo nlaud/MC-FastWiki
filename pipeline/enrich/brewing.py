@@ -173,6 +173,12 @@ _WEAKNESS_ROW = "Fermented Spider Eye"
 # can never be mistaken for one.
 _ROW_SEPARATOR = re.compile(r"(?m)^\|-\s*$")
 _ANCHOR_TEMPLATE = re.compile(r"\{\{anchor\|[^}]*\}\}")
+# The wiki lists an ingredient from a drop that has not shipped yet with an
+# `{{upcoming|...}}` marker: `Ice Ball{{upcoming|Fourth Drop 2026}}` joined the
+# Effect ingredients table in late September 2026. The build pins a released
+# Java version, so an upcoming ingredient has no registry item to map to yet and
+# is left out until a release ships it and the wiki drops the marker.
+_UPCOMING_TEMPLATE = re.compile(r"\{\{\s*upcoming\b[^}]*\}\}", re.IGNORECASE)
 _CELL_ATTRS = re.compile(r'^\s*(?P<attrs>(?:[A-Za-z-]+="[^"]*"\s*)+)\|(?P<content>.*)$', re.DOTALL)
 _ROWSPAN = re.compile(r'rowspan="(\d+)"')
 _UNBREWABLE_LINK = re.compile(
@@ -372,6 +378,11 @@ def _parse_effect_ingredients(
             corrupted = pending_corrupted or ""
             pending_remaining -= 1
 
+        # Skipped after the rowspan bookkeeping above, so an upcoming row still
+        # consumes its share of an inherited corrupted cell.
+        if _UPCOMING_TEMPLATE.search(block):
+            continue
+
         if corrupted and corrupted.casefold() != "none":
             corruption_map[effect_name] = corrupted
 
@@ -426,7 +437,7 @@ def _parse_base_potions(text: str, *, source: str) -> tuple[BaseRecipe, ...]:
         if raw_input is None:
             raise EnrichError(f"{source} carries a {header!r} recipe with no Input.")
         for name in (part.strip() for part in raw_input.split(";")):
-            if not name:
+            if not name or _UPCOMING_TEMPLATE.search(name):
                 continue
             item_id = WIKI_NAME_TO_ITEM_ID.get(name)
             if item_id is None:
