@@ -34,6 +34,7 @@ biome's whole spawn category, so `share` divides them rather than leaving a
 renderer to guess what "100" means.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -158,6 +159,24 @@ def _number(document: Mapping[str, Any], field: str, *, source: str) -> int | fl
     return value
 
 
+# A note the wiki appends to a group size in parentheses. Soul Sand Valley's
+# ghast row has answered `4 (max 1)` since 2026-10-12, and the strict read that
+# refused it failed every weekly wiki refresh from then on. The number in front
+# is still the group size; the parenthetical qualifies it.
+_SIZE_NOTE = re.compile(r"\s*\([^()]*\)\s*\Z")
+
+
+def _group_size(text: str, *, source: str) -> IntegerRange:
+    """Return the group size of a `Size` field, ignoring a trailing `(...)` note.
+
+    Only the note is forgiven. A size whose leading part is not a number or a
+    range still raises, because that would mean the template itself changed.
+    The value is not load-bearing either way: Tier A's biome spawners supply
+    every group size the site shows, and this bucket only contributes notes.
+    """
+    return parse_integer_range(_SIZE_NOTE.sub("", text), source=source)
+
+
 def parse_spawn_tables(rows: Sequence[Mapping[str, Any]], *, source: str = BUCKET) -> SpawnIndex:
     """Return the Java spawn table of `rows`, and a report of what was dropped.
 
@@ -202,9 +221,7 @@ def parse_spawn_tables(rows: Sequence[Mapping[str, Any]], *, source: str = BUCKE
                 category=required_text(document, "Category", source=where),
                 weight=_number(document, "Weight", source=where),
                 total_weight=_number(document, "Total weight", source=where),
-                group_size=parse_integer_range(
-                    required_text(document, "Size", source=where), source=where
-                ),
+                group_size=_group_size(required_text(document, "Size", source=where), source=where),
                 note=optional_text(document, "Note"),
                 note_name=optional_text(document, "Note name"),
             )

@@ -75,9 +75,7 @@ def test_a_bedrock_row_is_skipped_and_reported() -> None:
     bucket -- 789 of 1,602 rows -- is dropped by this, which is expected, and
     only the report makes it distinguishable from a scrape that half failed.
     """
-    index = parse_spawn_tables(
-        [row("Desert", "Creeper"), row("Desert", "Husk", edition="bedrock")]
-    )
+    index = parse_spawn_tables([row("Desert", "Creeper"), row("Desert", "Husk", edition="bedrock")])
 
     assert [entry.mob for entry in index.entries] == ["Creeper"]
     assert index.skipped[0].reason == "the row is bedrock edition, not java"
@@ -149,6 +147,19 @@ def test_a_java_row_with_a_weight_that_is_not_a_number_raises() -> None:
 
     with pytest.raises(EnrichError, match="Weight"):
         parse_spawn_tables([broken])
+
+
+def test_a_group_size_with_a_parenthetical_note_keeps_its_number() -> None:
+    """Soul Sand Valley's ghast answers `4 (max 1)`; the note must not fail the build."""
+    index = parse_spawn_tables([row("Soul Sand Valley", "Ghast", size="4 (max 1)")])
+
+    assert index.entries[0].group_size == IntegerRange(minimum=4, maximum=4)
+
+
+def test_a_note_does_not_excuse_a_group_size_that_is_not_a_number() -> None:
+    """Only the parenthetical is forgiven, not the size in front of it."""
+    with pytest.raises(EnrichError):
+        parse_spawn_tables([row("Desert", "Creeper", size="a few (max 1)")])
 
 
 def test_a_group_size_the_wiki_has_not_written_raises() -> None:

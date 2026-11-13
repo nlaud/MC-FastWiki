@@ -272,6 +272,38 @@ def test_an_unknown_ingredient_name_raises() -> None:
         parse_brewing(page(effect_ingredients=unknown))
 
 
+def test_an_ingredient_marked_upcoming_is_left_out() -> None:
+    """`Ice Ball{{upcoming|...}}` names no released item, so it must not fail the build."""
+    upcoming_row = (
+        "|-\n"
+        "!{{anchor|Ice Ball}}[[Ice Ball]]{{upcoming|Fourth Drop 2026}}\n"
+        "|{{Slot|Ice Ball}}\n"
+        "|[[Chilled]]\n"
+        "| [[Slowness]]\n"
+    )
+    with_upcoming = EFFECT_INGREDIENTS.replace(
+        "|[[Oozing]]\n|}", "|[[Oozing]]\n" + upcoming_row + "|}"
+    )
+    assert "Ice Ball" in with_upcoming
+
+    baseline = parse_brewing(page())
+    index = parse_brewing(page(effect_ingredients=with_upcoming))
+
+    assert index.effect_recipes == baseline.effect_recipes
+    assert index.corruption_map == baseline.corruption_map
+
+
+def test_an_upcoming_base_ingredient_is_left_out() -> None:
+    """The same marker on a `Brewing Stand` Input name drops only that name."""
+    with_upcoming = BASE_POTIONS.replace(
+        " |Input= Glowstone Dust", " |Input= Glowstone Dust; Ice Ball{{upcoming|Fourth Drop 2026}}"
+    )
+    assert (
+        parse_brewing(page(base_potions=with_upcoming)).base_recipes
+        == parse_brewing(page()).base_recipes
+    )
+
+
 def test_a_page_with_no_weakness_row_raises() -> None:
     """`weakness_recipe` is a required field this module must always be able to fill."""
     no_weakness = EFFECT_INGREDIENTS.replace("Fermented Spider Eye", "Sugar")
