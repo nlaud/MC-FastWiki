@@ -29,6 +29,7 @@ from pipeline.enrich import EnrichError
 from pipeline.enrich.resource_location import JoinTable
 
 __all__ = [
+    "NOISE_TABLE_ROLES",
     "NoiseExtractionResult",
     "NoiseLegend",
     "NoisePlacement",
@@ -36,6 +37,7 @@ __all__ = [
     "NoiseSibling",
     "ParsedCell",
     "extract_worldgen_noise",
+    "locate_noise_tables",
     "parse_noise_legend",
     "parse_wikitable_to_grid",
     "slice_overworld_section",
@@ -465,6 +467,99 @@ def _format_pv_range(pv_name: str, legend: NoiseLegend) -> str:
     return pv_name
 
 
+# The eight tables the extractor reads, in page order. Each is found by what it
+# says rather than by where it sits: the section held exactly eight tables until
+# 2026-11-16, when the live page answered with ten and the count check failed the
+# weekly refresh. A position-based read would have gone on to parse the wrong
+# tables, so the count is no longer the contract; each role's own signature is.
+NOISE_TABLE_ROLES = (
+    "depth",
+    "non_inland",
+    "inland",
+    "beach",
+    "badland",
+    "middle",
+    "plateau",
+    "shattered",
+)
+
+_TABLE = re.compile(r"\{\|.*?\n\|\}", re.DOTALL)
+_HEADER_DEPTH = re.compile(r"^!\s*Depth\b", re.MULTILINE)
+_HEADER_EROSION = re.compile(r"^!\s*Erosion\b", re.MULTILINE)
+_HEADER_PV = re.compile(r"^!\s*PV\b", re.MULTILINE)
+_UPCOMING = re.compile(r"upcoming", re.IGNORECASE)
+
+
+def _table_header(table_text: str) -> str:
+    """Return the table's opening and its first row, the part that names its columns."""
+    rows = re.split(r"(?m)^\|-", table_text)
+    return "|-".join(rows[:2])
+
+
+def _table_roles(lead: str, table_text: str) -> set[str]:
+    """Return every role a table's header, or the prose just before it, claims."""
+    header = _table_header(table_text)
+    roles: set[str] = set()
+    if _HEADER_DEPTH.search(header):
+        roles.add("depth")
+    if "Mushroom fields" in header and "Oceans" in header:
+        roles.add("non_inland")
+    if _HEADER_EROSION.search(header) and _HEADER_PV.search(header):
+        roles.add("inland")
+    lead_lower = lead.casefold()
+    for group, role in zip(GROUPS, NOISE_TABLE_ROLES[3:], strict=True):
+        if f"'''{group.casefold()}'''" in lead_lower:
+            roles.add(role)
+    return roles
+
+
+def _table_summary(index: int, table_text: str) -> str:
+    """Return a short one-line description of a table, for an error message."""
+    headers = re.findall(r"^!\s*([^\n]*)", _table_header(table_text), re.MULTILINE)
+    return f"#{index} [{', '.join(h.strip()[:24] for h in headers[:4])}]"
+
+
+def locate_noise_tables(section: str) -> dict[str, str]:
+    """Return the wikitext of each of the eight noise tables, keyed by role.
+
+    A table is claimed by its header (`Depth`; the ocean and mushroom-field
+    columns; `Erosion` with `PV`) or, for the five group tables, by the bold
+    group name in the prose just before it. A table that claims no role is
+    ignored. When two tables claim one role and only one of them is free of an
+    `upcoming` marker in its lead or header, that one is the released table.
+    Anything else -- a role no table claims, or one two released tables claim
+    -- raises, naming every table found so the failure says what the page holds.
+    """
+    candidates: dict[str, list[tuple[int, str, bool]]] = {role: [] for role in NOISE_TABLE_ROLES}
+    summaries: list[str] = []
+    previous_end = 0
+    for index, match in enumerate(_TABLE.finditer(section)):
+        lead = section[previous_end : match.start()]
+        table_text = match.group(0)
+        previous_end = match.end()
+        summaries.append(_table_summary(index, table_text))
+        upcoming = bool(
+            _UPCOMING.search(lead[-400:]) or _UPCOMING.search(_table_header(table_text))
+        )
+        for role in _table_roles(lead, table_text):
+            candidates[role].append((index, table_text, upcoming))
+
+    found = "; ".join(summaries) or "none"
+    located: dict[str, str] = {}
+    for role in NOISE_TABLE_ROLES:
+        options = candidates[role]
+        if len(options) > 1:
+            options = [option for option in options if not option[2]]
+        if len(options) != 1:
+            problem = "no table" if not candidates[role] else f"{len(options)} tables"
+            raise EnrichError(
+                f"World generation Overworld section: {problem} for the {role} table "
+                f"({len(summaries)} tables found: {found})."
+            )
+        located[role] = options[0][1]
+    return located
+
+
 def extract_worldgen_noise(
     wikitext: str,
     *,
@@ -473,11 +568,7 @@ def extract_worldgen_noise(
 ) -> NoiseExtractionResult:
     """Extract noise climate parameters from World generation section 4."""
     section = slice_overworld_section(wikitext)
-    tables = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
-    if len(tables) != 8:
-        raise EnrichError(
-            f"expected exactly 8 tables in World generation Overworld section, found {len(tables)}."
-        )
+    tables = locate_noise_tables(section)
 
     legend = parse_noise_legend(section)
 
@@ -541,7 +632,7 @@ def extract_worldgen_noise(
     # -------------------------------------------------------------------------
     # Table 0: Depth
     # -------------------------------------------------------------------------
-    grid0 = parse_wikitable_to_grid(tables[0].group(0))
+    grid0 = parse_wikitable_to_grid(tables["depth"])
     t0_count = 0
     for r in range(1, len(grid0)):
         depth_str = grid0[r][0].text.replace("D=", "").strip()
@@ -568,7 +659,7 @@ def extract_worldgen_noise(
     # -------------------------------------------------------------------------
     # Table 1: Non-inland surface
     # -------------------------------------------------------------------------
-    grid1 = parse_wikitable_to_grid(tables[1].group(0))
+    grid1 = parse_wikitable_to_grid(tables["non_inland"])
     t1_count = 0
     for r in range(1, len(grid1)):
         t_cell = grid1[r][0].text
@@ -621,7 +712,7 @@ def extract_worldgen_noise(
     # -------------------------------------------------------------------------
     # Table 2: Inland surface
     # -------------------------------------------------------------------------
-    grid2 = parse_wikitable_to_grid(tables[2].group(0))
+    grid2 = parse_wikitable_to_grid(tables["inland"])
 
     def extract_inland_items(cell_text: str) -> list[tuple[str, str, str | None]]:
         cleaned = _clean_cell_text(cell_text)
@@ -791,7 +882,7 @@ def extract_worldgen_noise(
         return placed_count
 
     # Table 3: Beach biomes
-    grid3 = parse_wikitable_to_grid(tables[3].group(0))
+    grid3 = parse_wikitable_to_grid(tables["beach"])
     t3_count = 0
     for r in range(1, len(grid3)):
         t_str_raw = grid3[r][0].text.replace("T=", "").strip()
@@ -816,7 +907,7 @@ def extract_worldgen_noise(
     table_counts["beach"] = t3_count
 
     # Table 4: Badland biomes
-    grid4 = parse_wikitable_to_grid(tables[4].group(0))
+    grid4 = parse_wikitable_to_grid(tables["badland"])
     t4_count = 0
     for r in range(1, len(grid4)):
         h_str_raw = grid4[r][0].text.replace("H=", "").strip()
@@ -838,7 +929,7 @@ def extract_worldgen_noise(
     table_counts["badland"] = t4_count
 
     # Table 5: Middle biomes
-    grid5 = parse_wikitable_to_grid(tables[5].group(0))
+    grid5 = parse_wikitable_to_grid(tables["middle"])
     t5_count = 0
     for r in range(1, len(grid5)):
         h_level = r - 1
@@ -857,7 +948,7 @@ def extract_worldgen_noise(
     table_counts["middle"] = t5_count
 
     # Table 6: Plateau biomes
-    grid6 = parse_wikitable_to_grid(tables[6].group(0))
+    grid6 = parse_wikitable_to_grid(tables["plateau"])
     t6_count = 0
     for r in range(1, len(grid6)):
         h_level = r - 1
@@ -876,7 +967,7 @@ def extract_worldgen_noise(
     table_counts["plateau"] = t6_count
 
     # Table 7: Shattered biomes
-    grid7 = parse_wikitable_to_grid(tables[7].group(0))
+    grid7 = parse_wikitable_to_grid(tables["shattered"])
     t7_count = 0
     t_headers = ["T=0~1 (-1.0~-0.15)", "T=2 (-0.15~0.2)", "T=3 (0.2~0.55)", "T=4 (0.55~1.0)"]
     h_headers = ["H=0~1 (-1.0~-0.1)", "H=2 (-0.1~0.1)", "H=3 (0.1~0.3)", "H=4 (0.3~1.0)"]
