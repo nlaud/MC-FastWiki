@@ -1,12 +1,15 @@
 """Unit tests for Overworld biome noise climate parsing (pipeline/enrich/worldgen_noise.py)."""
 
+import re
 from pathlib import Path
 
 import pytest
 
 from pipeline.enrich import EnrichError
 from pipeline.enrich.worldgen_noise import (
+    NOISE_TABLE_ROLES,
     extract_worldgen_noise,
+    locate_noise_tables,
     parse_noise_legend,
     parse_wikitable_to_grid,
     slice_overworld_section,
@@ -190,11 +193,76 @@ def test_extract_worldgen_noise_contiguous_collapse(overworld_wikitext: str) -> 
     assert "Middle biomes" in {p.group for p in terrain_placements}
 
 
-def test_extract_worldgen_noise_table_count_mismatch() -> None:
+def test_extract_worldgen_noise_missing_tables_raise() -> None:
     wikitext = "=== Overworld ===\n{| class='wikitable'\n|-\n| Test\n|}\n===The Nether==="
-    with pytest.raises(EnrichError, match="expected exactly 8 tables"):
+    with pytest.raises(EnrichError, match="no table for the depth table"):
         extract_worldgen_noise(wikitext)
 
+
+_UNRELATED_TABLE = (
+    "\nThe following table lists something else entirely.\n"
+    '{| class="wikitable"\n|-\n! Feature !! Notes\n|-\n| Rivers || carved later\n|}\n'
+)
+
+
+def _insert_before_table(section: str, index: int, text: str) -> str:
+    """Return `section` with `text` inserted just before its `index`th table."""
+    tables = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
+    at = tables[index].start()
+    return section[:at] + text + section[at:]
+
+
+def _insert_after_table(section: str, index: int, text: str) -> str:
+    """Return `section` with `text` inserted just after its `index`th table."""
+    tables = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
+    at = tables[index].end()
+    return section[:at] + text + section[at:]
+
+
+def test_locate_noise_tables_finds_all_eight_in_the_fixture(overworld_wikitext: str) -> None:
+    section = slice_overworld_section(overworld_wikitext)
+    tables = locate_noise_tables(section)
+    assert set(tables) == set(NOISE_TABLE_ROLES)
+    in_order = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
+    for role, match in zip(NOISE_TABLE_ROLES, in_order, strict=True):
+        assert tables[role] == match.group(0)
+
+
+def test_unrelated_tables_do_not_break_extraction(overworld_wikitext: str) -> None:
+    """The page grew from 8 to 10 tables in Nov 2026 and the strict count failed the build.
+
+    Tables that claim no role are ignored, wherever they sit, and every count
+    stays what it was.
+    """
+    section = slice_overworld_section(overworld_wikitext)
+    grown = _insert_after_table(section, 2, _UNRELATED_TABLE)
+    grown = _insert_after_table(grown, 8, _UNRELATED_TABLE)
+    assert len(re.findall(r"\{\|.*?\n\|\}", grown, re.DOTALL)) == 10
+    wikitext = overworld_wikitext.replace(section, grown)
+
+    baseline = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    assert result.report.table_counts == baseline.report.table_counts
+    assert set(result.placements_by_biome) == set(baseline.placements_by_biome)
+
+
+def test_an_upcoming_copy_of_a_table_is_skipped(overworld_wikitext: str) -> None:
+    section = slice_overworld_section(overworld_wikitext)
+    depth = locate_noise_tables(section)["depth"]
+    upcoming_copy = (
+        "\n{{Upcoming|Java Edition 26.5}} The depth table changes as follows.\n" + depth + "\n"
+    )
+    grown = _insert_after_table(section, 0, upcoming_copy)
+    tables = locate_noise_tables(grown)
+    assert tables["depth"] == depth
+
+
+def test_two_released_tables_for_one_role_raise(overworld_wikitext: str) -> None:
+    section = slice_overworld_section(overworld_wikitext)
+    depth = locate_noise_tables(section)["depth"]
+    grown = _insert_after_table(section, 0, "\nA second copy.\n" + depth + "\n")
+    with pytest.raises(EnrichError, match=r"2 tables for the depth table \(9 tables found"):
+        locate_noise_tables(grown)
 
 
 def test_placements_carry_levels_as_integers(overworld_wikitext: str) -> None:
