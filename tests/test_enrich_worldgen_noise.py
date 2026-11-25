@@ -8,6 +8,7 @@ import pytest
 from pipeline.enrich import EnrichError
 from pipeline.enrich.worldgen_noise import (
     NOISE_TABLE_ROLES,
+    OPTIONAL_TABLE_ROLES,
     extract_worldgen_noise,
     locate_noise_tables,
     parse_noise_legend,
@@ -222,9 +223,9 @@ def _insert_after_table(section: str, index: int, text: str) -> str:
 def test_locate_noise_tables_finds_all_eight_in_the_fixture(overworld_wikitext: str) -> None:
     section = slice_overworld_section(overworld_wikitext)
     tables = locate_noise_tables(section)
-    assert set(tables) == set(NOISE_TABLE_ROLES)
+    assert set(tables) == set(NOISE_TABLE_ROLES) - OPTIONAL_TABLE_ROLES
     in_order = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
-    for role, match in zip(NOISE_TABLE_ROLES, in_order, strict=True):
+    for role, match in zip(NOISE_TABLE_ROLES[:8], in_order, strict=True):
         assert tables[role] == match.group(0)
 
 
@@ -335,3 +336,109 @@ def test_beach_biomes_take_every_humidity_level(overworld_wikitext: str) -> None
     assert beach_groups
     for placement in beach_groups:
         assert set(placement.humidity_levels) == {0, 1, 2, 3, 4}
+
+
+# The Nov 2026 rework of the World generation page, as far as it changes what
+# the extractor reads. The beach table is copied from the live page's source.
+# The beach table holds full-width parentheses, as the wiki writes them, so it
+# lives in a fixture file rather than in this module's source.
+NEW_BEACH_TABLE_PATH = Path("tests") / "fixtures" / "wiki_worldgen_beach_2026_11.txt"
+
+_BADLAND_COMBINED_BLOCK = """|-
+!combined with <br>Badland biomes (T=4)
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+| rowspan="5" |{{BiomeLink|Snowy Plains}}
+| rowspan="5" |{{BiomeLink|Plains}}
+| rowspan="5" |{{BiomeLink|Forest}}
+| rowspan="5" |{{BiomeLink|Savanna}}
+| rowspan="5" |{{BiomeLink|Badlands}}
+|-
+|H=1
+|-
+|H=2
+|-
+|H=3
+|-
+|H=4
+|}"""
+
+
+def _with_tables_replaced(wikitext: str, replacements: dict[str, str]) -> str:
+    tables = locate_noise_tables(slice_overworld_section(wikitext))
+    for role, new_table in replacements.items():
+        wikitext = wikitext.replace(tables[role], new_table, 1)
+    return wikitext
+
+
+def _placements(wikitext: str, group: str) -> dict[str, list[object]]:
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    return {
+        biome: [p for p in placements if p.group == group and p.route == "group"]
+        for biome, placements in result.placements_by_biome.items()
+    }
+
+
+def test_the_target_depth_header_is_the_depth_table(overworld_wikitext: str) -> None:
+    depth = locate_noise_tables(slice_overworld_section(overworld_wikitext))["depth"]
+    renamed = depth.replace(
+        "!Depth\n!Additional requirement", "!Target Depth\n!Target Parameter Intervals"
+    )
+    assert renamed != depth
+    wikitext = _with_tables_replaced(overworld_wikitext, {"depth": renamed})
+    baseline = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    assert result.report.table_counts == baseline.report.table_counts
+
+
+def test_a_parameter_interval_over_several_lines_reads_as_one(overworld_wikitext: str) -> None:
+    depth = """{| class="wikitable"
+|-
+!Target Depth
+!Target Parameter Intervals
+!Biomes
+|-
+|D=0.2~0.9
+|Weirdness=-1.1~-0.85
+
+Continentalness=-0.19~0.55
+|{{BiomeLink|Sulfur Caves}}
+|-
+|}"""
+    wikitext = _with_tables_replaced(overworld_wikitext, {"depth": depth})
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    (placement,) = [
+        p for p in result.placements_by_biome["minecraft:sulfur_caves"] if p.route == "depth"
+    ]
+    assert placement.depth == "0.2~0.9"
+    assert placement.additional_requirement == "Weirdness=-1.1~-0.85, Continentalness=-0.19~0.55"
+
+
+def test_the_grid_beach_table_places_the_same_biomes(overworld_wikitext: str) -> None:
+    beach = NEW_BEACH_TABLE_PATH.read_text(encoding="utf-8").strip()
+    wikitext = _with_tables_replaced(overworld_wikitext, {"beach": beach})
+    expected = _placements(overworld_wikitext, "Beach biomes")
+    assert _placements(wikitext, "Beach biomes") == expected
+
+
+def test_combined_blocks_after_the_standard_block_are_not_read(overworld_wikitext: str) -> None:
+    middle = locate_noise_tables(slice_overworld_section(overworld_wikitext))["middle"]
+    combined = middle.removesuffix("|}") + _BADLAND_COMBINED_BLOCK
+    assert combined.count("{|") == 1
+    wikitext = _with_tables_replaced(overworld_wikitext, {"middle": combined})
+    expected = _placements(overworld_wikitext, "Middle biomes")
+    assert _placements(wikitext, "Middle biomes") == expected
+
+
+def test_a_group_the_inland_table_names_without_a_table_raises(overworld_wikitext: str) -> None:
+    inland = locate_noise_tables(slice_overworld_section(overworld_wikitext))["inland"]
+    sloped = re.sub(r"\{\{BiomeLink\|Snowy Slopes\}\}", "Slope biomes", inland, count=1)
+    assert sloped != inland
+    wikitext = _with_tables_replaced(overworld_wikitext, {"inland": sloped})
+    with pytest.raises(EnrichError, match="Slope biomes"):
+        extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)

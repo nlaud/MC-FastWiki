@@ -1,0 +1,56 @@
+{| class="wikitable mw-collapsible mw-collapsed" style="text-align:center"
+|-
+!Standard
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+| rowspan="5" |{{BiomeLink|Snowy Beach}}
+| colspan="3" rowspan="5" |{{BiomeLink|Beach}}
+| rowspan="5" |{{BiomeLink|Desert}}
+|-
+|H=1
+|-
+|H=2
+|-
+|H=3
+|-
+|H=4
+|-
+!combined with <br>Middle biomes (W>0)
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+|{{BiomeLink|Snowy Beach}}（W<0）<br>{{BiomeLink|Ice Spikes}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Dappled Forest}}（W>0)
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Sunflower Plains}}（W>0）
+| rowspan="2" |{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Savanna}}（W>0）
+| rowspan="5" |{{BiomeLink|Desert}}
+|-
+|H=1
+|{{BiomeLink|Snowy Beach}}（W<0）<br>{{BiomeLink|Snowy Plains}}（W>0）
+| colspan="2" |{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Plains}}（W>0）
+|-
+|H=2
+| rowspan="2" |{{BiomeLink|Snowy Beach}}（W<0）<br>{{BiomeLink|Snowy Taiga}}（W>0）
+| colspan="2" |{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Forest}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Plains}}（W>0）
+|-
+|H=3
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Taiga}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Old Growth Birch Forest}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Sparse Jungle}}（W>0）
+|-
+|H=4
+|{{BiomeLink|Snowy Beach}}（W<0）<br>{{BiomeLink|Taiga}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Old Growth Pine Taiga}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Dark Forest}}（W>0）
+|{{BiomeLink|Beach}}（W<0）<br>{{BiomeLink|Bamboo Jungle}}（W>0）
+|}
