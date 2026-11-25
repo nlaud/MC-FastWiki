@@ -8,6 +8,7 @@ import pytest
 from pipeline.enrich import EnrichError
 from pipeline.enrich.worldgen_noise import (
     NOISE_TABLE_ROLES,
+    OPTIONAL_TABLE_ROLES,
     extract_worldgen_noise,
     locate_noise_tables,
     parse_noise_legend,
@@ -222,9 +223,9 @@ def _insert_after_table(section: str, index: int, text: str) -> str:
 def test_locate_noise_tables_finds_all_eight_in_the_fixture(overworld_wikitext: str) -> None:
     section = slice_overworld_section(overworld_wikitext)
     tables = locate_noise_tables(section)
-    assert set(tables) == set(NOISE_TABLE_ROLES)
+    assert set(tables) == set(NOISE_TABLE_ROLES) - OPTIONAL_TABLE_ROLES
     in_order = list(re.finditer(r"\{\|.*?\n\|\}", section, re.DOTALL))
-    for role, match in zip(NOISE_TABLE_ROLES, in_order, strict=True):
+    for role, match in zip(NOISE_TABLE_ROLES[:8], in_order, strict=True):
         assert tables[role] == match.group(0)
 
 
@@ -335,3 +336,168 @@ def test_beach_biomes_take_every_humidity_level(overworld_wikitext: str) -> None
     assert beach_groups
     for placement in beach_groups:
         assert set(placement.humidity_levels) == {0, 1, 2, 3, 4}
+
+
+# The Overworld section as the live page answered on 2026-11-24, after the
+# rework: a renamed depth table, grid group tables with `combined with` blocks,
+# and Slope and Peak biome tables split out of the inland table.
+REWORKED_FIXTURE_PATH = Path("tests") / "fixtures" / "wiki_worldgen_overworld_2026_11.txt"
+
+_BADLAND_COMBINED_BLOCK = """|-
+!combined with <br>Badland biomes (T=4)
+!T=0
+!T=1
+!T=2
+!T=3
+!T=4
+|-
+|H=0
+| rowspan="5" |{{BiomeLink|Snowy Plains}}
+| rowspan="5" |{{BiomeLink|Plains}}
+| rowspan="5" |{{BiomeLink|Forest}}
+| rowspan="5" |{{BiomeLink|Savanna}}
+| rowspan="5" |{{BiomeLink|Badlands}}
+|-
+|H=1
+|-
+|H=2
+|-
+|H=3
+|-
+|H=4
+|}"""
+
+
+def _with_tables_replaced(wikitext: str, replacements: dict[str, str]) -> str:
+    tables = locate_noise_tables(slice_overworld_section(wikitext))
+    for role, new_table in replacements.items():
+        wikitext = wikitext.replace(tables[role], new_table, 1)
+    return wikitext
+
+
+def _placements(wikitext: str, group: str) -> dict[str, list[object]]:
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    return {
+        biome: [p for p in placements if p.group == group and p.route == "group"]
+        for biome, placements in result.placements_by_biome.items()
+    }
+
+
+def test_the_target_depth_header_is_the_depth_table(overworld_wikitext: str) -> None:
+    depth = locate_noise_tables(slice_overworld_section(overworld_wikitext))["depth"]
+    renamed = depth.replace(
+        "!Depth\n!Additional requirement", "!Target Depth\n!Target Parameter Intervals"
+    )
+    assert renamed != depth
+    wikitext = _with_tables_replaced(overworld_wikitext, {"depth": renamed})
+    baseline = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    assert result.report.table_counts == baseline.report.table_counts
+
+
+def test_a_parameter_interval_over_several_lines_reads_as_one(overworld_wikitext: str) -> None:
+    depth = """{| class="wikitable"
+|-
+!Target Depth
+!Target Parameter Intervals
+!Biomes
+|-
+|D=0.2~0.9
+|Weirdness=-1.1~-0.85
+
+Continentalness=-0.19~0.55
+|{{BiomeLink|Sulfur Caves}}
+|-
+|}"""
+    wikitext = _with_tables_replaced(overworld_wikitext, {"depth": depth})
+    result = extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+    (placement,) = [
+        p for p in result.placements_by_biome["minecraft:sulfur_caves"] if p.route == "depth"
+    ]
+    assert placement.depth == "0.2~0.9"
+    assert placement.additional_requirement == "Weirdness=-1.1~-0.85, Continentalness=-0.19~0.55"
+
+
+def test_the_grid_beach_table_places_the_same_biomes(overworld_wikitext: str) -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    beach = locate_noise_tables(slice_overworld_section(reworked))["beach"]
+    assert "!Standard" in beach
+    assert "combined with" in beach
+    wikitext = _with_tables_replaced(overworld_wikitext, {"beach": beach})
+    expected = _placements(overworld_wikitext, "Beach biomes")
+    assert _placements(wikitext, "Beach biomes") == expected
+
+
+def test_combined_blocks_after_the_standard_block_are_not_read(overworld_wikitext: str) -> None:
+    middle = locate_noise_tables(slice_overworld_section(overworld_wikitext))["middle"]
+    combined = middle.removesuffix("|}") + _BADLAND_COMBINED_BLOCK
+    assert combined.count("{|") == 1
+    wikitext = _with_tables_replaced(overworld_wikitext, {"middle": combined})
+    expected = _placements(overworld_wikitext, "Middle biomes")
+    assert _placements(wikitext, "Middle biomes") == expected
+
+
+def test_a_group_the_inland_table_names_without_a_table_raises(overworld_wikitext: str) -> None:
+    inland = locate_noise_tables(slice_overworld_section(overworld_wikitext))["inland"]
+    sloped = re.sub(r"\{\{BiomeLink\|Snowy Slopes\}\}", "Slope biomes", inland, count=1)
+    assert sloped != inland
+    wikitext = _with_tables_replaced(overworld_wikitext, {"inland": sloped})
+    with pytest.raises(EnrichError, match="Slope biomes"):
+        extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+
+
+def test_the_reworked_page_places_every_biome_the_old_one_did(overworld_wikitext: str) -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    old = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    new = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+
+    assert set(new.placements_by_biome) == set(old.placements_by_biome)
+    assert new.report.overworld_biomes_covered == 55
+    assert new.report.table_counts == {
+        "depth": 4,
+        "non_inland": 14,
+        "direct_inland": 17,
+        "beach": 3,
+        "badland": 4,
+        "middle": 33,
+        "plateau": 36,
+        "shattered": 28,
+        "slope": 27,
+        "peak": 42,
+    }
+    # Ice Caves is new on the page and not in this registry; Dappled Forest was
+    # already unplaced. Both are reported, not fatal.
+    assert new.report.unresolved_biome_names == ("Dappled Forest", "Ice Caves")
+
+
+def test_slope_and_peak_biomes_come_from_their_own_tables() -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    result = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+
+    for biome, group in (
+        ("minecraft:snowy_slopes", "Slope biomes"),
+        ("minecraft:grove", "Slope biomes"),
+        ("minecraft:jagged_peaks", "Peak biomes"),
+        ("minecraft:stony_peaks", "Peak biomes"),
+    ):
+        placements = result.placements_by_biome[biome]
+        assert {p.group for p in placements if p.route == "group"} == {group}
+        assert any(p.route == "group_terrain" and p.group == group for p in placements)
+
+    (jagged,) = {
+        p.temperature for p in result.placements_by_biome["minecraft:jagged_peaks"]
+        if p.route == "group" and p.temperature_levels == (0,)
+    }
+    assert jagged == "T=0 (-1.0~-0.45)"
+
+
+def test_the_reworked_depth_table_reads_new_cave_biomes() -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    result = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+    (sulfur,) = [
+        p for p in result.placements_by_biome["minecraft:sulfur_caves"] if p.route == "depth"
+    ]
+    assert sulfur.depth == "0.2~0.9"
+    assert sulfur.additional_requirement == (
+        "Weirdness=-1.1~-0.85, Continentalness=-0.19~0.55, Erosion=0.45~1"
+    )

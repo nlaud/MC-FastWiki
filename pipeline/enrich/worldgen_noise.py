@@ -30,6 +30,7 @@ from pipeline.enrich.resource_location import JoinTable
 
 __all__ = [
     "NOISE_TABLE_ROLES",
+    "OPTIONAL_TABLE_ROLES",
     "NoiseExtractionResult",
     "NoiseLegend",
     "NoisePlacement",
@@ -57,6 +58,8 @@ GROUPS = (
     "Middle biomes",
     "Plateau biomes",
     "Shattered biomes",
+    "Slope biomes",
+    "Peak biomes",
 )
 
 
@@ -481,10 +484,18 @@ NOISE_TABLE_ROLES = (
     "middle",
     "plateau",
     "shattered",
+    "slope",
+    "peak",
 )
 
+# The page split slope and peak biomes out of the inland table into tables of
+# their own in Nov 2026. A page without them is the older layout, where those
+# biomes sit in the inland table directly, so these two may be absent.
+OPTIONAL_TABLE_ROLES = frozenset({"slope", "peak"})
+
 _TABLE = re.compile(r"\{\|.*?\n\|\}", re.DOTALL)
-_HEADER_DEPTH = re.compile(r"^!\s*Depth\b", re.MULTILINE)
+# `Depth` until Nov 2026, `Target Depth` since.
+_HEADER_DEPTH = re.compile(r"^!\s*(?:Target\s+)?Depth\b", re.MULTILINE)
 _HEADER_EROSION = re.compile(r"^!\s*Erosion\b", re.MULTILINE)
 _HEADER_PV = re.compile(r"^!\s*PV\b", re.MULTILINE)
 _UPCOMING = re.compile(r"upcoming", re.IGNORECASE)
@@ -520,7 +531,7 @@ def _table_summary(index: int, table_text: str) -> str:
 
 
 def locate_noise_tables(section: str) -> dict[str, str]:
-    """Return the wikitext of each of the eight noise tables, keyed by role.
+    """Return the wikitext of each noise table, keyed by role.
 
     A table is claimed by its header (`Depth`; the ocean and mushroom-field
     columns; `Erosion` with `PV`) or, for the five group tables, by the bold
@@ -548,6 +559,8 @@ def locate_noise_tables(section: str) -> dict[str, str]:
     located: dict[str, str] = {}
     for role in NOISE_TABLE_ROLES:
         options = candidates[role]
+        if not options and role in OPTIONAL_TABLE_ROLES:
+            continue
         if len(options) > 1:
             options = [option for option in options if not option[2]]
         if len(options) != 1:
@@ -558,6 +571,46 @@ def locate_noise_tables(section: str) -> dict[str, str]:
             )
         located[role] = options[0][1]
     return located
+
+
+# A group table that holds more than its own grid. Since Nov 2026 each table
+# opens with a `Standard` block and follows it with `combined with ...` blocks
+# that restate inland-table cells mixing two groups. Those blocks repeat what
+# the standard block and the inland table already say, so only the first is read.
+_COMBINED_BLOCK = re.compile(r"\n\|-[ \t]*\n![ \t]*combined with", re.IGNORECASE)
+
+
+def _standard_block(table_text: str) -> str:
+    """Return a group table cut down to its first block, closed as a table of its own."""
+    match = _COMBINED_BLOCK.search(table_text)
+    if match is None:
+        return table_text
+    return table_text[: match.start()] + "\n|}"
+
+
+def _axis_levels(text: str, axis: str) -> tuple[str, tuple[int, ...]]:
+    """Return the label and levels of a `T=0`, `T=0~1` or `H=3,4` header cell.
+
+    A `~` is a range of levels; a comma lists them. The label is the text after
+    `=`, kept as the wiki writes it because it is what a reader sees.
+    """
+    match = re.search(rf"\b{axis}\s*=\s*([0-9][0-9~,\s]*)", _clean_cell_text(text))
+    if match is None:
+        return "", ()
+    label = re.sub(r"\s+", "", match.group(1))
+    numbers = [int(n) for n in re.findall(r"\d+", label)]
+    if "~" in label and len(numbers) == 2:
+        return label, tuple(range(numbers[0], numbers[1] + 1))
+    return label, tuple(numbers)
+
+
+def _format_levels(axis: str, label: str, levels: Sequence[int], bands: Sequence[str]) -> str:
+    """Return `T=3 (0.2~0.55)` for one level, `T=0~1 (-1.0~-0.15)` for several."""
+    if len(levels) == 1:
+        return f"{axis}={levels[0]} ({bands[levels[0]]})"
+    start = bands[levels[0]].split("~")[0]
+    end = bands[levels[-1]].split("~")[-1]
+    return f"{axis}={label} ({start}~{end})"
 
 
 def extract_worldgen_noise(
@@ -881,10 +934,85 @@ def extract_worldgen_noise(
                 placed_count += 1
         return placed_count
 
+    def read_group_grid(table_text: str, group_name: str) -> int:
+        """Read a humidity-by-temperature group table and return its placement count.
+
+        The header row names the temperature levels and the first column the
+        humidity levels, so a table that pairs levels (`T=0~1`) or lists them
+        (`H=3,4`) is read from what it says rather than from its position.
+        """
+        grid = parse_wikitable_to_grid(_standard_block(table_text))
+        if len(grid) < 2:
+            raise EnrichError(f"the {group_name} table has no rows.")
+        t_axis = [_axis_levels(cell.text, "T") for cell in grid[0][1:]]
+        if not t_axis or any(not levels for _, levels in t_axis):
+            raise EnrichError(
+                f"the {group_name} table's header does not name a temperature level in "
+                f"every column: {[cell.text for cell in grid[0]]}."
+            )
+        count = 0
+        for row in grid[1:]:
+            h_label, h_levels = _axis_levels(row[0].text, "H")
+            if not h_levels:
+                raise EnrichError(
+                    f"the {group_name} table has a row that names no humidity level: "
+                    f"{row[0].text!r}."
+                )
+            h_formatted = _format_levels("H", h_label, h_levels, legend.humidity)
+            for cell, (t_label, t_levels) in zip(row[1:], t_axis, strict=True):
+                count += extract_group_cell(
+                    cell.text,
+                    group_name,
+                    _format_levels("T", t_label, t_levels, legend.temperature),
+                    h_formatted,
+                    t_levels=t_levels,
+                    h_levels=h_levels,
+                )
+        return count
+
+    def read_beach_grid(grid: list[list[ParsedCell]]) -> int:
+        """Read the grid form of the beach table, one placement per biome per temperature run.
+
+        A column whose every row holds the same biome is one temperature level
+        at any humidity, and neighbouring columns with the same biome join into
+        one run (`T=1,2,3`), which is how the older one-column table put it.
+        """
+        t_axis = [_axis_levels(cell.text, "T") for cell in grid[0][1:]]
+        rows = grid[1:]
+        runs: list[tuple[list[int], str]] = []
+        count = 0
+        for col, (_, t_levels) in enumerate(t_axis, start=1):
+            texts = {row[col].text for row in rows}
+            if len(texts) != 1 or not t_levels:
+                raise EnrichError(
+                    "the beach table varies with humidity, which its prose says it does not."
+                )
+            text = texts.pop()
+            if runs and runs[-1][1] == text:
+                runs[-1][0].extend(t_levels)
+            else:
+                runs.append((list(t_levels), text))
+        for levels, text in runs:
+            label = ",".join(str(level) for level in levels)
+            count += extract_group_cell(
+                text,
+                "Beach biomes",
+                _format_levels("T", label, levels, legend.temperature),
+                "Any",
+                t_levels=tuple(levels),
+                h_levels=(0, 1, 2, 3, 4),
+            )
+        return count
+
     # Table 3: Beach biomes
-    grid3 = parse_wikitable_to_grid(tables["beach"])
+    grid3 = parse_wikitable_to_grid(_standard_block(tables["beach"]))
     t3_count = 0
-    for r in range(1, len(grid3)):
+    if grid3 and len(grid3[0]) > 2:
+        # Since Nov 2026 the beach table is a humidity-by-temperature grid like
+        # the middle table, though beach biomes still depend on temperature
+        # alone, so each biome spans every humidity row.
+        t3_count = read_beach_grid(grid3)
+    for r in range(1, len(grid3) if len(grid3[0]) == 2 else 1):
         t_str_raw = grid3[r][0].text.replace("T=", "").strip()
         t_indices = [int(x) for x in re.findall(r"\d+", t_str_raw)]
         if len(t_indices) == 1:
@@ -928,67 +1056,27 @@ def extract_worldgen_noise(
         )
     table_counts["badland"] = t4_count
 
-    # Table 5: Middle biomes
-    grid5 = parse_wikitable_to_grid(tables["middle"])
-    t5_count = 0
-    for r in range(1, len(grid5)):
-        h_level = r - 1
-        h_formatted = f"H={h_level} ({legend.humidity[h_level]})"
-        for c in range(1, 6):
-            t_level = c - 1
-            t_formatted = f"T={t_level} ({legend.temperature[t_level]})"
-            t5_count += extract_group_cell(
-                grid5[r][c].text,
-                "Middle biomes",
-                t_formatted,
-                h_formatted,
-                t_levels=(t_level,),
-                h_levels=(h_level,),
-            )
-    table_counts["middle"] = t5_count
+    # Tables 5 onward: humidity-by-temperature group tables
+    for role, group_name in (
+        ("middle", "Middle biomes"),
+        ("plateau", "Plateau biomes"),
+        ("shattered", "Shattered biomes"),
+        ("slope", "Slope biomes"),
+        ("peak", "Peak biomes"),
+    ):
+        if role in tables:
+            table_counts[role] = read_group_grid(tables[role], group_name)
 
-    # Table 6: Plateau biomes
-    grid6 = parse_wikitable_to_grid(tables["plateau"])
-    t6_count = 0
-    for r in range(1, len(grid6)):
-        h_level = r - 1
-        h_formatted = f"H={h_level} ({legend.humidity[h_level]})"
-        for c in range(1, 6):
-            t_level = c - 1
-            t_formatted = f"T={t_level} ({legend.temperature[t_level]})"
-            t6_count += extract_group_cell(
-                grid6[r][c].text,
-                "Plateau biomes",
-                t_formatted,
-                h_formatted,
-                t_levels=(t_level,),
-                h_levels=(h_level,),
-            )
-    table_counts["plateau"] = t6_count
-
-    # Table 7: Shattered biomes
-    grid7 = parse_wikitable_to_grid(tables["shattered"])
-    t7_count = 0
-    t_headers = ["T=0~1 (-1.0~-0.15)", "T=2 (-0.15~0.2)", "T=3 (0.2~0.55)", "T=4 (0.55~1.0)"]
-    h_headers = ["H=0~1 (-1.0~-0.1)", "H=2 (-0.1~0.1)", "H=3 (0.1~0.3)", "H=4 (0.3~1.0)"]
-    # This table pairs its first two levels into one column and one row, so the
-    # level tuples run alongside the headers rather than being derived from the
-    # index the way the middle and plateau tables allow.
-    t_header_levels: list[tuple[int, ...]] = [(0, 1), (2,), (3,), (4,)]
-    h_header_levels: list[tuple[int, ...]] = [(0, 1), (2,), (3,), (4,)]
-    for r in range(1, len(grid7)):
-        h_formatted = h_headers[r - 1]
-        for c in range(1, 5):
-            t_formatted = t_headers[c - 1]
-            t7_count += extract_group_cell(
-                grid7[r][c].text,
-                "Shattered biomes",
-                t_formatted,
-                h_formatted,
-                t_levels=t_header_levels[c - 1],
-                h_levels=h_header_levels[r - 1],
-            )
-    table_counts["shattered"] = t7_count
+    # A group the inland table sends biomes to must have a table of its own, or
+    # every biome that only that table places would silently have no climate.
+    read_groups = {"Beach biomes", "Badland biomes"} | {
+        name for role, name in zip(NOISE_TABLE_ROLES[3:], GROUPS, strict=True) if role in tables
+    }
+    unread = sorted(set(group_terrain_placements) - read_groups)
+    if unread:
+        raise EnrichError(
+            f"the inland table places biomes in {unread}, but the page has no table for them."
+        )
 
     # Attach group terrain placements to group biomes
     for b_id, g_names in groups_by_biome.items():
