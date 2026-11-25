@@ -338,11 +338,10 @@ def test_beach_biomes_take_every_humidity_level(overworld_wikitext: str) -> None
         assert set(placement.humidity_levels) == {0, 1, 2, 3, 4}
 
 
-# The Nov 2026 rework of the World generation page, as far as it changes what
-# the extractor reads. The beach table is copied from the live page's source.
-# The beach table holds full-width parentheses, as the wiki writes them, so it
-# lives in a fixture file rather than in this module's source.
-NEW_BEACH_TABLE_PATH = Path("tests") / "fixtures" / "wiki_worldgen_beach_2026_11.txt"
+# The Overworld section as the live page answered on 2026-11-24, after the
+# rework: a renamed depth table, grid group tables with `combined with` blocks,
+# and Slope and Peak biome tables split out of the inland table.
+REWORKED_FIXTURE_PATH = Path("tests") / "fixtures" / "wiki_worldgen_overworld_2026_11.txt"
 
 _BADLAND_COMBINED_BLOCK = """|-
 !combined with <br>Badland biomes (T=4)
@@ -420,7 +419,10 @@ Continentalness=-0.19~0.55
 
 
 def test_the_grid_beach_table_places_the_same_biomes(overworld_wikitext: str) -> None:
-    beach = NEW_BEACH_TABLE_PATH.read_text(encoding="utf-8").strip()
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    beach = locate_noise_tables(slice_overworld_section(reworked))["beach"]
+    assert "!Standard" in beach
+    assert "combined with" in beach
     wikitext = _with_tables_replaced(overworld_wikitext, {"beach": beach})
     expected = _placements(overworld_wikitext, "Beach biomes")
     assert _placements(wikitext, "Beach biomes") == expected
@@ -442,3 +444,60 @@ def test_a_group_the_inland_table_names_without_a_table_raises(overworld_wikitex
     wikitext = _with_tables_replaced(overworld_wikitext, {"inland": sloped})
     with pytest.raises(EnrichError, match="Slope biomes"):
         extract_worldgen_noise(wikitext, biome_registry=BIOME_REGISTRY)
+
+
+def test_the_reworked_page_places_every_biome_the_old_one_did(overworld_wikitext: str) -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    old = extract_worldgen_noise(overworld_wikitext, biome_registry=BIOME_REGISTRY)
+    new = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+
+    assert set(new.placements_by_biome) == set(old.placements_by_biome)
+    assert new.report.overworld_biomes_covered == 55
+    assert new.report.table_counts == {
+        "depth": 4,
+        "non_inland": 14,
+        "direct_inland": 17,
+        "beach": 3,
+        "badland": 4,
+        "middle": 33,
+        "plateau": 36,
+        "shattered": 28,
+        "slope": 27,
+        "peak": 42,
+    }
+    # Ice Caves is new on the page and not in this registry; Dappled Forest was
+    # already unplaced. Both are reported, not fatal.
+    assert new.report.unresolved_biome_names == ("Dappled Forest", "Ice Caves")
+
+
+def test_slope_and_peak_biomes_come_from_their_own_tables() -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    result = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+
+    for biome, group in (
+        ("minecraft:snowy_slopes", "Slope biomes"),
+        ("minecraft:grove", "Slope biomes"),
+        ("minecraft:jagged_peaks", "Peak biomes"),
+        ("minecraft:stony_peaks", "Peak biomes"),
+    ):
+        placements = result.placements_by_biome[biome]
+        assert {p.group for p in placements if p.route == "group"} == {group}
+        assert any(p.route == "group_terrain" and p.group == group for p in placements)
+
+    (jagged,) = {
+        p.temperature for p in result.placements_by_biome["minecraft:jagged_peaks"]
+        if p.route == "group" and p.temperature_levels == (0,)
+    }
+    assert jagged == "T=0 (-1.0~-0.45)"
+
+
+def test_the_reworked_depth_table_reads_new_cave_biomes() -> None:
+    reworked = REWORKED_FIXTURE_PATH.read_text(encoding="utf-8")
+    result = extract_worldgen_noise(reworked, biome_registry=BIOME_REGISTRY)
+    (sulfur,) = [
+        p for p in result.placements_by_biome["minecraft:sulfur_caves"] if p.route == "depth"
+    ]
+    assert sulfur.depth == "0.2~0.9"
+    assert sulfur.additional_requirement == (
+        "Weirdness=-1.1~-0.85, Continentalness=-0.19~0.55, Erosion=0.45~1"
+    )
